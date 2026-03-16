@@ -904,17 +904,24 @@ class initial_cal_gui(object):
                 ux = unique(plane_pts[:, 0])
                 uy = unique(plane_pts[:, 1])
                 
-                if len(ux) < 2 or len(uy) < 2:
-                    raise ValueError(f"Plane at Z={z} is not a grid (less than 2 unique X or Y values).")
+                if len(ux) < 1 or len(uy) < 1:
+                    continue
                 
                 xmin, xmax = ux.min(), ux.max()
                 ymin, ymax = uy.min(), uy.max()
                 xmid = ux[len(ux)//2]
                 ymid = uy[len(uy)//2]
                 
-                coords = [(xmin,ymin), (xmin,ymax), (xmax,ymin), (xmax,ymax),
-                          (xmin,ymid), (xmax,ymid), (xmid,ymin), (xmid,ymax),
-                          (xmid,ymid)]
+                if len(ux) >= 2 and len(uy) >= 2:
+                    coords = [(xmin,ymin), (xmin,ymax), (xmax,ymin), (xmax,ymax),
+                              (xmin,ymid), (xmax,ymid), (xmid,ymin), (xmid,ymax),
+                              (xmid,ymid)]
+                elif len(uy) >= 2: # Single column
+                    coords = [(xmid, ymin), (xmid, ymax), (xmid, ymid)]
+                elif len(ux) >= 2: # Single row
+                    coords = [(xmin, ymid), (xmax, ymid), (xmid, ymid)]
+                else: # Single point
+                    coords = [(xmin, ymin)]
                 
                 for cx, cy in coords:
                     dists = sqrt((plane_pts[:, 0] - cx)**2 + (plane_pts[:, 1] - cy)**2)
@@ -963,17 +970,24 @@ class initial_cal_gui(object):
                 ux = unique(plane_pts[:, 0])
                 uy = unique(plane_pts[:, 1])
                 
-                if len(ux) < 2 or len(uy) < 2:
-                    raise ValueError(f"Plane at Z={z} is not a grid (less than 2 unique X or Y values).")
+                if len(ux) < 1 or len(uy) < 1:
+                    continue
                 
                 xmin, xmax = ux.min(), ux.max()
                 ymin, ymax = uy.min(), uy.max()
                 xmid = ux[len(ux)//2]
                 ymid = uy[len(uy)//2]
                 
-                coords = [(xmin,ymin), (xmin,ymax), (xmax,ymin), (xmax,ymax),
-                          (xmin,ymid), (xmax,ymid), (xmid,ymin), (xmid,ymax),
-                          (xmid,ymid)]
+                if len(ux) >= 2 and len(uy) >= 2:
+                    coords = [(xmin,ymin), (xmin,ymax), (xmax,ymin), (xmax,ymax),
+                              (xmin,ymid), (xmax,ymid), (xmid,ymin), (xmid,ymax),
+                              (xmid,ymid)]
+                elif len(uy) >= 2: # Single column
+                    coords = [(xmid, ymin), (xmid, ymax), (xmid, ymid)]
+                elif len(ux) >= 2: # Single row
+                    coords = [(xmin, ymid), (xmax, ymid), (xmid, ymid)]
+                else: # Single point
+                    coords = [(xmin, ymin)]
                 
                 for cx, cy in coords:
                     dists = sqrt((plane_pts[:, 0] - cx)**2 + (plane_pts[:, 1] - cy)**2)
