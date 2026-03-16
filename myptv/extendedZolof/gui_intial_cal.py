@@ -87,6 +87,7 @@ class initial_cal_gui(object):
         self.point_list = []      # <-- list of points to save
         self.point_markers = []   # <-- position of crosses
         self.z = 1.0              # <-- Zoom level
+        self.auto_advancing = False # <-- Auto-advancing flag
         
         # set the window
         self.root = Tk()
@@ -799,6 +800,7 @@ class initial_cal_gui(object):
         # Remove the point from the listbox and displayed_indices
         selection = self.target_listbox.curselection()
         if selection:
+            self.auto_advancing = True
             list_idx = selection[0]
             del self.displayed_indices[list_idx]
             self.target_listbox.delete(list_idx)
@@ -809,6 +811,7 @@ class initial_cal_gui(object):
                 self.target_listbox.selection_set(next_idx)
                 self.target_listbox.see(next_idx)
                 self.on_target_select(None)
+            self.auto_advancing = False
         
         # Zoom out after marking
         self.z = 1.0
@@ -980,20 +983,22 @@ class initial_cal_gui(object):
             self.z_input.insert(0, str(t[2]))
 
             # If camera is calibrated, zoom in on the projected point
-            if hasattr(self, 'cam') and (self.cam.A != 0).any():
-                try:
-                    lab_pt = array([t[0], t[1], t[2]])
-                    img_pt = self.cam.projection(lab_pt)
-                    self.zoom_on_point(img_pt)
-                except:
-                    pass
+            # BUT ONLY IF NOT AUTO-ADVANCING
+            if not self.auto_advancing:
+                if hasattr(self, 'cam') and (self.cam.A != 0).any():
+                    try:
+                        lab_pt = array([t[0], t[1], t[2]])
+                        img_pt = self.cam.projection(lab_pt)
+                        self.zoom_on_point(img_pt)
+                    except:
+                        pass
 
 
     def location_handler(self, event):
         '''handling the location of the mouse pointer with snapping'''
         
-        x = int(self.canvas.canvasx(event.x)/self.z) + int(self.hbar.get()[1])
-        y = int(self.canvas.canvasy(event.y)/self.z) + int(self.vbar.get()[1])
+        x = int(self.canvas.canvasx(event.x)/self.z)
+        y = int(self.canvas.canvasy(event.y)/self.z)
         
         # Snapping logic: find nearest segmented blob
         if len(self.segmented) > 0:
@@ -1017,7 +1022,9 @@ class initial_cal_gui(object):
         self.Xloc.configure(text = x) 
         self.Yloc.configure(text = y)
         self.xy_marked = (x, y)
-        self.mark_points()
+        
+        # Zoom in on the marked point
+        self.zoom_on_point((x, y))
         print( x,y )
         
     
@@ -1082,6 +1089,12 @@ class initial_cal_gui(object):
         self.canvas.delete('all')
         self.canvas.create_image(0, 0, image=new_bird, anchor='nw')
         self.canvas.configure(scrollregion = self.canvas.bbox("all"))
+        
+        # Reset scroll if zooming out to full view
+        if self.z == 1.0:
+            self.canvas.xview_moveto(0)
+            self.canvas.yview_moveto(0)
+            
         self.mark_points()
         if hasattr(self, 'mtf'):
             self.plot_matched_point_pair()
