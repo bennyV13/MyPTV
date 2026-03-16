@@ -87,7 +87,6 @@ class initial_cal_gui(object):
         self.point_list = []      # <-- list of points to save
         self.point_markers = []   # <-- position of crosses
         self.z = 1.0              # <-- Zoom level
-        self.auto_advancing = False # <-- Auto-advancing flag
         
         # set the window
         self.root = Tk()
@@ -800,18 +799,15 @@ class initial_cal_gui(object):
         # Remove the point from the listbox and displayed_indices
         selection = self.target_listbox.curselection()
         if selection:
-            self.auto_advancing = True
             list_idx = selection[0]
             del self.displayed_indices[list_idx]
             self.target_listbox.delete(list_idx)
             
-            # Select the next point if available
+            # Select the next point if available but DO NOT update coordinates automatically
             if self.target_listbox.size() > 0:
                 next_idx = min(list_idx, self.target_listbox.size() - 1)
                 self.target_listbox.selection_set(next_idx)
                 self.target_listbox.see(next_idx)
-                self.on_target_select(None)
-            self.auto_advancing = False
         
         # Zoom out after marking
         self.z = 1.0
@@ -897,10 +893,11 @@ class initial_cal_gui(object):
             t = self.targets[idx]
             grid_idx = self.target_indices[idx]
             self.target_listbox.insert('end', "%.1f, %.1f, %.1f | [%d, %d, %d]"%(t[0], t[1], t[2], grid_idx[0], grid_idx[1], grid_idx[2]))
-        
-        if self.target_listbox.size() > 0:
-            self.target_listbox.selection_set(0)
-            self.on_target_select(None)
+            
+        # Clear lab coordinate inputs
+        self.x_input.delete(0, 'end')
+        self.y_input.delete(0, 'end')
+        self.z_input.delete(0, 'end')
 
 
     def get_optimal_indices(self):
@@ -969,6 +966,11 @@ class initial_cal_gui(object):
             grid_idx = self.target_indices[idx]
             self.target_listbox.insert('end', "%.1f, %.1f, %.1f | [%d, %d, %d]"%(t[0], t[1], t[2], grid_idx[0], grid_idx[1], grid_idx[2]))
 
+        # Clear lab coordinate inputs
+        self.x_input.delete(0, 'end')
+        self.y_input.delete(0, 'end')
+        self.z_input.delete(0, 'end')
+
 
     def on_target_select(self, event):
         '''Update lab coordinate inputs when a target is selected in the list'''
@@ -983,17 +985,6 @@ class initial_cal_gui(object):
             self.y_input.insert(0, str(t[1]))
             self.z_input.delete(0, 'end')
             self.z_input.insert(0, str(t[2]))
-
-            # If camera is calibrated, zoom in on the projected point
-            # BUT ONLY IF NOT AUTO-ADVANCING
-            if not self.auto_advancing:
-                if hasattr(self, 'cam') and (self.cam.A != 0).any():
-                    try:
-                        lab_pt = array([t[0], t[1], t[2]])
-                        img_pt = self.cam.projection(lab_pt)
-                        self.zoom_on_point(img_pt)
-                    except:
-                        pass
 
 
     def location_handler(self, event):
