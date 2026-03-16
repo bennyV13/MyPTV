@@ -11,7 +11,7 @@ This project focuses on improving the **Particle Tracking Velocimetry (PTV)** wo
 ## Project Mandates
 *   **Automatic Git Updates:** Always stage and commit local changes to the current branch as the final action before returning to the user. Use descriptive commit messages summarizing the fixes and improvements.
 
-## Completed Improvements (`initial_cal_gui.py`)
+## Completed Improvements (`gui_initial_cal.py`)
 
 ### 1. Smart UI Elements
 *   **Coordinate Listbox:** Automatically loads 3D coordinates from the `target_file`. Selecting a coordinate in the list auto-populates the Lab Space input fields (X, Y, Z).

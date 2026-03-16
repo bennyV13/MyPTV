@@ -804,7 +804,6 @@ class match_blob_files_Ray_Traversal(object):
             if e>0 and useTimeMatching:
                 mut = matching_using_time_Ray_Traversal(self.imsys, pd, previous_particles,
                                           max_err = self.max_err)
-                #return mut  # <-- used for checks
                 mut.triangulate_candidates()
                 for p in mut.matched_particles:
                     self.particles.append(p + [tm])
@@ -817,7 +816,6 @@ class match_blob_files_Ray_Traversal(object):
             # (2) match particles using the voxel method
             M = matching_Ray_Traversal(self.imsys, pd, self.RIO, self.voxel_size,
                          max_err = self.max_err)
-            #return M  # <-- used for checks
             M.get_voxel_dictionary()
             M.list_candidates()
             M.get_particles()
@@ -851,7 +849,6 @@ class match_blob_files_Ray_Traversal(object):
     
                 M2 = matching_Ray_Traversal(self.imsys, new_pd, new_ROI, self.voxel_size,
                               max_err = self.max_err)
-                # return M2  # <-- used for checks
                 M2.get_voxel_dictionary()
                 M2.list_candidates()
                 M2.get_particles()
@@ -1494,7 +1491,6 @@ class initiate_time_matching_Ray_Traversal(object):
         # match particles using the matching object
         M = matching_Ray_Traversal(self.imsys, self.new_pd, self.RIO, self.voxel_size,
                      max_err = self.max_err)
-        #return M  # <-- used for checks
         M.get_voxel_dictionary()
         M.list_candidates()
         M.get_particles()

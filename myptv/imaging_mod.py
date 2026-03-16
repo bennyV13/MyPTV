@@ -218,7 +218,10 @@ class camera_wrapper(object):
             calibratorClass = calibrate_Tsai
              
         elif self.modelName == 'extendedZolof':
-            calibratorClass = ...
+            calibratorClass = calibrate_extendedZolof
+        
+        else:
+            raise ValueError('Model name %s not recognized'%self.modelName)
             
         calibrator = calibratorClass(self.camera, lab_coords, img_coords)
         
@@ -235,12 +238,7 @@ class camera_wrapper(object):
         output - (array,2) - camera coordinates of the projection of x 
                              (eta, zeta) 
         '''
-        
-        if self.modelName == 'Tsai':
-            return self.camera.projection(x)
-        
-        elif self.modelName == 'extendedZolof':
-            return self.camera.projection(x)
+        return self.camera.projection(x)
             
     
     
@@ -255,12 +253,7 @@ class camera_wrapper(object):
         O (array, 3) - the origin of the epipolar line
         r (array, 3) - the direction vector of the epipolar line
         '''
-        
-        if self.modelName == 'Tsai':
-            return (self.camera.O, self.camera.get_r(eta, zeta))
-        
-        elif self.modelName == 'extendedZolof':
-            return (self.camera.O, self.camera.get_r(eta, zeta))
+        return (self.camera.O, self.camera.get_r(eta, zeta))
     
     
     
@@ -269,12 +262,7 @@ class camera_wrapper(object):
         input - pixel coordinates (eta, zeta) seen by the camera
         output - direction vector in real space
         '''
-        
-        if self.modelName == 'Tsai':
-            return self.camera.get_r(eta, zeta)
-        
-        elif self.modelName == 'extendedZolof':
-            return self.camera.get_r(eta, zeta)
+        return self.camera.get_r(eta, zeta)
 
 
 
@@ -301,11 +289,7 @@ class camera_wrapper(object):
         in which a cantral origin point is used, and otherwise it will raise 
         an error. It is basically made to help in backward compatibility.
         '''
-        if self.modelName == 'Tsai':
-            return self.camera.O
-        
-        elif self.modelName == 'extendedZolof':
-            return self.camera.O
+        return self.camera.O
         
         
     @property
