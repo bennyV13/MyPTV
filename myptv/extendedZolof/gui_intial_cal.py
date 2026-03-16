@@ -137,6 +137,9 @@ class initial_cal_gui(object):
         # zoom in and zoom out by pressing + and -
         self.root.bind('x', self.zoomIn)
         self.root.bind('z', self.zoomOut)
+        self.root.bind('+', self.zoomIn)
+        self.root.bind('-', self.zoomOut)
+        self.root.bind('=', self.zoomIn) # Support for keyboards where + is shift+=
         
         # move cross with the arrow keys
         self.root.bind('<Shift-Left>', self.leftKey)
@@ -873,9 +876,9 @@ class initial_cal_gui(object):
         factor = 1.15 + (0.15 * (self.zoom_out_presses - 1))
         self.z = self.z / factor
         
-        # Cap minimum zoom at 1.0 (full view)
-        if self.z < 1.0:
-            self.z = 1.0
+        # Cap minimum zoom at 0.05 (to prevent errors)
+        if self.z < 0.05:
+            self.z = 0.05
             self.zoom_out_presses = 0
             
         self.update_image_display()
@@ -892,9 +895,9 @@ class initial_cal_gui(object):
         factor = 1.15 + (0.15 * (self.zoom_out_presses - 1))
         self.z = self.z / factor
         
-        # Cap minimum zoom at 1.0 (full view)
-        if self.z < 1.0:
-            self.z = 1.0
+        # Cap minimum zoom at 0.05 (to prevent errors)
+        if self.z < 0.05:
+            self.z = 0.05
             self.zoom_out_presses = 0
             
         self.update_image_display()
