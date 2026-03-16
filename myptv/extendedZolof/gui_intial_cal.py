@@ -46,6 +46,18 @@ class initial_cal_gui(object):
         
         self.target_fname = target_fname
         self.targets = loadtxt(self.target_fname)
+        
+        # Pre-calculate grid indices for X, Y, and Z
+        unique_x = sorted(unique(self.targets[:, 0]))
+        unique_y = sorted(unique(self.targets[:, 1]))
+        unique_z = sorted(unique(self.targets[:, 2]))
+        x_map = {val: i for i, val in enumerate(unique_x)}
+        y_map = {val: i for i, val in enumerate(unique_y)}
+        z_map = {val: i for i, val in enumerate(unique_z)}
+        self.target_indices = []
+        for t in self.targets:
+            self.target_indices.append((x_map[t[0]], y_map[t[1]], z_map[t[2]]))
+        
         self.show_optimal_only = False
         self.optimal_indices = self.get_optimal_indices()
         self.displayed_indices = list(range(len(self.targets)))
@@ -57,7 +69,7 @@ class initial_cal_gui(object):
                           self.cam_name, 
                           cal_points_fname = self.cam_name+'_manualPoints')
             self.cam.load('.')
-        except:
+        except Exception as e:
             self.cam = camera_extendedZolof(self.cam_name)
 
         self.segmented = []
@@ -131,6 +143,8 @@ class initial_cal_gui(object):
         self.root.bind('<Shift-Right>', self.rightKey)
         self.root.bind('<Shift-Up>', self.upKey)
         self.root.bind('<Shift-Down>', self.downKey)
+        self.root.bind('<Shift-S>', lambda e: self.addPoint())
+        self.root.bind('<Shift-s>', lambda e: self.addPoint())
         
         
         
@@ -149,6 +163,13 @@ class initial_cal_gui(object):
                                 height=1)
         
         ZoomOut_button.grid(row=0, column=1, padx=7, pady=1, sticky='ew')
+
+        # Zoom level entry
+        self.zoom_label = Label(frame2, text='Target Zoom:', padx=5, pady=2)
+        self.zoom_label.grid(row=0, column=2, padx=5, pady=1, sticky='ew')
+        self.zoom_level_input = Entry(frame2, width=5)
+        self.zoom_level_input.insert(0, '4.0')
+        self.zoom_level_input.grid(row=0, column=3, padx=5, pady=1, sticky='ew')
         
         
         
@@ -329,14 +350,27 @@ class initial_cal_gui(object):
         target_scroll.grid(row=0, column=1, sticky='ns')
         self.target_listbox.config(yscrollcommand=target_scroll.set)
         
-        for t in self.targets:
-            self.target_listbox.insert('end', "%.1f, %.1f, %.1f"%(t[0], t[1], t[2]))
+        for i in range(len(self.targets)):
+            t = self.targets[i]
+            idx = self.target_indices[i]
+            self.target_listbox.insert('end', "%.1f, %.1f, %.1f | [%d, %d, %d]"%(t[0], t[1], t[2], idx[0], idx[1], idx[2]))
             
         self.target_listbox.bind('<<ListboxSelect>>', self.on_target_select)
         
         self.toggle_optimal_btn = Button(target_list_frame, text='Show Optimal Only', 
                                         command=self.toggle_optimal_list)
         self.toggle_optimal_btn.grid(row=1, column=0, columnspan=2, sticky='ew', padx=2, pady=5)
+        
+        # Sorting buttons
+        sort_frame = LabelFrame(target_list_frame, text='Sort by:', padx=2, pady=2)
+        sort_frame.grid(row=2, column=0, columnspan=2, sticky='ew', padx=2, pady=5)
+        
+        btn_x = Button(sort_frame, text='X', command=lambda: self.sort_list(0), width=3)
+        btn_x.grid(row=0, column=0, padx=2)
+        btn_y = Button(sort_frame, text='Y', command=lambda: self.sort_list(1), width=3)
+        btn_y.grid(row=0, column=1, padx=2)
+        btn_z = Button(sort_frame, text='Z', command=lambda: self.sort_list(2), width=3)
+        btn_z.grid(row=0, column=2, padx=2)
         
         
         
@@ -414,6 +448,11 @@ class initial_cal_gui(object):
         self.x_input_label = Label(lab_frame, text='x lab:', padx=2, pady=2)
         self.y_input_label = Label(lab_frame, text='y lab:', padx=2, pady=2)
         self.z_input_label = Label(lab_frame, text='z lab:', padx=2, pady=2)
+        
+        self.ix_label = Label(lab_frame, text='(ix: -)', padx=2, pady=2, fg='blue')
+        self.iy_label = Label(lab_frame, text='(iy: -)', padx=2, pady=2, fg='blue')
+        self.iz_label = Label(lab_frame, text='(iz: -)', padx=2, pady=2, fg='blue')
+        
         self.x_input = Entry(lab_frame, width=9)
         self.x_input.insert(0,'0.0')
         self.y_input = Entry(lab_frame, width=9)
@@ -422,11 +461,16 @@ class initial_cal_gui(object):
         self.z_input.insert(0,'0.0')
         
         self.x_input_label.grid(row=4, column=0, sticky='w', padx=2, pady=2)
-        self.y_input_label.grid(row=5, column=0, sticky='w', padx=2, pady=2)
-        self.z_input_label.grid(row=6, column=0, sticky='w', padx=2, pady=2)
         self.x_input.grid(row=4, column=1, sticky='w', padx=2, pady=2)
+        self.ix_label.grid(row=4, column=2, sticky='w', padx=2, pady=2)
+        
+        self.y_input_label.grid(row=5, column=0, sticky='w', padx=2, pady=2)
         self.y_input.grid(row=5, column=1, sticky='w', padx=2, pady=2)
+        self.iy_label.grid(row=5, column=2, sticky='w', padx=2, pady=2)
+        
+        self.z_input_label.grid(row=6, column=0, sticky='w', padx=2, pady=2)
         self.z_input.grid(row=6, column=1, sticky='w', padx=2, pady=2)
+        self.iz_label.grid(row=6, column=2, sticky='w', padx=2, pady=2)
         
 
 
@@ -485,6 +529,10 @@ class initial_cal_gui(object):
                                 command = self.saveTargetPoints, padx=2, pady=4, 
                                 height=1) 
         save_cal_points.grid(row=3, column=0, padx=2, pady=2, sticky='new')
+
+        self.error_msg_label = Label(init_cal_frame, text='', padx=2, pady=2,
+                                     fg='red', font=("Arial", 10, "bold"))
+        self.error_msg_label.grid(row=4, column=0, padx=2, pady=2, sticky='new')
         
         
         
@@ -534,10 +582,13 @@ class initial_cal_gui(object):
         print('done!')
         err = cal.mean_squared_err()
         self.cam.save('.')
-        print('Finished with error: %.3f pixels\n'%(err))
+        msg = 'Finished with error: %.3f pixels\n'%(err)
+        print(msg)
+        self.error_msg_label.config(text=msg)
         
         if err==0:
             print('Calibration error is zero -> you need to mark more points.')
+            self.error_msg_label.config(text=msg + " (Mark more points!)")
             
             
         
@@ -566,7 +617,6 @@ class initial_cal_gui(object):
             x0 = int(int(proj[0])*self.z) - int(self.hbar.get()[1])
             y0 = int(int(proj[1])*self.z) - int(self.vbar.get()[1])
             
-            print(proj)
             self.canvas.create_oval(x0-4, y0-4, x0+4, y0+4, 
                                     fill='#cf9417')
         
@@ -730,8 +780,12 @@ class initial_cal_gui(object):
     
 
     def addPoint(self):
-        '''add marked point to list and advance listbox selection'''
+        '''add marked point to list and remove from listbox'''
         x_im, y_im = self.xy_marked
+        if x_im == -1:
+            messagebox.showwarning("Warning", "Please mark a point on the image first.")
+            return
+
         x_lab = float(self.x_input.get())
         y_lab = float(self.y_input.get())
         z_lab = float(self.z_input.get())
@@ -741,23 +795,35 @@ class initial_cal_gui(object):
         print('%d marked points'%(len(self.point_list)))
         self.points_count_label.config(text='Points marked: %d'%len(self.point_list))
         self.xy_marked = (-1, -1)
-        self.mark_points()
         
-        # Auto-advance the listbox selection
+        # Remove the point from the listbox and displayed_indices
         selection = self.target_listbox.curselection()
         if selection:
-            next_index = selection[0] + 1
-            if next_index < self.target_listbox.size():
-                self.target_listbox.selection_clear(0, 'end')
-                self.target_listbox.selection_set(next_index)
-                self.target_listbox.see(next_index)
+            list_idx = selection[0]
+            del self.displayed_indices[list_idx]
+            self.target_listbox.delete(list_idx)
+            
+            # Select the next point if available
+            if self.target_listbox.size() > 0:
+                next_idx = min(list_idx, self.target_listbox.size() - 1)
+                self.target_listbox.selection_set(next_idx)
+                self.target_listbox.see(next_idx)
                 self.on_target_select(None)
+        
+        # Zoom out after marking
+        self.z = 1.0
+        self.update_image_display()
+        
             
         
     def forgetLast(self):
+        if len(self.point_list) == 0: return
         p = self.point_list.pop(-1)
         print('Deleted: ', p)
         self.points_count_label.config(text='Points marked: %d'%len(self.point_list))
+        
+        # Note: We don't easily know which index to add back to the listbox 
+        # without searching targets. For now, just refresh if user wants.
         self.mark_points()
         
         
@@ -793,166 +859,44 @@ class initial_cal_gui(object):
     def zoomIn(self, event):
         '''zoom in the image with + key'''
         self.z = self.z*1.15
-        image = Image.open(self.image_name).convert('F')
-        s = image.size
-        image = image.resize((int(s[0]*self.z),int(s[1]*self.z)),
-                                             Image.LANCZOS)
-        #new_bird = ImageTk.PhotoImage(image)
-        new_bird = ImageTk.PhotoImage(Image.fromarray(image/amax(image)*255))
-        self.board.configure(image = new_bird)
-        self.board.image = new_bird
-        self.canvas.delete('all')
-        self.canvas.create_image(0, 0, image=new_bird, anchor='nw')
-        self.canvas.configure(scrollregion = self.canvas.bbox("all"))
-        
-        self.mark_points()
-        
-        if hasattr(self, 'mtf'):
-            self.plot_matched_point_pair()
-        
-        else:
-            self.plotSegmented()
+        self.update_image_display()
             
     
         
     def zoomIn_btn(self):
         '''zoom in the Zoom in button'''
         self.z = self.z*1.15
-        image = Image.open(self.image_name).convert('F')
-        s = image.size
-        image = image.resize((int(s[0]*self.z),int(s[1]*self.z)),
-                                         Image.LANCZOS)
-        #new_bird = ImageTk.PhotoImage(image)
-        new_bird = ImageTk.PhotoImage(Image.fromarray(image/amax(image)*255))
-        self.board.configure(image = new_bird)
-        self.board.image = new_bird
-        self.canvas.delete('all')
-        self.canvas.create_image(0, 0, image=new_bird, anchor='nw')
-        self.canvas.configure(scrollregion = self.canvas.bbox("all"))
-        
-        self.mark_points()
-        
-        if hasattr(self, 'mtf'):
-            self.plot_matched_point_pair()
-        
-        else:
-            self.plotSegmented()
+        self.update_image_display()
     
     
     
     def zoomOut(self, event):
         '''zoom out with - key'''
         self.z = self.z*(1/1.15)
-        image = Image.open(self.image_name).convert('F')
-        s = image.size
-        image = image.resize((int(s[0]*self.z),int(s[1]*self.z)),
-                                             Image.LANCZOS)
-        #new_bird = ImageTk.PhotoImage(image)
-        new_bird = ImageTk.PhotoImage(Image.fromarray(image/amax(image)*255))
-        self.board.configure(image = new_bird)
-        self.board.image = new_bird
-        self.canvas.delete('all')
-        self.canvas.create_image(0, 0, image=new_bird, anchor='nw')
-        self.canvas.configure(scrollregion = self.canvas.bbox("all"))
-        
-        self.mark_points()
-        
-        if hasattr(self, 'mtf'):
-            self.plot_matched_point_pair()
-        
-        else:
-            self.plotSegmented()
+        self.update_image_display()
             
             
             
     def zoomOut_btn(self):
-        '''zoom out with - key'''
+        '''zoom out with the button'''
         self.z = self.z*(1/1.15)
-        image = Image.open(self.image_name).convert('F')
-        s = image.size
-        image = image.resize((int(s[0]*self.z),int(s[1]*self.z)),
-                                                  Image.LANCZOS)
-        #new_bird = ImageTk.PhotoImage(image)
-        new_bird = ImageTk.PhotoImage(Image.fromarray(image/amax(image)*255))
-        self.board.configure(image = new_bird)
-        self.board.image = new_bird
-        self.canvas.delete('all')
-        self.canvas.create_image(0, 0, image=new_bird, anchor='nw')
-        self.canvas.configure(scrollregion = self.canvas.bbox("all"))
-        
-        self.mark_points()
-        
-        if hasattr(self, 'mtf'):
-            self.plot_matched_point_pair()
-        
-        else:
-            self.plotSegmented()
-        
-        
-    def get_optimal_indices(self):
-        '''Identify optimal calibration points from the target file'''
-        try:
-            unique_zs = unique(self.targets[:, 2])
-            if len(unique_zs) < 2:
-                raise ValueError("Target is not 3D (less than 2 Z-planes found).")
+        self.update_image_display()
             
-            indices = []
-            for z in unique_zs:
-                plane_idx = where(self.targets[:, 2] == z)[0]
-                plane_pts = self.targets[plane_idx]
-                
-                ux = unique(plane_pts[:, 0])
-                uy = unique(plane_pts[:, 1])
-                
-                if len(ux) < 1 or len(uy) < 1:
-                    continue
-                
-                xmin, xmax = ux.min(), ux.max()
-                ymin, ymax = uy.min(), uy.max()
-                xmid = ux[len(ux)//2]
-                ymid = uy[len(uy)//2]
-                
-                if len(ux) >= 2 and len(uy) >= 2:
-                    coords = [(xmin,ymin), (xmin,ymax), (xmax,ymin), (xmax,ymax),
-                              (xmin,ymid), (xmax,ymid), (xmid,ymin), (xmid,ymax),
-                              (xmid,ymid)]
-                elif len(uy) >= 2: # Single column
-                    coords = [(xmid, ymin), (xmid, ymax), (xmid, ymid)]
-                elif len(ux) >= 2: # Single row
-                    coords = [(xmin, ymid), (xmax, ymid), (xmid, ymid)]
-                else: # Single point
-                    coords = [(xmin, ymin)]
-                
-                for cx, cy in coords:
-                    dists = sqrt((plane_pts[:, 0] - cx)**2 + (plane_pts[:, 1] - cy)**2)
-                    idx = plane_idx[argmin(dists)]
-                    if idx not in indices: indices.append(idx)
-            return sorted(indices)
-        except Exception as e:
-            print(f"Structure Error: {e}")
-            return None
-
-
-    def toggle_optimal_list(self):
-        '''Toggle between showing all points and only optimal ones'''
-        if self.optimal_indices is None:
-            messagebox.showerror("Structure Error", 
-                                 "Cannot determine optimal points. Target structure must be 3D and organized in a grid.")
-            return
-
-        self.show_optimal_only = not self.show_optimal_only
+            
+            
+    def sort_list(self, axis):
+        '''Sort the currently displayed list by X, Y, or Z coordinate'''
+        self.displayed_indices = sorted(self.displayed_indices, 
+                                        key=lambda i: self.targets[i][axis])
+        
         self.target_listbox.delete(0, 'end')
-        
-        if self.show_optimal_only:
-            self.displayed_indices = self.optimal_indices
-            self.toggle_optimal_btn.config(text='Show All Points')
-        else:
-            self.displayed_indices = list(range(len(self.targets)))
-            self.toggle_optimal_btn.config(text='Show Optimal Only')
-            
         for idx in self.displayed_indices:
             t = self.targets[idx]
             self.target_listbox.insert('end', "%.1f, %.1f, %.1f"%(t[0], t[1], t[2]))
+        
+        if self.target_listbox.size() > 0:
+            self.target_listbox.selection_set(0)
+            self.on_target_select(None)
 
 
     def get_optimal_indices(self):
@@ -993,9 +937,9 @@ class initial_cal_gui(object):
                     dists = sqrt((plane_pts[:, 0] - cx)**2 + (plane_pts[:, 1] - cy)**2)
                     idx = plane_idx[argmin(dists)]
                     if idx not in indices: indices.append(idx)
+            
             return sorted(indices)
         except Exception as e:
-            print(f"Structure Error: {e}")
             return None
 
 
@@ -1034,6 +978,15 @@ class initial_cal_gui(object):
             self.y_input.insert(0, str(t[1]))
             self.z_input.delete(0, 'end')
             self.z_input.insert(0, str(t[2]))
+
+            # If camera is calibrated, zoom in on the projected point
+            if hasattr(self, 'cam') and (self.cam.A != 0).any():
+                try:
+                    lab_pt = array([t[0], t[1], t[2]])
+                    img_pt = self.cam.projection(lab_pt)
+                    self.zoom_on_point(img_pt)
+                except:
+                    pass
 
 
     def location_handler(self, event):
@@ -1118,6 +1071,50 @@ class initial_cal_gui(object):
         '''quit the app'''
         self.root.destroy()
 
+    def update_image_display(self):
+        '''Refresh the image on the canvas according to current zoom'''
+        image = Image.open(self.image_name).convert('F')
+        s = image.size
+        image = image.resize((int(s[0]*self.z),int(s[1]*self.z)), Image.LANCZOS)
+        new_bird = ImageTk.PhotoImage(Image.fromarray(image/amax(image)*255))
+        self.board.configure(image = new_bird)
+        self.board.image = new_bird
+        self.canvas.delete('all')
+        self.canvas.create_image(0, 0, image=new_bird, anchor='nw')
+        self.canvas.configure(scrollregion = self.canvas.bbox("all"))
+        self.mark_points()
+        if hasattr(self, 'mtf'):
+            self.plot_matched_point_pair()
+        else:
+            self.plotSegmented()
+
+    def zoom_on_point(self, point):
+        '''Zooms in on a specific image point (x, y)'''
+        try:
+            self.z = float(self.zoom_level_input.get())
+        except ValueError:
+            self.z = 4.0
+        
+        self.update_image_display()
+        
+        # Calculate scroll positions to center the point
+        # canvasx/y with no arguments returns the top-left visible coordinate
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
+        
+        target_x = point[0] * self.z
+        target_y = point[1] * self.z
+        
+        # xview_moveto takes fraction of total width
+        total_width = self.cam_res[0] * self.z
+        total_height = self.cam_res[1] * self.z
+        
+        move_x = (target_x - canvas_width/2) / total_width
+        move_y = (target_y - canvas_height/2) / total_height
+        
+        self.canvas.xview_moveto(max(0, move_x))
+        self.canvas.yview_moveto(max(0, move_y))
+
 
 
 
@@ -1128,4 +1125,3 @@ if __name__ == '__main__':
 
 #cam = camera(cam_name, res)
 #cam.save('.')
-

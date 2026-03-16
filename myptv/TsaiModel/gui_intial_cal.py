@@ -124,6 +124,8 @@ class initial_cal_gui(object):
         self.root.bind('<Shift-Right>', self.rightKey)
         self.root.bind('<Shift-Up>', self.upKey)
         self.root.bind('<Shift-Down>', self.downKey)
+        self.root.bind('<Shift-S>', lambda e: self.addPoint())
+        self.root.bind('<Shift-s>', lambda e: self.addPoint())
         
         
         
@@ -483,6 +485,10 @@ class initial_cal_gui(object):
         save_cal_points = Button(sortgrid, text='Save cal points', 
                                 command = self.saveTargetPoints, padx=2, pady=4) 
         save_cal_points.grid(row=1, column=0, padx=2, pady=2, sticky='new')
+
+        self.error_msg_label = Label(init_cal_frame, text='', padx=2, pady=2,
+                                     fg='red', font=("Arial", 10, "bold"))
+        self.error_msg_label.grid(row=4, column=0, padx=2, pady=2, sticky='new')
         
         
         
@@ -544,7 +550,9 @@ class initial_cal_gui(object):
         
         self.error_input.config(text = '%0.3f'%err)
         self.cam.save('.')
-        print('Finished with error: %.3f pixels\n'%(err))
+        msg = 'Finished with error: %.3f pixels\n'%(err)
+        print(msg)
+        self.error_msg_label.config(text=msg)
             
             
         
