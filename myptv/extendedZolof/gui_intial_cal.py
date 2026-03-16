@@ -349,7 +349,7 @@ class initial_cal_gui(object):
         for i in range(len(self.targets)):
             t = self.targets[i]
             idx = self.target_indices[i]
-            self.target_listbox.insert('end', "%.1f, %.1f, %.1f | [%d, %d, %d]"%(t[0], t[1], t[2], idx[0], idx[1], idx[2]))
+            self.target_listbox.insert('end', "[%d, %d]"%(idx[0], idx[1]))
             
         self.target_listbox.bind('<<ListboxSelect>>', self.on_target_select)
         
@@ -436,37 +436,11 @@ class initial_cal_gui(object):
         self.Xloc.grid(row=2, column=1, sticky='w', padx=2, pady=2)
         self.Yloc.grid(row=3, column=1, sticky='w', padx=2, pady=2)
         
-        
-        # lab space coordinates textboxes
-        lab_frame = LabelFrame(button_frame, padx=2, pady=2)
-        lab_frame.grid(row=2, column=0, columnspan=2, sticky='ew',
-                       padx=2, pady=2)
-        self.x_input_label = Label(lab_frame, text='x lab:', padx=2, pady=2)
-        self.y_input_label = Label(lab_frame, text='y lab:', padx=2, pady=2)
-        self.z_input_label = Label(lab_frame, text='z lab:', padx=2, pady=2)
-        
-        self.ix_label = Label(lab_frame, text='(ix: -)', padx=2, pady=2, fg='blue')
-        self.iy_label = Label(lab_frame, text='(iy: -)', padx=2, pady=2, fg='blue')
-        self.iz_label = Label(lab_frame, text='(iz: -)', padx=2, pady=2, fg='blue')
-        
-        self.x_input = Entry(lab_frame, width=9)
-        self.x_input.insert(0,'0.0')
-        self.y_input = Entry(lab_frame, width=9)
-        self.y_input.insert(0,'0.0')
-        self.z_input = Entry(lab_frame, width=9)
-        self.z_input.insert(0,'0.0')
-        
-        self.x_input_label.grid(row=4, column=0, sticky='w', padx=2, pady=2)
-        self.x_input.grid(row=4, column=1, sticky='w', padx=2, pady=2)
-        self.ix_label.grid(row=4, column=2, sticky='w', padx=2, pady=2)
-        
-        self.y_input_label.grid(row=5, column=0, sticky='w', padx=2, pady=2)
-        self.y_input.grid(row=5, column=1, sticky='w', padx=2, pady=2)
-        self.iy_label.grid(row=5, column=2, sticky='w', padx=2, pady=2)
-        
-        self.z_input_label.grid(row=6, column=0, sticky='w', padx=2, pady=2)
-        self.z_input.grid(row=6, column=1, sticky='w', padx=2, pady=2)
-        self.iz_label.grid(row=6, column=2, sticky='w', padx=2, pady=2)
+        # We hidden lab coordinate inputs as requested by user
+        self.x_input = Entry(self.root) 
+        self.y_input = Entry(self.root)
+        self.z_input = Entry(self.root)
+
         
 
 
@@ -797,7 +771,7 @@ class initial_cal_gui(object):
             
         self.point_list.append([x_im, y_im, x_lab, y_lab, z_lab, ix, iy, iz])
         
-        print('Added to list: ', self.point_list[-1][:5], 'Indices:', self.point_list[-1][5:])
+        print('Added to list. Indices: [%d, %d]'%(ix, iy))
         print('%d marked points'%(len(self.point_list)))
         self.points_count_label.config(text='Points marked: %d'%len(self.point_list))
         self.xy_marked = (-1, -1)
@@ -820,7 +794,7 @@ class initial_cal_gui(object):
     def forgetLast(self):
         if len(self.point_list) == 0: return
         p = self.point_list.pop(-1)
-        print('Deleted: ', p)
+        print('Deleted last marked point')
         self.points_count_label.config(text='Points marked: %d'%len(self.point_list))
         
         # Note: We don't easily know which index to add back to the listbox 
@@ -921,7 +895,7 @@ class initial_cal_gui(object):
         for idx in self.displayed_indices:
             t = self.targets[idx]
             grid_idx = self.target_indices[idx]
-            self.target_listbox.insert('end', "%.1f, %.1f, %.1f | [%d, %d, %d]"%(t[0], t[1], t[2], grid_idx[0], grid_idx[1], grid_idx[2]))
+            self.target_listbox.insert('end', "[%d, %d]"%(grid_idx[0], grid_idx[1]))
             
         # Clear lab coordinate inputs
         self.x_input.delete(0, 'end')
@@ -993,7 +967,7 @@ class initial_cal_gui(object):
         for idx in self.displayed_indices:
             t = self.targets[idx]
             grid_idx = self.target_indices[idx]
-            self.target_listbox.insert('end', "%.1f, %.1f, %.1f | [%d, %d, %d]"%(t[0], t[1], t[2], grid_idx[0], grid_idx[1], grid_idx[2]))
+            self.target_listbox.insert('end', "[%d, %d]"%(grid_idx[0], grid_idx[1]))
 
         # Clear lab coordinate inputs
         self.x_input.delete(0, 'end')
@@ -1046,7 +1020,6 @@ class initial_cal_gui(object):
         self.xy_marked = (x, y)
         
         self.mark_points()
-        print( x,y )
         
     
     def motion(self, event):
@@ -1081,9 +1054,9 @@ class initial_cal_gui(object):
                 list_idx = selection[0]
                 global_idx = self.displayed_indices[list_idx]
                 ix, iy, iz = self.target_indices[global_idx]
-                label = '[%d, %d, %d]'%(ix, iy, iz)
+                label = '[%d, %d]'%(ix, iy)
             else:
-                label = '(%d, %d)'%(x, y)
+                label = ''
 
             t1 = self.canvas.create_text(x_+5, y_+5, text=label, 
                                          fill='white', anchor='nw')
@@ -1102,10 +1075,11 @@ class initial_cal_gui(object):
             self.point_markers.append(c2)
             
             # Add text for the saved points (using grid indices)
-            label = '[%d, %d, %d]'%(ix, iy, iz)
+            label = '[%d, %d]'%(ix, iy)
             t1 = self.canvas.create_text(x_+5, y_+5, text=label, 
                                          fill='white', anchor='nw')
             self.point_markers.append(t1)
+
         
     
     def Save(self):
