@@ -13,8 +13,8 @@ from myptv.segmentation_mod import particle_segmentation
 from myptv.utils import match_calibration_blobs_and_points
 
 from PIL import Image, ImageTk
-from tkinter import Label, Canvas, LabelFrame, Entry, Tk, Scrollbar, Button, Listbox, BooleanVar, Checkbutton
-from numpy import array, amax, loadtxt
+from tkinter import Label, Canvas, LabelFrame, Entry, Tk, Scrollbar, Button, Listbox, BooleanVar, Checkbutton, messagebox
+from numpy import array, amax, loadtxt, unique, where, sqrt, argmin
 import os
 
 
@@ -46,6 +46,9 @@ class initial_cal_gui(object):
         
         self.target_fname = target_fname
         self.targets = loadtxt(self.target_fname)
+        self.show_optimal_only = False
+        self.optimal_indices = self.get_optimal_indices()
+        self.displayed_indices = list(range(len(self.targets)))
         
         self.cam_name = cam_name
         self.cam_res = image_size
@@ -330,6 +333,10 @@ class initial_cal_gui(object):
             self.target_listbox.insert('end', "%.1f, %.1f, %.1f"%(t[0], t[1], t[2]))
             
         self.target_listbox.bind('<<ListboxSelect>>', self.on_target_select)
+        
+        self.toggle_optimal_btn = Button(target_list_frame, text='Show Optimal Only', 
+                                        command=self.toggle_optimal_list)
+        self.toggle_optimal_btn.grid(row=1, column=0, columnspan=2, sticky='ew', padx=2, pady=5)
         
         
         
@@ -882,12 +889,131 @@ class initial_cal_gui(object):
             self.plotSegmented()
         
         
+    def get_optimal_indices(self):
+        '''Identify optimal calibration points from the target file'''
+        try:
+            unique_zs = unique(self.targets[:, 2])
+            if len(unique_zs) < 2:
+                raise ValueError("Target is not 3D (less than 2 Z-planes found).")
+            
+            indices = []
+            for z in unique_zs:
+                plane_idx = where(self.targets[:, 2] == z)[0]
+                plane_pts = self.targets[plane_idx]
+                
+                ux = unique(plane_pts[:, 0])
+                uy = unique(plane_pts[:, 1])
+                
+                if len(ux) < 2 or len(uy) < 2:
+                    raise ValueError(f"Plane at Z={z} is not a grid (less than 2 unique X or Y values).")
+                
+                xmin, xmax = ux.min(), ux.max()
+                ymin, ymax = uy.min(), uy.max()
+                xmid = ux[len(ux)//2]
+                ymid = uy[len(uy)//2]
+                
+                coords = [(xmin,ymin), (xmin,ymax), (xmax,ymin), (xmax,ymax),
+                          (xmin,ymid), (xmax,ymid), (xmid,ymin), (xmid,ymax),
+                          (xmid,ymid)]
+                
+                for cx, cy in coords:
+                    dists = sqrt((plane_pts[:, 0] - cx)**2 + (plane_pts[:, 1] - cy)**2)
+                    idx = plane_idx[argmin(dists)]
+                    if idx not in indices: indices.append(idx)
+            return sorted(indices)
+        except Exception as e:
+            print(f"Structure Error: {e}")
+            return None
+
+
+    def toggle_optimal_list(self):
+        '''Toggle between showing all points and only optimal ones'''
+        if self.optimal_indices is None:
+            messagebox.showerror("Structure Error", 
+                                 "Cannot determine optimal points. Target structure must be 3D and organized in a grid.")
+            return
+
+        self.show_optimal_only = not self.show_optimal_only
+        self.target_listbox.delete(0, 'end')
+        
+        if self.show_optimal_only:
+            self.displayed_indices = self.optimal_indices
+            self.toggle_optimal_btn.config(text='Show All Points')
+        else:
+            self.displayed_indices = list(range(len(self.targets)))
+            self.toggle_optimal_btn.config(text='Show Optimal Only')
+            
+        for idx in self.displayed_indices:
+            t = self.targets[idx]
+            self.target_listbox.insert('end', "%.1f, %.1f, %.1f"%(t[0], t[1], t[2]))
+
+
+    def get_optimal_indices(self):
+        '''Identify optimal calibration points from the target file'''
+        try:
+            unique_zs = unique(self.targets[:, 2])
+            if len(unique_zs) < 2:
+                raise ValueError("Target is not 3D (less than 2 Z-planes found).")
+            
+            indices = []
+            for z in unique_zs:
+                plane_idx = where(self.targets[:, 2] == z)[0]
+                plane_pts = self.targets[plane_idx]
+                
+                ux = unique(plane_pts[:, 0])
+                uy = unique(plane_pts[:, 1])
+                
+                if len(ux) < 2 or len(uy) < 2:
+                    raise ValueError(f"Plane at Z={z} is not a grid (less than 2 unique X or Y values).")
+                
+                xmin, xmax = ux.min(), ux.max()
+                ymin, ymax = uy.min(), uy.max()
+                xmid = ux[len(ux)//2]
+                ymid = uy[len(uy)//2]
+                
+                coords = [(xmin,ymin), (xmin,ymax), (xmax,ymin), (xmax,ymax),
+                          (xmin,ymid), (xmax,ymid), (xmid,ymin), (xmid,ymax),
+                          (xmid,ymid)]
+                
+                for cx, cy in coords:
+                    dists = sqrt((plane_pts[:, 0] - cx)**2 + (plane_pts[:, 1] - cy)**2)
+                    idx = plane_idx[argmin(dists)]
+                    if idx not in indices: indices.append(idx)
+            return sorted(indices)
+        except Exception as e:
+            print(f"Structure Error: {e}")
+            return None
+
+
+    def toggle_optimal_list(self):
+        '''Toggle between showing all points and only optimal ones'''
+        if self.optimal_indices is None:
+            messagebox.showerror("Structure Error", 
+                                 "Cannot determine optimal points. Target structure must be 3D and organized in a grid.")
+            return
+
+        self.show_optimal_only = not self.show_optimal_only
+        self.target_listbox.delete(0, 'end')
+        
+        if self.show_optimal_only:
+            self.displayed_indices = self.optimal_indices
+            self.toggle_optimal_btn.config(text='Show All Points')
+        else:
+            self.displayed_indices = list(range(len(self.targets)))
+            self.toggle_optimal_btn.config(text='Show Optimal Only')
+            
+        for idx in self.displayed_indices:
+            t = self.targets[idx]
+            self.target_listbox.insert('end', "%.1f, %.1f, %.1f"%(t[0], t[1], t[2]))
+
+
     def on_target_select(self, event):
         '''Update lab coordinate inputs when a target is selected in the list'''
         selection = self.target_listbox.curselection()
         if selection:
-            index = selection[0]
-            t = self.targets[index]
+            list_idx = selection[0]
+            global_idx = self.displayed_indices[list_idx]
+            t = self.targets[global_idx]
             self.x_input.delete(0, 'end')
             self.x_input.insert(0, str(t[0]))
             self.y_input.delete(0, 'end')
