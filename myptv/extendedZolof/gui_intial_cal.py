@@ -86,7 +86,7 @@ class initial_cal_gui(object):
         self.xy_marked = (-1, -1)
         self.point_list = []      # <-- list of points to save
         self.point_markers = []   # <-- position of crosses
-        self.z = 1.0              # <-- Zoom level
+        self.z = 1           # <-- Zoom level
         
         # set the window
         self.root = Tk()
@@ -163,13 +163,6 @@ class initial_cal_gui(object):
                                 height=1)
         
         ZoomOut_button.grid(row=0, column=1, padx=7, pady=1, sticky='ew')
-
-        # Zoom level entry
-        self.zoom_label = Label(frame2, text='Target Zoom:', padx=5, pady=2)
-        self.zoom_label.grid(row=0, column=2, padx=5, pady=1, sticky='ew')
-        self.zoom_level_input = Entry(frame2, width=5)
-        self.zoom_level_input.insert(0, '4.0')
-        self.zoom_level_input.grid(row=0, column=3, padx=5, pady=1, sticky='ew')
         
         
         
@@ -809,10 +802,7 @@ class initial_cal_gui(object):
                 self.target_listbox.selection_set(next_idx)
                 self.target_listbox.see(next_idx)
         
-        # Zoom out after marking
-        self.z = 1.0
-        self.zoom_out_presses = 0
-        self.update_image_display()
+        self.mark_points()
         
             
         
@@ -1018,8 +1008,8 @@ class initial_cal_gui(object):
     def location_handler(self, event):
         '''handling the location of the mouse pointer with snapping'''
         
-        x = int(self.canvas.canvasx(event.x)/self.z)
-        y = int(self.canvas.canvasy(event.y)/self.z)
+        x = int(self.canvas.canvasx(event.x)/self.z) + int(self.hbar.get()[1])
+        y = int(self.canvas.canvasy(event.y)/self.z) + int(self.vbar.get()[1])
         
         # Snapping logic: find nearest segmented blob
         if len(self.segmented) > 0:
@@ -1044,8 +1034,7 @@ class initial_cal_gui(object):
         self.Yloc.configure(text = y)
         self.xy_marked = (x, y)
         
-        # Zoom in on the marked point
-        self.zoom_on_point((x, y))
+        self.mark_points()
         print( x,y )
         
     
@@ -1110,47 +1099,12 @@ class initial_cal_gui(object):
         self.canvas.delete('all')
         self.canvas.create_image(0, 0, image=new_bird, anchor='nw')
         self.canvas.configure(scrollregion = self.canvas.bbox("all"))
-        
-        # Reset scroll if zooming out to full view
-        if self.z == 1.0:
-            self.canvas.xview_moveto(0)
-            self.canvas.yview_moveto(0)
             
         self.mark_points()
         if hasattr(self, 'mtf'):
             self.plot_matched_point_pair()
         else:
             self.plotSegmented()
-
-    def zoom_on_point(self, point):
-        '''Zooms in on a specific image point (x, y)'''
-        self.zoom_out_presses = 0
-        try:
-            self.z = float(self.zoom_level_input.get())
-        except ValueError:
-            self.z = 4.0
-        
-        self.update_image_display()
-        
-        # Calculate scroll positions to center the point
-        # canvasx/y with no arguments returns the top-left visible coordinate
-        canvas_width = self.canvas.winfo_width()
-        canvas_height = self.canvas.winfo_height()
-        
-        target_x = point[0] * self.z
-        target_y = point[1] * self.z
-        
-        # xview_moveto takes fraction of total width
-        total_width = self.cam_res[0] * self.z
-        total_height = self.cam_res[1] * self.z
-        
-        move_x = (target_x - canvas_width/2) / total_width
-        move_y = (target_y - canvas_height/2) / total_height
-        
-        self.canvas.xview_moveto(max(0, move_x))
-        self.canvas.yview_moveto(max(0, move_y))
-
-
 
 
 if __name__ == '__main__':
