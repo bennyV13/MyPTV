@@ -13,8 +13,8 @@ from myptv.segmentation_mod import particle_segmentation
 from myptv.utils import match_calibration_blobs_and_points
 
 from PIL import Image, ImageTk
-from tkinter import Label, Canvas, LabelFrame, Entry, Tk, Scrollbar, Button
-from numpy import array, amax
+from tkinter import Label, Canvas, LabelFrame, Entry, Tk, Scrollbar, Button, Listbox
+from numpy import array, amax, loadtxt
 import os
 
 
@@ -45,6 +45,7 @@ class initial_cal_gui(object):
         image_size = self.image.size
         
         self.target_fname = target_fname
+        self.targets = loadtxt(self.target_fname)
         
         self.cam_name = cam_name
         self.cam_res = image_size
@@ -310,6 +311,23 @@ class initial_cal_gui(object):
         Column3 = LabelFrame(self.bf_canvas, padx=2, pady=10, width=100, 
                                   bg='#c2c2c2')
         Column3.grid(row=0, column=0, padx=(2), pady=10, sticky='nsew')
+        
+        # Target coordinates listbox
+        target_list_frame = LabelFrame(Column3, text='Target Coordinates', 
+                                       padx=2, pady=8, width=150)
+        target_list_frame.grid(row=0, column=2, rowspan=3, sticky='nsew', padx=5, pady=8)
+        
+        self.target_listbox = Listbox(target_list_frame, width=25, height=30)
+        self.target_listbox.grid(row=0, column=0, sticky='nsew')
+        
+        target_scroll = Scrollbar(target_list_frame, orient='vertical', command=self.target_listbox.yview)
+        target_scroll.grid(row=0, column=1, sticky='ns')
+        self.target_listbox.config(yscrollcommand=target_scroll.set)
+        
+        for t in self.targets:
+            self.target_listbox.insert('end', "%.1f, %.1f, %.1f"%(t[0], t[1], t[2]))
+            
+        self.target_listbox.bind('<<ListboxSelect>>', self.on_target_select)
         
         
         
@@ -692,7 +710,7 @@ class initial_cal_gui(object):
     
 
     def addPoint(self):
-        '''add marked point to list'''
+        '''add marked point to list and advance listbox selection'''
         x_im, y_im = self.xy_marked
         x_lab = float(self.x_input.get())
         y_lab = float(self.y_input.get())
@@ -703,6 +721,16 @@ class initial_cal_gui(object):
         print('%d marked points'%(len(self.point_list)))
         self.xy_marked = (-1, -1)
         self.mark_points()
+        
+        # Auto-advance the listbox selection
+        selection = self.target_listbox.curselection()
+        if selection:
+            next_index = selection[0] + 1
+            if next_index < self.target_listbox.size():
+                self.target_listbox.selection_clear(0, 'end')
+                self.target_listbox.selection_set(next_index)
+                self.target_listbox.see(next_index)
+                self.on_target_select(None)
             
         
     def forgetLast(self):
@@ -839,17 +867,48 @@ class initial_cal_gui(object):
             self.plotSegmented()
         
         
+    def on_target_select(self, event):
+        '''Update lab coordinate inputs when a target is selected in the list'''
+        selection = self.target_listbox.curselection()
+        if selection:
+            index = selection[0]
+            t = self.targets[index]
+            self.x_input.delete(0, 'end')
+            self.x_input.insert(0, str(t[0]))
+            self.y_input.delete(0, 'end')
+            self.y_input.insert(0, str(t[1]))
+            self.z_input.delete(0, 'end')
+            self.z_input.insert(0, str(t[2]))
+
+
     def location_handler(self, event):
-        '''handling the location of the mouse pointer'''
-        #x,y = int(event.x/z), int(event.y/z)
+        '''handling the location of the mouse pointer with snapping'''
         
         x = int(self.canvas.canvasx(event.x)/self.z) + int(self.hbar.get()[1])
         y = int(self.canvas.canvasy(event.y)/self.z) + int(self.vbar.get()[1])
         
+        # Snapping logic: find nearest segmented blob
+        if len(self.segmented) > 0:
+            from numpy.linalg import norm
+            from numpy import array
+            
+            p_click = array([x, y])
+            d_min = 10.0  # snapping threshold in pixels
+            snapped_p = None
+            
+            for b in self.segmented:
+                p_blob = array([b[0], b[1]])
+                d = norm(p_click - p_blob)
+                if d < d_min:
+                    d_min = d
+                    snapped_p = p_blob
+            
+            if snapped_p is not None:
+                x, y = snapped_p
+        
         self.Xloc.configure(text = x) 
         self.Yloc.configure(text = y)
         self.xy_marked = (x, y)
-        #tracking_dic[i%len(imagelist)]=(x,y)
         self.mark_points()
         print( x,y )
         
