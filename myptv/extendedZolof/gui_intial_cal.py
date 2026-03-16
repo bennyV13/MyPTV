@@ -895,7 +895,8 @@ class initial_cal_gui(object):
         self.target_listbox.delete(0, 'end')
         for idx in self.displayed_indices:
             t = self.targets[idx]
-            self.target_listbox.insert('end', "%.1f, %.1f, %.1f"%(t[0], t[1], t[2]))
+            grid_idx = self.target_indices[idx]
+            self.target_listbox.insert('end', "%.1f, %.1f, %.1f | [%d, %d, %d]"%(t[0], t[1], t[2], grid_idx[0], grid_idx[1], grid_idx[2]))
         
         if self.target_listbox.size() > 0:
             self.target_listbox.selection_set(0)
@@ -965,7 +966,8 @@ class initial_cal_gui(object):
             
         for idx in self.displayed_indices:
             t = self.targets[idx]
-            self.target_listbox.insert('end', "%.1f, %.1f, %.1f"%(t[0], t[1], t[2]))
+            grid_idx = self.target_indices[idx]
+            self.target_listbox.insert('end', "%.1f, %.1f, %.1f | [%d, %d, %d]"%(t[0], t[1], t[2], grid_idx[0], grid_idx[1], grid_idx[2]))
 
 
     def on_target_select(self, event):
