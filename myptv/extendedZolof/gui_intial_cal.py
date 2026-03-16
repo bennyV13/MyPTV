@@ -86,7 +86,7 @@ class initial_cal_gui(object):
         self.xy_marked = (-1, -1)
         self.point_list = []      # <-- list of points to save
         self.point_markers = []   # <-- position of crosses
-        self.z = 1           # <-- Zoom level
+        self.z = 1.0           # <-- Zoom level
         
         # set the window
         self.root = Tk()
