@@ -243,7 +243,7 @@ class workflow(object):
         
         
         if model_name == 'Tsai':
-            from myptv.TsaiModel.gui_intial_cal import initial_cal_gui
+            from myptv.TsaiModel.gui_initial_cal import initial_cal_gui
             image = imread(cal_image)
             if image.shape[1] != res[0] or image.shape[0] != res[1]:
                 msg = 'The given resolution doesnt match the image size'
@@ -253,7 +253,7 @@ class workflow(object):
         
         
         elif model_name == 'extendedZolof':
-            from myptv.extendedZolof.gui_intial_cal import initial_cal_gui
+            from myptv.extendedZolof.gui_initial_cal import initial_cal_gui
             image = imread(cal_image)
             gui = initial_cal_gui(cam_name, cal_image, target_file)
             
