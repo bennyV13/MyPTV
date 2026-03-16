@@ -13,7 +13,7 @@ from myptv.segmentation_mod import particle_segmentation
 from myptv.utils import match_calibration_blobs_and_points
 
 from PIL import Image, ImageTk
-from tkinter import Label, Canvas, LabelFrame, Entry, Tk, Scrollbar, Button, Listbox
+from tkinter import Label, Canvas, LabelFrame, Entry, Tk, Scrollbar, Button, Listbox, BooleanVar, Checkbutton
 from numpy import array, amax, loadtxt
 import os
 
@@ -75,6 +75,8 @@ class initial_cal_gui(object):
         
         # set the window
         self.root = Tk()
+        self.snap_to_blobs = BooleanVar(value=True) # <-- Snapping state
+        
         self.root.geometry('1100x730+320+70')
         self.root.title('MyPTV: Initial Calibration GUI - Extended Zolof camera')
         #self.root.configure(background='#709eba')
@@ -344,10 +346,21 @@ class initial_cal_gui(object):
         button_frame.grid(row=0, column=0, columnspan=2, sticky='nwe', padx=2, 
                           pady=8)
         
-        msg = 'Marking 10 points\nis usually needed for\ninitial calibration!'
+        msg = 'Marking 24 points\nis recommended for\naccurate calibration!'
         self.message = Label(button_frame, text=msg, padx=2, pady=4,anchor="e",
                              justify='left',font=("Arial", 10))
         self.message.grid(row=0, column=0, padx=2, pady=2, sticky='ew')
+        
+        # points counter
+        self.points_count_label = Label(button_frame, text='Points marked: 0', 
+                                        padx=2, pady=4, font=("Arial", 10, "bold"),
+                                        fg="#001ced")
+        self.points_count_label.grid(row=0, column=1, padx=2, pady=2, sticky='ew')
+        
+        # Snap toggle
+        self.snap_toggle = Checkbutton(button_frame, text='Snap to blobs', 
+                                       variable=self.snap_to_blobs)
+        self.snap_toggle.grid(row=1, column=0, sticky='w', padx=5, pady=2)
         
         # add point button
         add_button = Button(button_frame, text='Mark point', 
@@ -719,6 +732,7 @@ class initial_cal_gui(object):
         
         print('Added to list: ', self.point_list[-1])
         print('%d marked points'%(len(self.point_list)))
+        self.points_count_label.config(text='Points marked: %d'%len(self.point_list))
         self.xy_marked = (-1, -1)
         self.mark_points()
         
@@ -736,6 +750,7 @@ class initial_cal_gui(object):
     def forgetLast(self):
         p = self.point_list.pop(-1)
         print('Deleted: ', p)
+        self.points_count_label.config(text='Points marked: %d'%len(self.point_list))
         self.mark_points()
         
         
