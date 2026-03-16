@@ -785,17 +785,25 @@ class initial_cal_gui(object):
         x_lab = float(self.x_input.get())
         y_lab = float(self.y_input.get())
         z_lab = float(self.z_input.get())
-        self.point_list.append([x_im, y_im, x_lab, y_lab, z_lab])
         
-        print('Added to list: ', self.point_list[-1])
+        # Get the grid indices from the selection
+        selection = self.target_listbox.curselection()
+        if selection:
+            list_idx = selection[0]
+            global_idx = self.displayed_indices[list_idx]
+            ix, iy, iz = self.target_indices[global_idx]
+        else:
+            ix, iy, iz = 0, 0, 0
+            
+        self.point_list.append([x_im, y_im, x_lab, y_lab, z_lab, ix, iy, iz])
+        
+        print('Added to list: ', self.point_list[-1][:5], 'Indices:', self.point_list[-1][5:])
         print('%d marked points'%(len(self.point_list)))
         self.points_count_label.config(text='Points marked: %d'%len(self.point_list))
         self.xy_marked = (-1, -1)
         
         # Remove the point from the listbox and displayed_indices
-        selection = self.target_listbox.curselection()
         if selection:
-            list_idx = selection[0]
             del self.displayed_indices[list_idx]
             self.target_listbox.delete(list_idx)
             
@@ -1057,17 +1065,33 @@ class initial_cal_gui(object):
             self.canvas.delete(c)
         
         x, y = self.xy_marked
-        x_ = int(x*self.z) - int(self.hbar.get()[1])
-        y_ = int(y*self.z) - int(self.vbar.get()[1])
-        c1 = self.canvas.create_line(x_-4, y_, x_+4, y_, 
-                                     fill="#e31010", width=1)
-        c2 = self.canvas.create_line(x_, y_-4, x_, y_+4, 
-                                     fill="#e31010", width=1)    
-        self.point_markers.append(c1)
-        self.point_markers.append(c2)
+        if x != -1:
+            x_ = int(x*self.z) - int(self.hbar.get()[1])
+            y_ = int(y*self.z) - int(self.vbar.get()[1])
+            c1 = self.canvas.create_line(x_-4, y_, x_+4, y_, 
+                                         fill="#e31010", width=1)
+            c2 = self.canvas.create_line(x_, y_-4, x_, y_+4, 
+                                         fill="#e31010", width=1)    
+            self.point_markers.append(c1)
+            self.point_markers.append(c2)
+            
+            # Show grid indices if available from current selection
+            selection = self.target_listbox.curselection()
+            if selection:
+                list_idx = selection[0]
+                global_idx = self.displayed_indices[list_idx]
+                ix, iy, iz = self.target_indices[global_idx]
+                label = '[%d, %d, %d]'%(ix, iy, iz)
+            else:
+                label = '(%d, %d)'%(x, y)
+
+            t1 = self.canvas.create_text(x_+5, y_+5, text=label, 
+                                         fill='white', anchor='nw')
+            self.point_markers.append(t1)
         
         for p in self.point_list:
             x, y = p[0], p[1]
+            ix, iy, iz = p[5], p[6], p[7]
             x_ = int(x*self.z) - int(self.hbar.get()[1])
             y_ = int(y*self.z) - int(self.vbar.get()[1])
             c1 = self.canvas.create_line(x_-4, y_, x_+4, y_, 
@@ -1076,13 +1100,21 @@ class initial_cal_gui(object):
                                          fill="#001ced", width=1)    
             self.point_markers.append(c1)
             self.point_markers.append(c2)
+            
+            # Add text for the saved points (using grid indices)
+            label = '[%d, %d, %d]'%(ix, iy, iz)
+            t1 = self.canvas.create_text(x_+5, y_+5, text=label, 
+                                         fill='white', anchor='nw')
+            self.point_markers.append(t1)
         
     
     def Save(self):
         '''save the manually selected calibration points'''
-        from numpy import savetxt
+        from numpy import savetxt, array
         saveName = os.path.join(self.folder, self.cam_name+'_manualPoints')
-        savetxt(saveName, self.point_list, 
+        # Only save the first 5 columns [x_im, y_im, x_lab, y_lab, z_lab]
+        save_data = array(self.point_list)[:, :5]
+        savetxt(saveName, save_data, 
                 fmt='%.1f', delimiter='\t')
         print('Points saved at: %s'%saveName)
         
