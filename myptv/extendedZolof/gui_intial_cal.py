@@ -811,6 +811,7 @@ class initial_cal_gui(object):
         
         # Zoom out after marking
         self.z = 1.0
+        self.zoom_out_presses = 0
         self.update_image_display()
         
             
@@ -857,6 +858,7 @@ class initial_cal_gui(object):
     
     def zoomIn(self, event):
         '''zoom in the image with + key'''
+        self.zoom_out_presses = 0
         self.z = self.z*1.15
         self.update_image_display()
             
@@ -864,6 +866,7 @@ class initial_cal_gui(object):
         
     def zoomIn_btn(self):
         '''zoom in the Zoom in button'''
+        self.zoom_out_presses = 0
         self.z = self.z*1.15
         self.update_image_display()
     
@@ -871,14 +874,39 @@ class initial_cal_gui(object):
     
     def zoomOut(self, event):
         '''zoom out with - key'''
-        self.z = self.z*(1/1.15)
+        if not hasattr(self, 'zoom_out_presses'):
+            self.zoom_out_presses = 0
+        self.zoom_out_presses += 1
+        
+        # Factor increases with each consecutive press
+        # 1.15, 1.30, 1.45, 1.60, ...
+        factor = 1.15 + (0.15 * (self.zoom_out_presses - 1))
+        self.z = self.z / factor
+        
+        # Cap minimum zoom at 1.0 (full view)
+        if self.z < 1.0:
+            self.z = 1.0
+            self.zoom_out_presses = 0
+            
         self.update_image_display()
             
             
             
     def zoomOut_btn(self):
         '''zoom out with the button'''
-        self.z = self.z*(1/1.15)
+        if not hasattr(self, 'zoom_out_presses'):
+            self.zoom_out_presses = 0
+        self.zoom_out_presses += 1
+        
+        # Factor increases with each consecutive press
+        factor = 1.15 + (0.15 * (self.zoom_out_presses - 1))
+        self.z = self.z / factor
+        
+        # Cap minimum zoom at 1.0 (full view)
+        if self.z < 1.0:
+            self.z = 1.0
+            self.zoom_out_presses = 0
+            
         self.update_image_display()
             
             
@@ -1096,6 +1124,7 @@ class initial_cal_gui(object):
 
     def zoom_on_point(self, point):
         '''Zooms in on a specific image point (x, y)'''
+        self.zoom_out_presses = 0
         try:
             self.z = float(self.zoom_level_input.get())
         except ValueError:
