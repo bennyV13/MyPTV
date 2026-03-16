@@ -1002,7 +1002,7 @@ class initial_cal_gui(object):
             from numpy import array
             
             p_click = array([x, y])
-            d_min = 10.0  # snapping threshold in pixels
+            d_min = 30.0  # snapping threshold in pixels
             snapped_p = None
             
             for b in self.segmented:
