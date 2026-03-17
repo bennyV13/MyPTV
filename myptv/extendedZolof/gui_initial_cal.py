@@ -58,9 +58,7 @@ class initial_cal_gui(object):
         for t in self.targets:
             self.target_indices.append((x_map[t[0]], y_map[t[1]], z_map[t[2]]))
         
-        self.show_optimal_only = False
-        self.optimal_indices = self.get_optimal_indices()
-        self.displayed_indices = list(range(len(self.targets)))
+        self.available_indices = list(range(len(self.targets)))
         
         self.cam_name = cam_name
         self.cam_res = image_size
@@ -171,7 +169,7 @@ class initial_cal_gui(object):
         
         # ====================================================================
         # (2) The second column
-        second_column = LabelFrame(self.root, padx=2, pady=10, width=100, 
+        second_column = LabelFrame(self.root, padx=2, pady=10, width=75, 
                                    bg='#c2c2c2')
         second_column.grid(row=0, column=1, padx=(2), pady=10, sticky='nsew')
         
@@ -179,7 +177,7 @@ class initial_cal_gui(object):
         
         # =========================
         # cam file generation frame
-        camFile_frame = LabelFrame(second_column, padx=2, pady=8, width=100,
+        camFile_frame = LabelFrame(second_column, padx=2, pady=8, width=75,
                                    text='1) cam file generation')
         camFile_frame.grid(row=0, column=0, padx=5, pady=8, sticky='nwe')
         
@@ -192,7 +190,7 @@ class initial_cal_gui(object):
         self.camName = Label(name_dashboard, text='Camera:', padx=2, pady=2)
         self.camName.grid(row=1, column=0, rowspan=1, sticky='nw', padx=2, pady=2)
         self.camName_input = Label(name_dashboard, text=self.cam_name, padx=2, pady=2,
-                                 width=10, bg='white')
+                                 width=7, bg='white')
         self.camName_input.grid(row=1, column=1, rowspan=1, sticky='nw', padx=2, pady=2)
         
         
@@ -210,75 +208,75 @@ class initial_cal_gui(object):
         # ==================
         # segmentation frame
         segmentation_frame = LabelFrame(second_column, padx=2, pady=8, 
-                                        width=100, text='2) image segmentation')
+                                        width=75, text='2) image segmentation')
         segmentation_frame.grid(row=1, column=0, padx=5, pady=8, sticky='s')
         
         
         
         self.threshold = Label(segmentation_frame, text='threshold:', padx=2, pady=2)
         self.threshold.grid(row=0, column=0, rowspan=1, sticky='nw', padx=2, pady=2)
-        self.threshold_input = Entry(segmentation_frame, width=7)
+        self.threshold_input = Entry(segmentation_frame, width=5)
         self.threshold_input.insert(0,'20')
         self.threshold_input.grid(row=0, column=1, rowspan=1, sticky='nw', padx=2, pady=2)
         
         
         self.xmin = Label(segmentation_frame, text='x min size:', padx=2, pady=2)
         self.xmin.grid(row=1, column=0, rowspan=1, sticky='nw', padx=2, pady=2)
-        self.xmin_input = Entry(segmentation_frame, width=7)
+        self.xmin_input = Entry(segmentation_frame, width=5)
         self.xmin_input.insert(0,'2')
         self.xmin_input.grid(row=1, column=1, rowspan=1, sticky='nw', padx=2, pady=2)
         
         self.xmax = Label(segmentation_frame, text='x max size:', padx=2, pady=2)
         self.xmax.grid(row=2, column=0, rowspan=1, sticky='nw', padx=2, pady=2)
-        self.xmax_input = Entry(segmentation_frame, width=7)
+        self.xmax_input = Entry(segmentation_frame, width=5)
         self.xmax_input.insert(0,'30')
         self.xmax_input.grid(row=2, column=1, rowspan=1, sticky='nw', padx=2, pady=2)
         
         self.ymin = Label(segmentation_frame, text='y min size:', padx=2, pady=2)
         self.ymin.grid(row=3, column=0, rowspan=1, sticky='nw', padx=2, pady=2)
-        self.ymin_input = Entry(segmentation_frame, width=7)
+        self.ymin_input = Entry(segmentation_frame, width=5)
         self.ymin_input.insert(0,'2')
         self.ymin_input.grid(row=3, column=1, rowspan=1, sticky='nw', padx=2, pady=2)
         
         self.ymax = Label(segmentation_frame, text='y max size:', padx=2, pady=2)
         self.ymax.grid(row=4, column=0, rowspan=1, sticky='nw', padx=2, pady=2)
-        self.ymax_input = Entry(segmentation_frame, width=7)
+        self.ymax_input = Entry(segmentation_frame, width=5)
         self.ymax_input.insert(0,'30')
         self.ymax_input.grid(row=4, column=1, rowspan=1, sticky='nw', padx=2, pady=2)
         
         self.minMass = Label(segmentation_frame, text='mass min:', padx=2, pady=2)
         self.minMass.grid(row=5, column=0, rowspan=1, sticky='nw', padx=2, pady=2)
-        self.minMass_input = Entry(segmentation_frame, width=7)
+        self.minMass_input = Entry(segmentation_frame, width=5)
         self.minMass_input.insert(0,'0')
         self.minMass_input.grid(row=5, column=1, rowspan=1, sticky='nw', padx=2, pady=2)
         
         self.maxMass = Label(segmentation_frame, text='mass max:', padx=2, pady=2)
         self.maxMass.grid(row=6, column=0, rowspan=1, sticky='nw', padx=2, pady=2)
-        self.maxMass_input = Entry(segmentation_frame, width=7)
+        self.maxMass_input = Entry(segmentation_frame, width=5)
         self.maxMass_input.insert(0,'10000')
         self.maxMass_input.grid(row=6, column=1, rowspan=1, sticky='nw', padx=2, pady=2)
         
         self.sigma = Label(segmentation_frame, text='blur sgima:', padx=2, pady=2)
         self.sigma.grid(row=7, column=0, rowspan=1, sticky='nw', padx=2, pady=2)
-        self.sigma_input = Entry(segmentation_frame, width=7)
+        self.sigma_input = Entry(segmentation_frame, width=5)
         self.sigma_input.insert(0,'0')
         self.sigma_input.grid(row=7, column=1, rowspan=1, sticky='nw', padx=2, pady=2)
         
         self.median = Label(segmentation_frame, text='median filter:', padx=2, pady=2)
         self.median.grid(row=8, column=0, rowspan=1, sticky='nw', padx=2, pady=2)
-        self.median_input = Entry(segmentation_frame, width=7)
+        self.median_input = Entry(segmentation_frame, width=5)
         self.median_input.insert(0,'0')
         self.median_input.grid(row=8, column=1, rowspan=1, sticky='nw', padx=2, pady=2)
         
         self.local = Label(segmentation_frame, text='local filter:', padx=2, pady=2)
         self.local.grid(row=9, column=0, rowspan=1, sticky='nw', padx=2, pady=2)
-        self.local_input = Entry(segmentation_frame, width=7)
+        self.local_input = Entry(segmentation_frame, width=5)
         self.local_input.insert(0,'0')
         self.local_input.grid(row=9, column=1, rowspan=1, sticky='nw', padx=2, pady=2)
         
         
         ROI_frame = LabelFrame(segmentation_frame, padx=2, pady=2, 
-                                        width=100, text='ROI')
+                                        width=75, text='ROI')
         ROI_frame.grid(row=11, column=0, columnspan=2, padx=5, pady=1, sticky='sew')
         
         self.ROI_x0y0 = Label(ROI_frame, text='x0, y0:', padx=2, pady=2)
@@ -286,16 +284,16 @@ class initial_cal_gui(object):
         self.ROI_x1y1 = Label(ROI_frame, text='x1, y1:', padx=2, pady=2)
         self.ROI_x1y1.grid(row=1, column=0, rowspan=1, sticky='nw', padx=2, pady=2)
         
-        self.ROIx0 = Entry(ROI_frame, width=7)
+        self.ROIx0 = Entry(ROI_frame, width=5)
         self.ROIx0.insert(0,'0')
         self.ROIx0.grid(row=0, column=1)
-        self.ROIy0 = Entry(ROI_frame, width=7)
+        self.ROIy0 = Entry(ROI_frame, width=5)
         self.ROIy0.insert(0,'0')
         self.ROIy0.grid(row=0, column=2)
-        self.ROIx1 = Entry(ROI_frame, width=7)
+        self.ROIx1 = Entry(ROI_frame, width=5)
         self.ROIx1.insert(0,str(self.cam_res[0]))
         self.ROIx1.grid(row=1, column=1)
-        self.ROIy1 = Entry(ROI_frame, width=7)
+        self.ROIy1 = Entry(ROI_frame, width=5)
         self.ROIy1.insert(0,str(self.cam_res[1]))
         self.ROIy1.grid(row=1, column=2)
         
@@ -330,16 +328,16 @@ class initial_cal_gui(object):
         # add scrollbars to the image
         #self.vbar2.config(command=self.bf_canvas.yview)
         
-        Column3 = LabelFrame(self.bf_canvas, padx=2, pady=10, width=100, 
+        Column3 = LabelFrame(self.bf_canvas, padx=2, pady=10, width=50, 
                                   bg='#c2c2c2')
         Column3.grid(row=0, column=0, padx=(2), pady=10, sticky='nsew')
         
         # Target coordinates listbox
         target_list_frame = LabelFrame(Column3, text='Target Coordinates', 
-                                       padx=2, pady=8, width=150)
+                                       padx=2, pady=8, width=75)
         target_list_frame.grid(row=0, column=2, rowspan=3, sticky='nsew', padx=5, pady=8)
         
-        self.target_listbox = Listbox(target_list_frame, width=25, height=30)
+        self.target_listbox = Listbox(target_list_frame, width=12, height=30)
         self.target_listbox.grid(row=0, column=0, sticky='nsew')
         
         target_scroll = Scrollbar(target_list_frame, orient='vertical', command=self.target_listbox.yview)
@@ -353,19 +351,15 @@ class initial_cal_gui(object):
             
         self.target_listbox.bind('<<ListboxSelect>>', self.on_target_select)
         
-        self.toggle_optimal_btn = Button(target_list_frame, text='Show Optimal Only', 
-                                        command=self.toggle_optimal_list)
-        self.toggle_optimal_btn.grid(row=1, column=0, columnspan=2, sticky='ew', padx=2, pady=5)
-        
         # Sorting buttons
         sort_frame = LabelFrame(target_list_frame, text='Sort by:', padx=2, pady=2)
         sort_frame.grid(row=2, column=0, columnspan=2, sticky='ew', padx=2, pady=5)
         
-        btn_x = Button(sort_frame, text='X', command=lambda: self.sort_list(0), width=3)
+        btn_x = Button(sort_frame, text='X', command=lambda: self.sort_list(0), width=2)
         btn_x.grid(row=0, column=0, padx=2)
-        btn_y = Button(sort_frame, text='Y', command=lambda: self.sort_list(1), width=3)
+        btn_y = Button(sort_frame, text='Y', command=lambda: self.sort_list(1), width=2)
         btn_y.grid(row=0, column=1, padx=2)
-        btn_z = Button(sort_frame, text='Z', command=lambda: self.sort_list(2), width=3)
+        btn_z = Button(sort_frame, text='Z', command=lambda: self.sort_list(2), width=2)
         btn_z.grid(row=0, column=2, padx=2)
         
         
@@ -379,7 +373,7 @@ class initial_cal_gui(object):
         #                          padx=2, pady=8, width=100)
         
         button_frame = LabelFrame(Column3, text='3) mark image points', 
-                                  padx=2, pady=8, width=100)
+                                  padx=2, pady=8, width=50)
         button_frame.grid(row=0, column=0, columnspan=2, sticky='nwe', padx=2, 
                           pady=8)
         
@@ -429,12 +423,16 @@ class initial_cal_gui(object):
                           padx=2, pady=2)
         self.xloc = Label(select_frame, text='x image:', padx=2, pady=2)
         self.yloc = Label(select_frame, text='y image:', padx=2, pady=2)
+        self.val_loc = Label(select_frame, text='pixel value:', padx=2, pady=2)
         self.Xloc = Label(select_frame, text='-', padx=2, pady=2)
         self.Yloc = Label(select_frame, text='-', padx=2, pady=2)
+        self.Valloc = Label(select_frame, text='-', padx=2, pady=2)
         self.xloc.grid(row=2, column=0, rowspan=1, sticky='w', padx=2, pady=2)
         self.yloc.grid(row=3, column=0, rowspan=1, sticky='w', padx=2, pady=2)
+        self.val_loc.grid(row=4, column=0, rowspan=1, sticky='w', padx=2, pady=2)
         self.Xloc.grid(row=2, column=1, sticky='w', padx=2, pady=2)
         self.Yloc.grid(row=3, column=1, sticky='w', padx=2, pady=2)
+        self.Valloc.grid(row=4, column=1, sticky='w', padx=2, pady=2)
         
         # We hidden lab coordinate inputs as requested by user
         self.x_input = Entry(self.root) 
@@ -458,7 +456,7 @@ class initial_cal_gui(object):
         # sortgrid
         
         init_cal_frame = LabelFrame(Column3, text='4) sortgrid', 
-                                  padx=2, pady=8, width=100)
+                                  padx=2, pady=8, width=50)
         init_cal_frame.grid(row=1, column=0, columnspan=1, sticky='s', padx=2, 
                           pady=8)
         
@@ -509,11 +507,11 @@ class initial_cal_gui(object):
         # quit button
         
         quit_frame = LabelFrame(Column3, text='', 
-                                  padx=2, pady=8, width=100)
+                                  padx=2, pady=8, width=50)
         quit_frame.grid(row=2, column=0, columnspan=2, sticky='sew', padx=2, 
                           pady=2)
         
-        quit_button = Button(quit_frame, text='Quit', width=19,
+        quit_button = Button(quit_frame, text='Quit', width=10,
                                 command = self.Quit, padx=2, pady=2, 
                                 height=1) 
         quit_button.grid(row=0, column=0, padx=2, pady=2, sticky='sew')
@@ -764,21 +762,22 @@ class initial_cal_gui(object):
         selection = self.target_listbox.curselection()
         if selection:
             list_idx = selection[0]
-            global_idx = self.displayed_indices[list_idx]
+            global_idx = self.available_indices[list_idx]
             ix, iy, iz = self.target_indices[global_idx]
         else:
             ix, iy, iz = 0, 0, 0
+            global_idx = -1
             
-        self.point_list.append([x_im, y_im, x_lab, y_lab, z_lab, ix, iy, iz])
+        self.point_list.append([x_im, y_im, x_lab, y_lab, z_lab, ix, iy, iz, global_idx])
         
         print('Added to list. Indices: [%d, %d]'%(ix, iy))
         print('%d marked points'%(len(self.point_list)))
         self.points_count_label.config(text='Points marked: %d'%len(self.point_list))
         self.xy_marked = (-1, -1)
         
-        # Remove the point from the listbox and displayed_indices
+        # Remove the point from the listbox and available_indices
         if selection:
-            del self.displayed_indices[list_idx]
+            del self.available_indices[list_idx]
             self.target_listbox.delete(list_idx)
             
             # Select the next point if available but DO NOT update coordinates automatically
@@ -794,11 +793,21 @@ class initial_cal_gui(object):
     def forgetLast(self):
         if len(self.point_list) == 0: return
         p = self.point_list.pop(-1)
+        global_idx = p[8]
+        
+        # If the point was removed from the listbox, add it back
+        if global_idx != -1:
+            self.available_indices.append(global_idx)
+            
+            # Re-sort the listbox to maintain order if it was sorted
+            # For simplicity, we just refresh the whole listbox
+            self.target_listbox.delete(0, 'end')
+            for idx in self.available_indices:
+                grid_idx = self.target_indices[idx]
+                self.target_listbox.insert('end', "[%d, %d]"%(grid_idx[0], grid_idx[1]))
+        
         print('Deleted last marked point')
         self.points_count_label.config(text='Points marked: %d'%len(self.point_list))
-        
-        # Note: We don't easily know which index to add back to the listbox 
-        # without searching targets. For now, just refresh if user wants.
         self.mark_points()
         
         
@@ -888,87 +897,14 @@ class initial_cal_gui(object):
             
     def sort_list(self, axis):
         '''Sort the currently displayed list by X, Y, or Z coordinate'''
-        self.displayed_indices = sorted(self.displayed_indices, 
+        self.available_indices = sorted(self.available_indices, 
                                         key=lambda i: self.targets[i][axis])
         
         self.target_listbox.delete(0, 'end')
-        for idx in self.displayed_indices:
-            t = self.targets[idx]
+        for idx in self.available_indices:
             grid_idx = self.target_indices[idx]
             self.target_listbox.insert('end', "[%d, %d]"%(grid_idx[0], grid_idx[1]))
             
-        # Clear lab coordinate inputs
-        self.x_input.delete(0, 'end')
-        self.y_input.delete(0, 'end')
-        self.z_input.delete(0, 'end')
-
-
-    def get_optimal_indices(self):
-        '''Identify optimal calibration points from the target file'''
-        try:
-            unique_zs = unique(self.targets[:, 2])
-            if len(unique_zs) < 2:
-                raise ValueError("Target is not 3D (less than 2 Z-planes found).")
-            
-            indices = []
-            for z in unique_zs:
-                plane_idx = where(self.targets[:, 2] == z)[0]
-                plane_pts = self.targets[plane_idx]
-                
-                ux = unique(plane_pts[:, 0])
-                uy = unique(plane_pts[:, 1])
-                
-                if len(ux) < 1 or len(uy) < 1:
-                    continue
-                
-                xmin, xmax = ux.min(), ux.max()
-                ymin, ymax = uy.min(), uy.max()
-                xmid = ux[len(ux)//2]
-                ymid = uy[len(uy)//2]
-                
-                if len(ux) >= 2 and len(uy) >= 2:
-                    coords = [(xmin,ymin), (xmin,ymax), (xmax,ymin), (xmax,ymax),
-                              (xmin,ymid), (xmax,ymid), (xmid,ymin), (xmid,ymax),
-                              (xmid,ymid)]
-                elif len(uy) >= 2: # Single column
-                    coords = [(xmid, ymin), (xmid, ymax), (xmid, ymid)]
-                elif len(ux) >= 2: # Single row
-                    coords = [(xmin, ymid), (xmax, ymid), (xmid, ymid)]
-                else: # Single point
-                    coords = [(xmin, ymin)]
-                
-                for cx, cy in coords:
-                    dists = sqrt((plane_pts[:, 0] - cx)**2 + (plane_pts[:, 1] - cy)**2)
-                    idx = plane_idx[argmin(dists)]
-                    if idx not in indices: indices.append(idx)
-            
-            return sorted(indices)
-        except Exception as e:
-            return None
-
-
-    def toggle_optimal_list(self):
-        '''Toggle between showing all points and only optimal ones'''
-        if self.optimal_indices is None:
-            messagebox.showerror("Structure Error", 
-                                 "Cannot determine optimal points. Target structure must be 3D and organized in a grid.")
-            return
-
-        self.show_optimal_only = not self.show_optimal_only
-        self.target_listbox.delete(0, 'end')
-        
-        if self.show_optimal_only:
-            self.displayed_indices = self.optimal_indices
-            self.toggle_optimal_btn.config(text='Show All Points')
-        else:
-            self.displayed_indices = list(range(len(self.targets)))
-            self.toggle_optimal_btn.config(text='Show Optimal Only')
-            
-        for idx in self.displayed_indices:
-            t = self.targets[idx]
-            grid_idx = self.target_indices[idx]
-            self.target_listbox.insert('end', "[%d, %d]"%(grid_idx[0], grid_idx[1]))
-
         # Clear lab coordinate inputs
         self.x_input.delete(0, 'end')
         self.y_input.delete(0, 'end')
@@ -980,7 +916,7 @@ class initial_cal_gui(object):
         selection = self.target_listbox.curselection()
         if selection:
             list_idx = selection[0]
-            global_idx = self.displayed_indices[list_idx]
+            global_idx = self.available_indices[list_idx]
             t = self.targets[global_idx]
             self.x_input.delete(0, 'end')
             self.x_input.insert(0, str(t[0]))
@@ -1019,6 +955,13 @@ class initial_cal_gui(object):
         self.Yloc.configure(text = y)
         self.xy_marked = (x, y)
         
+        # Update pixel value
+        try:
+            val = self.image.getpixel((int(x), int(y)))
+            self.Valloc.configure(text = "%.1f" % val)
+        except:
+            self.Valloc.configure(text = "-")
+        
         self.mark_points()
         
     
@@ -1027,7 +970,15 @@ class initial_cal_gui(object):
         #x, y = int(event.x/z), int(event.y/z)
         x = int(self.canvas.canvasx(event.x)/self.z) + int(self.hbar.get()[1])
         y = int(self.canvas.canvasy(event.y)/self.z) + int(self.vbar.get()[1])
-        self.Mousepos.configure(text = '(%d, %d)'%(x, y))   
+        
+        # Update pixel value for the moving mouse
+        try:
+            val = self.image.getpixel((int(x), int(y)))
+            val_str = "%.1f" % val
+        except:
+            val_str = "-"
+            
+        self.Mousepos.configure(text = '(%d, %d) val: %s'%(x, y, val_str))   
         
     
     def mark_points(self):
@@ -1052,7 +1003,7 @@ class initial_cal_gui(object):
             selection = self.target_listbox.curselection()
             if selection:
                 list_idx = selection[0]
-                global_idx = self.displayed_indices[list_idx]
+                global_idx = self.available_indices[list_idx]
                 ix, iy, iz = self.target_indices[global_idx]
                 label = '[%d, %d]'%(ix, iy)
             else:
