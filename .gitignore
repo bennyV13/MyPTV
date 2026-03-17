@@ -1,26 +1,18 @@
-*.pyc
-*.log
-*.lot
-*.aux
-*.blg
-*.out
-*user_manual.synctex.gz
-*.log
-*.out
-*.toc
-.eggs/*
-dist/*
-myptv.egg-info/*
-build/*
+.env
+.gemini/
+conductor/
+MyPTV1/
+venv/
+check_image_shape.py
+analyzing_softwares_copy/
+mcp_crash_log.txt
+myptv-log-searcher.skill
 
-*.aux
-*.bbl
-*.fdb_latexmk
-*.log
-*.out
-*.aux
-*.fls
-*.log
-*.out
-.vscode/settings.json
-GEMINI.md
+# Ignore all Data contents except the specific frames folder
+Data/*
+!Data/20260315_frames/
+
+# Inside that folder, ignore everything except workflow and params
+Data/20260315_frames/*
+!Data/20260315_frames/workflow.py
+!Data/20260315_frames/params_file.yml
