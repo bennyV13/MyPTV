@@ -1,16 +1,16 @@
 - calibration:
-    3D_model: extendedZolof
-    camera_name: cam3
-    resolution: 2176, 2176
-    calibration_image: ./calibration/Cam3.tif
+    3D_model: Tsai
+    camera_name: cam1
+    resolution: 1280, 1024
+    calibration_image: ./Calibration/cal1.tif
     target_file: ./Calibration/target_file
 
 - analyze_calibration_error:
-    camera_names: cam1, cam2, cam3, cam4
+    camera_names: cam1, cam2, cam3
     plot_histogram: True
 
 - calculate_BG_image:
-    images_folder: Data/20260315_frames/Rec15/Cam1
+    images_folder: Images_cam3
     image_extension: '.tif'
     raw_format: False
     N_img: 200
@@ -26,33 +26,33 @@
     save_name: EQmap_cam3.tif
 
 - segmentation:
-    Number_of_images: 1
+    Number_of_images: None
     image_start: 0
-    images_folder: /Users/user/Desktop/Research/Data/20260315_frames/Rec15/clean_1
-    single_image_name: 100.tif
+    images_folder: Images_cam3
+    single_image_name: 01.tif
     image_extension: '.tif'
     raw_format: False
     multiprocessing: True
     shape: particles
     mask: 1.0
-    ROI: 0, 2020, 10, 2172
+    ROI: 227, 1050, 120, 920
     plot_result: True
-    threshold: 70
-    remove_background: /Users/user/Desktop/Research/Data/20260315_frames/BG-EQ/Cam1-BG.tif
+    threshold: 8
+    remove_background: True
     equilization_map: None
-    DoG_sigmas: None
-    median: 1
-    blur_sigma: 1
+    DoG_sigmas: [6, 2]
+    median: None
+    blur_sigma: 0.5
     local_filter: None
-    min_xsize: 1.0
-    min_ysize: 1.0
-    min_mass: 300.0
-    max_xsize: 1500.0
-    max_ysize: 1500.0
-    max_mass: 3000000
+    min_xsize: 0.0
+    min_ysize: 0.0
+    min_mass: 30.0
+    max_xsize: 15.0
+    max_ysize: 15.0
+    max_mass: None
     method: labeling
     particle_size: 8  
-    save_name: None
+    save_name: blobs_cam3
 
 - matching:
     blob_files: blobs_cam1, blobs_cam2, blobs_cam3

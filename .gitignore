@@ -1,7 +1,6 @@
 .env
 .gemini/
 conductor/
-MyPTV1/
 venv/
 check_image_shape.py
 analyzing_softwares_copy/
@@ -16,3 +15,11 @@ Data/*
 Data/20260315_frames/*
 !Data/20260315_frames/workflow.py
 !Data/20260315_frames/params_file.yml
+
+# All of MyPTV
+MyPTV/*
+
+# except myptv
+!MyPTV/myptv/
+!MyPTV/example/
+!MyPTV/example_fibers/

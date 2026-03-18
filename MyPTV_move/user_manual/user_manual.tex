@@ -1,0 +1,1956 @@
+\documentclass[10pt,a4paper]{article}
+
+
+\usepackage[T1]{fontenc}
+% \usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage[english]{isodate}
+\usepackage[parfill]{parskip}
+\usepackage[margin=2.cm]{geometry}
+\usepackage{graphicx}
+\graphicspath{{./figs/}}
+\usepackage{amsmath}
+\usepackage{amssymb}
+%\usepackage{cite}
+\usepackage{array}
+\usepackage{natbib}
+\usepackage[caption=false]{subfig}
+\usepackage{titling}
+\usepackage{titlesec}
+
+\usepackage{xcolor}
+
+\definecolor{bcolor}{rgb}{0.95,0.95,1.0}
+
+\usepackage[caption=false]{subfig}
+\usepackage{caption}
+%\usepackage{orcidlink}
+\usepackage{hyperref}
+\hypersetup{
+	colorlinks = true,
+	urlcolor   = blue,
+	citecolor  = blue,
+	linkcolor = blue
+}
+
+\title{\Huge \sffamily \textsc{\textbf{User Manual}}}
+\author{}%Ron Shnapp}
+\date{}
+
+
+
+\pretitle{%
+	\begin{center}
+		\LARGE
+		\includegraphics[width=8cm]{logo.png}\\[3cm]
+	}
+\posttitle{\end{center}}
+
+
+\begin{document}
+	
+	
+
+
+	
+\maketitle
+
+\thispagestyle{empty}
+\vspace{2.5cm}
+
+\begin{center}
+	\includegraphics[width=10cm]{traj_image.jpg}
+\end{center}
+
+\vfill
+
+\begin{minipage}{14cm}
+	{\small \sffamily
+	Version: 1.3.7 \\
+	Last updated: \today \\
+	Github repository: \url{https://github.com/ronshnapp/MyPTV} \\
+	Get help \& interact with our community: \url{https://github.com/ronshnapp/MyPTV/discussions}\\
+	Contact the developers: ronshnapp@gmail.com}
+\end{minipage}
+
+
+
+\newpage
+% ================================
+%            TOC
+% ================================
+\tableofcontents
+\pagenumbering{Roman}
+\newpage
+
+\pagenumbering{arabic}
+
+
+
+
+
+
+
+
+% ================================
+%            Section 1
+% ================================
+
+
+\section{Introduction}
+
+\subsection{3D-PTV principles}
+
+
+3D-PTV is a method used to measure the trajectories of particles in 3D space. It utilizes the principles of stereoscopic vision to reconstruct 3D positions of particles from images taken from several orientations. A scheme of a typical 3D-PTV experiment using a four-camera system is shown in Fig.~\ref{fig:3dptv_exp}. The main components comprising the 3D-PTV method are the co-linearity condition and the 3D model. According to the co-linearity condition, the position of a point in 3D space can be identified from the crossing of two or more straight lines in 3D space. Therefore, if we have a system of cameras that all of them see a common particle, then the particles' position can be estimated by finding the point in which rays of light connecting the particle with the different cameras cross each other. To perform this task we use a 3D model -- a mathematical representation of the way in which cameras "see" the world. Thus, the 3D model is a function that can convert 3D points into pixel coordinates ($\eta,\, \zeta$ in Fig.~\ref{fig:3dmodel}) and pixel coordinates back into rays of light~\cite{Virant1997, Maas1993}.
+For example, A commonly used 3D model is the pin-hole camera model, in which each camera is associated with a position and orientation in 3D space ($O'$ and $\theta$ in Fig.~\ref{fig:3dmodel}). MyPTV has two 3D models that the user can choose from and they are described below.
+
+
+\begin{figure}[!ht]
+	\centering
+	\subfloat[]{\label{fig:3dptv_exp}
+		\includegraphics[width=6.5cm]{3D_PTV_acquisition.pdf}}
+	\hfill
+	%
+	\subfloat[]{\label{fig:3dmodel}
+		\includegraphics[width=6.5cm]{pinhole_model.pdf}}
+	%
+	\caption{(a) A schematics of a 3D-PTV experiment. (b) A schematic description of the 3d model, the pin-hole camera model.}
+\end{figure}
+
+
+
+Once the experiment, namely data acquisition, is done, there are six intrinsic post-processing steps to follow in order to complete the analysis and obtain the particles' trajectories. The six steps are outlined in Fig.~\ref{fig:steps}. In the camera calibration step, we use images of known calibration targets to fit our physical cameras to the 3D model. In particle segmentation, we use image analysis to obtain the particles' image space coordinates ($\eta, \, \zeta$). In the particle matching step, we use the co-linearity condition to identify which particle images in the different cameras correspond to the same physical particle, and triangulate their positions. In particle tracking, we connect the positions of particles in 3D space to form trajectories. In data conditioning, we might use smoothing and re-tracking algorithms to enhance our data quality according to some physical heuristics. Lastly, we can analyze the data to obtain information on the physics of the particles we are studying. The MyPTV package is meant to handle the first five of these steps.    
+
+
+
+\begin{figure}
+	\centering
+	\includegraphics[width=10cm]{steps.pdf}
+	\caption{Basic steps in the analysis of PTV raw data into particle trajectories and scientific output. The first five steps are handled by MyPYV. \label{fig:steps}}
+\end{figure}
+
+
+The sections that follow outline both how MyPTV can be used by end users and also details on the code used internally to comply with the 3D-PTV method.
+
+
+
+
+
+
+
+
+\subsection{MyPTV usage and structure}
+
+
+MyPTV is used to conduct the post-processing steps in which the experimental raw data (images) are transformed into particles' trajectories. The five steps include camera calibration, image segmentation, particle matching, particle tracking, and, data conditioning which is divided into smoothing and stitching of broken trajectories. This section outlines how these steps are to be followed and how MyPTV is structured to facilitate them. Section~\ref{sec:workflow} gives instructions on how to efficiently use MyPTV. 
+
+
+At the current stage, MyPTV does not include a graphical user interface. Instead, the package includes a script that can be used to efficiently and conveniently run the various post-processing steps. Knowledge of Python is not required to operate MyPTV.
+
+
+The internal structure of MyPTV is made of separate "modules", each of which deals with a particular step out of the list described above. Each module consists of a Python script file that includes one or several classes. Detailed information on each of these classes is given in Sections~\ref{sec:image_mod}--\ref{sec:stitching}, and the code itself includes documentation to a level appropriate for development. In addition to the source code, MyPTV includes a \textit{workflow} script that is used to operate the software in an organized fashion. Thus, MyPTV can be used either by using the workflow script or by directly evoking classes from the source code. 
+
+
+
+
+
+
+
+
+
+
+
+\clearpage
+
+
+
+
+
+
+\section{MyPTVs 3D models}
+
+
+The 3D model is a core element of the 3D-PTV method, as it allows us to do the transformation between the coordinates of objects in the 3D world--lab-space--and the 2D coordinates of the camera images--image space--seen by the cameras and vise-versa. 
+In MyPTV there are two such models that have been implemented thus far, each having certain advantages and disadvantages with respect to the other. Other PTV software might use other 3D models. The models implemented are introduced below.
+
+
+
+
+\subsection{The Tsai model with non-linear polynomial correction}        
+
+
+The 3D model described here is based on the original model that was originally introduced in the seminal work of Maas, Gruen \& Papantoniou from ETH Z\"{u}rich~\cite{Maas1993}.
+The basic model uses the physical pin-hole camera model concepts to project 3D points onto an imaging plane; the basic model is invertible, meaning that points on the imaging plane can be transformed back to lines in the 3D world analytically. Notably, this model was the only one used in the first versions of MyPTV (all the 0.x.x versions).
+
+
+
+Each camera in this model is represented by its position ($\vec O$), orientation vector ($\vec \theta$), and the focal length, as described in Fig.~\ref{fig:3dmodel}. On top of that, to correct for non-linear image aberrations (such as lens imperfection, fisheye, etc), our version of the model uses a non-linear correction term. All in all, the model uses the following equation to transform between the coordinates in the 2D image space coordinates and a direction vector pointing out from the camera imaging center:
+%
+\begin{equation}
+\vec{r}-\vec{O} = \Big( \, 
+\begin{bmatrix}
+\eta + x_h\\
+\zeta + y_h \\
+f
+\end{bmatrix}
++ \vec{e}(\eta, \zeta) \,\Big) \cdot \Big[ R \Big]
+\label{eq:3dmodel}
+\end{equation}
+%
+Here, $\vec{r}$ and $\vec{O}$ are the position of a particle and the position of the cameras imaging center in 3D space; $(\eta, \zeta)$ are the particle coordinates as seen by the camera in 2D image space; $f$ is a scale factor, equal to the cameras' principal distance divided by the physical size of the camera pixels, $\vec e$ is the non-linear correction term, and $x_h,\, y_h$ are corrections to the cameras' imaging center. The matrix $[R]= [R_1]\cdot [R_2] \cdot [R_3]$ is the rotation matrix calculated with the components of the orientation vector, $\vec{\theta} = [\theta 1,\, \theta 2,\, \theta 3]$. 
+The notations are summarized in Table~\ref{tab1:mathdesc}. Each camera has its own distinct values of the parameters listed above. 
+
+
+
+\begin{table}[!hb]
+	\centering
+	\caption{Description of mathematical notation. used to describe the 3D model based on the Tsai model \label{tab1:mathdesc}}
+	\begin{tabular}{p{5em} p{30em}}
+		\hline
+		Symbol & Description \\ \hline
+		$\vec{r}$ & Particle position in the lab space coordinates\\
+		$\vec{O} $& Position of a camera's imaging center \\
+		$\eta, \, \zeta$ & image space coordinates (pixels) of a particle \\
+		$x_h , \, y_h$ & Correction to the camera's imaging center (in pixels)\\
+		$f$ & The camera's principle distance divided by the pixel size \\ 
+		$\vec{e}(\eta, \zeta)$ & A nonlinear correction term to compensate for image distortion and multimedia problems.\\
+		$[R]$ & The rotation matrix which corresponds to the camera orientation vector. \\  \hline
+	\end{tabular}
+\end{table}
+
+
+
+In addition, to the above, the correction term $\vec{e}$ is assumed to be a quadratic polynomial of the image space coordinates:
+%
+\begin{equation}
+\vec{e}(\eta,\,\zeta) = [E]\cdot P(\eta,\,\zeta) =
+\begin{bmatrix}
+E_{11} & E_{12} & E_{13} & E_{14} & E_{15}\\
+E_{21} & E_{22} & E_{23} & E_{24} & E_{25}\\
+0 & 0 & 0 & 0 & 0
+\end{bmatrix}
+\cdot 
+\begin{bmatrix}
+\eta\\
+\zeta\\
+\eta^2\\
+\zeta^2\\
+\eta\,\zeta
+\end{bmatrix}
+\end{equation}
+%
+Here, $[E]$ is a $3\times5$ matrix that holds the coefficients of the correction term (the last row is filled with zeros because we do not attempt to correct for $f$).
+
+
+
+
+
+
+
+
+
+
+
+\subsection{The extended Zolof model} 
+
+
+
+The extended Zolof model is used for the transformation between 3D lab-space and 2D image space. 
+Here, the transformation from lab-space to image-space does not involve any physical assumption about how cameras perceive the world--it is purely mathematical. However, a physical assumption is used in the transformation back from image-space to lab-space. 
+
+
+The projection of 3D lab-space coordinates into the 2D image-space is achieved using interpolating functions
+%
+\begin{equation}
+\left[ 
+\begin{matrix}
+\eta \\[.2cm]
+\zeta
+\end{matrix}
+\right]
+=
+\left[ 
+\begin{matrix}
+P_\eta(\vec{r}) \\[.2cm]
+P_\zeta(\vec{r})
+\end{matrix}
+\right]\,\, .
+\end{equation}
+%
+In MyPTV, $P_\eta$ and $P_\zeta$ are polynomial functions of the $\vec{r}=(x,y,z)$ coordinates defined as the product 
+\begin{equation}
+\left[ 
+\begin{matrix}
+P_\eta(\vec{r}) \\[.2cm]
+P_\zeta(\vec{r})
+\end{matrix}
+\right] = S \, A^{\top}
+\end{equation}
+where $S$ is the 19 polynomial components
+%
+\begin{align}
+\label{eq:SoloffVector}
+\begin{split}
+S\left(x,y,z\right) = [\,&1,\,x,\,y,\,z,\,x^2,\,y^2,\,z^2,\,xy,\,yz,\,xz,\\
+&x^3,\,y^3,\,xyz,\,x^2y,\,x^2z,\,xy^2,\,y^2z,\,xz^2,\,yz^2\,]
+\end{split}
+\end{align}
+%
+and $A$ is the polynomial coefficients matrix 
+%
+\begin{align}
+\label{eq:SoloffVector2}
+A =
+\begin{bmatrix}
+a^\eta_{0},\, a^\eta_{0},\, \ldots , a^\eta_{18} \\[.2cm]
+a^\zeta_{0},\, a^\zeta_{1},\, \ldots , a^\zeta_{18}
+\end{bmatrix}\,\,.
+\end{align}
+
+
+
+For the transformation from image-space to lab-space a we use a unified approach, utilizing a pinhole model in which the direction vector is obtained for each 2D image point via a polynomial of degree 3. Specifically, intrinsic to this model is the assumption that each 2D camera position $(\eta,\, \zeta)$ is associated with a (straight) line of sight and that all the lines of sight cross at some points in the 3D physical world at the camera position $\vec{O}_i$ of camera $i$. Therefore, each 3D line of sight for image coordinates from camera $i$ is given as
+%
+\begin{equation}
+\vec l_i(x_i, \, y_i) = \vec{O}_i + \mu\,\vec{U}_i(x_i, \, y_i) 
+\end{equation}
+%
+where $\mu$ is a free parameter and $\vec{U}_i$ represents the unit vector associated with each 2D image coordinate of camera $i$, defined as
+%
+\begin{align}
+\label{Eq::extendedSoloff_backwards}
+\vec{U}_i(x_i, \, y_i) = \mathbf{B}_i \cdot u(\eta, \, \zeta)^\top
+\end{align}
+%
+Here, the matrix $\mathbf{B}_i$ stores of the polynomials coefficients of camera $i$ and vector $\vec{u}$ defines the polynomial over the 2D camera coordinates.
+\begin{align}
+\mathbf{B}_i = 
+\begin{bmatrix}
+b^{(i)}_{0x} & b^{(i)}_{1x} & b^{(i)}_{2x} &  \cdots & b^{(i)}_{9x}\\[2pt]
+b^{(i)}_{0y} & b^{(i)}_{1y} & b^{(i)}_{2y} &  \ldots & b^{(i)}_{9y}\\[2pt]
+b^{(i)}_{0z} & b^{(i)}_{1z} & b^{(i)}_{2z} &  \ldots & b^{(i)}_{9z}
+\end{bmatrix}
+\end{align} 
+%
+\begin{align}
+u(\eta, \, \zeta) = \left[1, \eta,\,  \zeta,\, \eta^2,\, \zeta^2,\, \eta \zeta,\, \eta^3,\, \zeta^3,\, \eta^2 \zeta,\, \eta \zeta^2\right]
+\end{align}
+%
+All in all, each camera in the unified polynomial calibration method is characterized using $19\times 2$ coefficients stored in matrix $\mathbf{A}_i$ for the projection from 3D to 2D, plus three coordinates of the 3D camera position ($\vec{O}_i$), plus $10\times 3$ coefficients stored in matrix $\mathbf{B}_i$ of the backward projection, giving a total of 71 parameters per camera. 
+
+
+
+
+
+\subsection{Advantage and disadvantage of each model}
+
+The extended Zolof model is a later addition to MyPTV, and its main advantage is that it is easier to calibrate than the Tsai model. Specifically, the transformation can be formalized as a linear least square problem such that its globally optimal parameters can be found exactly. In comparison, the Tsai model calibration process must employ a non-convex optimization, making it difficult to converge to the optimal solution. In addition, the extended Zolof calibration does not require that the user to input an initial guess, which posses one of the main difficulties in the calibration process. 
+
+
+The disadvantage of the extended Zolof model is that it does not comply with a physical principle. Therefore, extrapolation of the model to regions beyond the region of the calibration, or careless use of high degree polynomials ($P_\eta$ and $P_\zeta$) could lead to errors. The Tsai model on the other hand uses the pin hole camera physical model, and so it is expected to perform better in extrapolations beyond the calibration region.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\clearpage
+
+
+
+\section{The Workflow: guidelines for a 3D-PTV experiment}\label{sec:workflow}
+
+
+MyPTV can be operated using the \texttt{workflow.py} script. The script is found under the \textit{example} folder under the home directory of the MyPTV package. The workflow is used through command line given instructions and a file that outlines the parameters to be used in each step.
+
+
+
+
+
+\subsection{Preparation of an experiment folder}~\label{sec:workflow_exp_folder}
+
+To begin post processing of the 3D-PTV results, prepare the following directory structure:
+
+\begin{enumerate}
+	\item Make a new directory; in it, make a new directory called \texttt{Calibration} and place inside it the calibration images, and make another set of directories, one for each camera, and place inside it the particle images of each camera.
+	\item Locate the \texttt{example} under the root folder of the MyPTV package. This can be used as a template to the experiment directory made in the previous step.
+	\item Copy the files \texttt{workflow.py} and \texttt{params\_file.yml} from the \texttt{example} folder into your experiment's folder.
+\end{enumerate}
+
+
+
+
+\subsubsection{The \texttt{workflow.py} script} \label{sec:workflow_commands}
+
+\texttt{workflow.py} is a Python script used by the user to run the various steps of the post-processing. The script is used through the terminal or command line. To use MyPTV's various functions, go to the experiment's directory with:
+\begin{verbatim}
+cd \path\to\experiment\folder
+\end{verbatim}
+%
+and then, use the following syntax:
+%
+\begin{verbatim}
+python workflow.py params_file.yml "command"
+\end{verbatim}
+%
+where \texttt{"command"} should be replaced with one of the following options, depending on the particular step of the post processing:
+%
+\begin{verbatim}
+	"help"
+	"initial_calibration"
+	"final_calibration"
+	"analyze_calibration_error"
+	"calibration_with_particles"
+	"calculate_equilization_map"
+	"calculate_BG_image"
+	"segmentation"
+	"matching"
+	"analyze_disparity"
+	"tracking"
+	"smoothing"
+	"stitching"
+	"2D_tracking"
+	"manual_matching"
+	"fiber_orientations"
+	"plot_trajectories"
+	"animate_trajectories"
+	"run_extention"
+\end{verbatim}
+%
+Each of these commands initiates one of MyPTVs functionalities, and a detailed explanation on them is found in Sections \ref{sec:cal_guide}--\ref{sec:workflow_stitch}. Use \texttt{help} to print the available list of commands.
+
+
+\subsubsection{The \texttt{params\_file.yml} file}
+
+The \texttt{params\_file.yml} outlines all the parameters needed in order to run MyPTV using the workflow script. In every step conducted, go through the lists of parameters and make sure that their values are correct. The definitions per every step are tabulated in the sections below.
+
+
+
+
+
+
+
+\subsection{Calibration guide} \label{sec:cal_guide}
+
+
+A good calibration is key to having success in your PTV experiment! Thus, follow this guide to calibrate your camera using MyPTV. 
+
+
+In the process called camera calibration, our goal is to determine what are the external ($\vec{O}$, $\vec{\theta}$) and internal ($f$, $x_h,\,y_h$, $[E]$) parameters of each of our cameras. This process is done by taking an image, a \textit{calibration image}, of an object that has points with known coordinates marked on it - \textit{calibration target}. Therefore, its important to make sure that for each experiment and each camera we have a calibration image ready, as seen, for example, in Fig.~\ref{fig:cal_img}.
+
+
+Importantly, since our goal in calibration is to find the cameras' positions, once calibration images were taken in an experiment it is crucial that the cameras are not moved. Even minor vibrations can ruin an experiment. Also, the calibration target needs to be in the same medium in which the experiment will be performed to ensure that any refraction is corrected by the error terms (for example, if you are using a tank of water, place the calibration target inside the tank of water). 
+
+
+Once calibration images have been obtains, we use MyPTV to fit the cameras to the 3D-model chosen and estimate the model's parameters. 
+The calibration in MyPTV is performed in two steps: \textit{initial calibration} and \textit{final calibration}. The initial calibration is used to obtain a rough estimation of some of the camera's parameters using a small number of calibration points, as well as to extract the information for all the calibration points on the calibration target. In the final calibration we fine tune the camera's parameters in order to minimize the \textit{calibration error}. 
+The initial and final calibration steps are slightly different for each of the 3D models, so note which model is chosen.
+The process is explained in detail in the following sub sections. 
+
+
+%A schematic block diagram for the calibration process of each camera is given in Fig.~\ref{fig:calibsteps}. The calibration is divided into two sub-processes: 1) initial calibration, in which we use only 6 calibration points to obtain an approximate calibration estimation, and, 2) final calibration, in which we use all the calibration points on the calibration target to improve the accuracy of the initial calibration. The various steps of the process are performed in MyPTV through the workflow script, and detailed instructions are given below. 
+%
+%
+%\begin{figure}
+%	\centering
+%	\includegraphics[width=10cm]{Calibration_steps.pdf}
+%	\caption{A block diagram representing the steps to follow in the calibration of each camera using MyPTV. \label{fig:calibsteps}}
+%\end{figure}
+
+
+
+
+\subsubsection{Preparing a \texttt{target\_file}}\label{sec:target_file}
+
+The target file is a text file (tab separated values), in which each row shows the lab space coordinates of a calibration point.  An example for the format is shown in Fig.~\ref{fig:target_file}. If there is no target file in the experimental folder, this is the time to generate one. Prepare such a file and save it in the experiment's calibration folder.
+
+
+
+
+\subsubsection{Preparing the parameters in the \texttt{params\_file}}
+
+As in any step of MyPTV, we make sure that the \texttt{params\_file.yaml} in our experiment folder has the correct parameters, namely file names under the calibration tab; see Tab.~\ref{tab:cal_paramsfile}. Each camera is calibrated separately, and so, for the calibration of each camera we need to change the file names in \texttt{params\_file.yaml} appropriately (alternatively, one could have separate parameter files for each camera).  
+
+\begin{table}
+	\centering
+	\caption{The \texttt{params\_file.yml} parameters for the calibration step. All paths to files are relative to the \texttt{workflow.py} script. \label{tab:cal_paramsfile}}
+	\begin{tabular}{l m{10cm}}
+		\hline
+		Parameter & Description\\[.2cm]
+		\hline
+		
+		\texttt{3D\_model} & The name of the 3D model used; can be either "\texttt{Tsai}" or "\texttt{extendedZolof}". \\[.2cm]
+		
+		\texttt{camera\_name} & The name of the camera to be calibrated; for example, \texttt{cam1}, etc. \\[.2cm]
+		
+		\texttt{resolution} & Camera resolution; for example: \texttt{1280, 1024}. \\[.2cm]
+		
+		\texttt{target\_file} & Path to the file that lists the calibration target's lab points (for example \texttt{./Calibration/target\_file}) \\[.2cm]
+		
+		\texttt{calibration\_image} & Path of the calibration image (for example \texttt{./Calibration/cal1.tif})\\[.2cm]
+		
+		\hline
+	\end{tabular}
+\end{table}
+
+
+
+
+
+\subsubsection{Initial calibration}\label{sec:init_calibration}
+
+
+To start the initial calibration, we start the \textit{initial calibration GUI}. Using the workflow file in the terminal, use the following command:
+%
+\begin{verbatim}
+python workflow.py params_file.yml initial_calibration
+\end{verbatim} 
+%
+which should open the a window like the one shown in Fig.~\ref{fig:init_cal_gui}. The left most panel shows the calibration image; we can zoom in and out by pressing the "+" and "-" keys. 
+
+\begin{figure}
+	\includegraphics[width=1.0\textwidth]{initial_calibration.pdf}
+	\caption{The initial calibration GUI when using the Tsai 3D-model. \label{fig:init_cal_gui}}
+\end{figure}
+
+
+The initial calibration is composed of four steps, and each one has a dedicated panel in the GUI. The steps should, in general, be followed along the order of the steps: 1 $\rightarrow$ 4.   
+
+
+Here are the details regarding each of the initial calibration steps:
+
+\begin{enumerate}
+	\item \texttt{cam file generation}: Here we produce a text file that stores the camera parameters. If using the \textit{extended Zolof model}, everything is done automatically and the user only needs to click the \texttt{Generate cam file} button. If using the \textit{Tsai model}, we first have to give a first guess for the six different external parameters, $\vec{O}$ and $\vec{\theta}$, and the focal length, $f$. It's important to give a reasonably good initial guess, because the calibration problem often has local minima that make the convergence to solution difficult. To understand the how to choose the values, consult Section~\ref{sec:camera_external_params}. When done, click the \texttt{Generate cam file} button.  
+	
+	\item \texttt{image segmentation}: In this step we use MyPTV to detect the points on the calibration image and to store their pixel coordinates in a file. Choose and tweak the segmentation parameters until all the calibration points are detected (or at least most of them if the images are not ideal). Detected points are indicated by green squares on the image. Also, a reference for the segmentation parameters can be found in Section~\ref{sec:workflow_segment}. Once done, save the file using the \texttt{save} button.
+	
+	\item \texttt{mark image points}: Here, we start by choosing six points (at least) of the calibration target. The points should not be coplanar and it is best to choose them such that there is some asymmetry to reduce the chance of false convergence. For each point chosen, we mark it by clicking on it on the image and we write its' lab space coordinates in the \texttt{x lab}, \texttt{y lab}, \texttt{z lab} fields, and then click the \texttt{Mark point} button. The marked points will be shown as blue crosses on the image. After marking all the chosen points, we save their coordinates using the \texttt{Save points} button.
+	
+	\item \texttt{sortgrid}: In this last step, MyPTV tries to calibrate the camera using only the points we marked in step 3, and then to match the calibration points we segmented in step 2 to the points we gave in the target file. Thus, click the \texttt{initial calibration} button, make sure that the calibration error is low (aim for about 1.0), and click \texttt{show calibration}. If the results are good, click the \texttt{Match target file} button, and you should see the segmented points and the associated points from the target file paired by a red line on the image. Make sure that there are no errors in the pairing, and then save the results. If you detect errors or the initial calibration did not reach low enough error, it might be needed to generate an improved initial guess.  
+		 
+\end{enumerate}
+ 
+This concludes the initial calibration step.
+
+
+
+
+
+
+\begin{figure}
+	\centering
+	\includegraphics[width=0.4\textwidth]{calibration_gui.png}
+	\caption{An image of the calibration GUI. The calibration GUI has several functionalities to run the minimization functions, plot the calibration error and the calibration particle's images, as well as change manually the camera parameters. See Tab.~\ref{tab:calibration_gui} for a description of the operation of each button. \label{fig:calibration_gui}}
+\end{figure}
+
+
+
+\begin{table}[!ht]
+	\centering
+	\caption{The various commands available in the calibration GUI (Fig.~\ref{fig:calibration_gui}). \label{tab:calibration_gui}}
+	\begin{tabular}{l m{10cm}}
+		\hline
+		Parameter & Description\\
+		\hline
+		
+		\texttt{External calibration} & Will minimize the calibration error by optimizing the external parameters of the camera using all the calibration points. This might require several runs to reach good results.\\[.3em]
+		
+		\texttt{Fast ext. cal.} & Will optimize the external camera parameters using a faster stochastic optimizer. This option is good for rapidly obtaining a reasonable calibration when there are a lot of calibration points.\\[.3em]
+		
+		\texttt{Fine calibration} & Will minimize the calibration error by optimizing the nonlinear error term of the camera parameters. This might require several runs to reach good results. \\[.3em]
+		
+		\texttt{Fast fine cal.} & Will optimize the nonlinear error terms of the camera parameters using a faster stochastic optimizer. This option is good for rapidly obtaining a reasonable calibration when there are a lot of calibration points.\\[.3em]
+		
+		\texttt{Grab manual} & This allows to manually change camera parameters. to do this, first tick the \texttt{Manual} checkbox. Then, manually change the values of the camera parameters. Finally, click the button and watch the effect on the calibration error. \\[.3em]
+		
+		\texttt{Plot calibration} & Will generate a plot of the calibration points projected on the camera space, and the known calibration points.\\[.3em]
+		
+		\texttt{Plot error hist.} & Will generate a histogram of the calibration errors for the various calibration points. \\[.3em]
+		
+		\texttt{Save} & Will save the results of the current session in the camera file. \\[.3em]
+		
+		\texttt{Quit} & Will quit the GUI.\\[.3em]
+		\hline
+	\end{tabular}
+\end{table}
+
+
+
+
+
+\subsubsection{Tsai model: Understanding camera external parameters} \label{sec:camera_external_params}
+
+
+
+The external parameters of the Tsai model in MyPTV include its position, its orientation, and its focal length, $\vec{O}$, $\vec{\theta}$, and $f$, respectively. In the calibration process, it is important to understand these parameters to be able to give a good initial guess and judge the results of the calibration procedure. Thus, let us explain how these parameters are defined.
+
+
+Each camera is associated with an image space reference frame, shown in Fig.~\ref{fig:cam_pos_example} as the $x',$ $y'$, and $z'$ axes. The $z'$ axis is normal to the imaging plane (the camera's sensor), while $x',$ and $y'$ are tangent to it; the system is right-handed. 
+
+
+The position parameter, $\vec{O}$, is defined as a vector pointing from the origin of the lab space coordinate system to the origin of the camera's reference frame. It is measured in lab-space units (e.g. millimeters). Therefore, one could estimate $\vec{O}$ directly by using a ruler or a measuring tape to measure where the camera is in the lab-space coordinates. 
+
+
+The orientation parameter, $\vec{\theta}$, is a vector of three angles that describe the rotation of the camera's reference frame with respect to the lab space frame, namely the camera's Euler angles. The first angle describes the rotation around the $x'$ axis, the second describes rotation around $y'$, and the third angle describes rotation around $z'$. Rules of thumb in trying to guess $\vec{\theta}$ are: 1) ask yourself "how should one rotate the lab's frame of reference so that it aligns with the camera's frame of reference?"; 2) we first rotate around the $x'$ axis, then around $y'$ and then around $z'$. Note: in many cases, the origin of the images is on the top left corner, so half a turn rotation around the $z'$ axis is often needed. See Fig.~\ref{fig:cam_pos_example} for an example.
+
+
+The focal length parameter,$f$, is essentially an extension factor. In MyPTV $f$ is measured in units of pixels. The focal length is normally more or less equal to the camera's lens focal length. For example, if one uses a camera with a 60mm lens in their experiment, and the size of one camera pixel is 10$\mu$m=0.01mm, then $f$ would roughly be equal to 6000 (pixels). Potentially, one could also estimate $f$ in an experiment: 1) place the camera in a known position facing a calibration target (as e.g. in Fig.4a) and take a picture 2) prepare a calibration points file for a few of the points on the calibration target; 3) preparing a camera file using the known position and orientation 4) insert some initial value for $f$; 5) using the \texttt{workflow.py} file to compare the distribution of the points using this value of $f$; 6) repeat steps 4 and 5 until a fair agreement is found.  
+
+\vspace{.25cm}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=0.8\textwidth]{Cam_pos_examples.pdf}
+	\caption{Two examples for camera setups. The (x, y, z) system represents the lab space, and the (x', y', z') represents the camera's system of reference. In (a) the camera's position is roughly $\vec{O} = (0,0,1)$, and an appropriate rotation vector could be $\vec{\theta} = (0,\pi,0)$. In (b) the camera's position might be $\vec{O} = (1,1,1)$, and the orientation vector might approximately be $\vec{\theta} = (-\frac{1}{4}\pi,-\frac{3}{4}\pi,0)$. \label{fig:cam_pos_example}}
+\end{figure}
+
+
+
+
+
+
+\begin{figure}[!ht]
+	\centering
+	%
+	\subfloat[]{ \label{fig:calpointfile}
+		\includegraphics[width=7cm]{cal_point_file.pdf}
+	}\\
+	%
+	\subfloat[]{\label{fig:target_file}
+		\includegraphics[width=9cm]{target_file.pdf}}
+	%
+	\subfloat[]{\label{fig:match_target_file}
+		\includegraphics[width=6.0cm]{match_target_file.jpeg}}
+	%
+	\caption{(a) Format of the target file, which lists the lab-space coordinates of the calibration target as tab-separated values. The order at which points are given is not relevant. (b) An example of a text file holding the calibration point data. (c) The results of matching a target file points (blue circles) and the segmented blobs (red crosses). Here, we know that the match is correct because each cross overlays a circle. In location where circles are not overlaid by a cross, the segmentation did not recognize a calibration target; having such missing points may slightly reduce the quality of the calibration but it is not critical for the target file matching.}
+\end{figure}
+
+
+
+\subsubsection{Final calibration}
+
+In the final calibration we use all the calibration points to find the parameters of the camera. We do this by minimizing the calibration error, defined as the root mean square of the distances between the image-space calibration points positions and the projection of the lab-space points on the image plane.
+The procedure is performed using the final calibration gui, which is initiated by using the workflow script with the command
+%
+\begin{verbatim}
+python workflow.py params_file.yml final_calibration
+\end{verbatim}
+%
+
+
+
+The final calibration gui is different for each 3D-model.
+For the \textit{extended Zolof}, the minimization is done by solving an exact least squares problem, and for a given set of calibration points there is only one solution which is found by the solver. Therefore, to complete the calibration simply click on the \texttt{calibrate} button, and once the process is finished the calibration was found. Click \texttt{save} to save the results into the camera file. You can inspect the calibration using the histogram and the calibration target plots. 
+
+
+For the \textit{Tsai model}, the minimization is solved numerically in iterations using the \textit{final calibration gui}. 
+The gui for the Tsai model is shown in Fig.~\ref{fig:calibration_gui}. The description of each of the possible functionalities are given in Table~\ref{tab:calibration_gui}. In principal, the lower the calibration error, the results of the measurements will be more reliable, and it will become possible to track a higher number of particles in each frame. Once a sufficiently low error value is achieved, the calibration process is complete. 
+
+
+
+Note: A "good" calibration will have a low error value - how much exactly is difficult to say and it strongly depends on the imaging setup used and in particular the imaging resolution. Typically, we would want to get down to approximately 1 pixel or lower.  
+
+
+
+
+
+\subsubsection{Calibration error analysis, validation and uncertainty}
+
+	
+Once all the cameras have been calibrated, it is important to verify the calibration quality, as this gives us information on the uncertainty of the results. We analyze the calibration error by stereo matching the calibration points, which is done through the workflow command "\verb!analyze\_calibration\_error!". 
+
+The \texttt{analyze calibration error} command calculates statistics of the deviation between the ground truth of the calibration points and the estimate that is obtained using stereo matching. The command outputs two types of information: 
+\begin{enumerate}
+	\item it prints the root mean square of the deviations both in total distance and for each direction;
+	
+	\item it plots histograms of the deviations' total distance and in each direction.
+\end{enumerate}
+%
+The results are shown in lab-space coordinates (i.e. in millimeters). Therefore, the values obtained can be taken as the \underline{lower bound} for the uncertainty in the measurements of the particle positions in the experiment. Figure~\ref{fig:cal_error} shows an example for the output of this type of analysis. 
+
+
+
+
+\begin{figure}[h!]
+	\centering
+	\includegraphics[height=8cm]{Cal_error_analysis.pdf}
+	\caption{Example results of the calibration error analysis. In this experiment, the lower bound for the uncertainty for position measurements based on the RMS deviation value was approximately $100 \, \mu m$, with the largest deviations in the $z$ direction.}
+	\label{fig:cal_error}
+\end{figure}
+
+
+
+
+
+
+
+\begin{figure}[h!]
+	\centering
+	%
+	\subfloat[]{\label{fig:cal_img}
+		\includegraphics[height=6cm]{cal_image.jpg}}
+	\hfill
+	%
+	\subfloat[]{\label{fig:cal_err}
+		\includegraphics[height=6cm]{cal_error.pdf}}
+	%
+	\caption{(a) An example of a calibration image. The points on the target have known lab space coordinates. Not also that the points are distributed over several plains (3 different $z$ values in this case). (b) An example plot of a calibration error estimation. The red crosses represent the known positions of the calibration points given in the target file, and the black circles mark the positions of the stereo-matched segmented calibration points. In this case, the root mean square of the static calibration error was 84$\mu m$.}
+\end{figure}
+
+
+
+
+
+
+
+\subsubsection{How to perform calibration with several images (sometimes called multiplane calibration)}\label{sec:multiplane_cal}
+
+
+
+Calibrating the PTV cameras requires having calibration points spanning a full 3D volume, with points being positioned on different planes. Traditionally, this is done by constructing the calibration target with multiple planes (Fig.~\ref{fig:cal_img}).
+However, in some PTV systems another solution is taken such that the calibration target is moved to different locations and images of the target are taken there. In OpenPTV, this is called multiplane calibration. The following steps outline the procedure to follow when using such a multiplane calibration in MyPTV:
+
+\begin{enumerate}
+	\item Place the calibration target in its first position; make sure you the location of the target and take an image of it. Then, move the target to another position and take an image of it. Repeat until the whole domain is covered by your calibration points, and save the sequence of images you just took. 
+	
+	\item Prepare a target file for each one of the images in the calibration sequence (see Seq.~\ref{sec:target_file}). Note that the target file for each image needs to hold only the information for the points that are seen in its particular image. 
+	
+	\item Perform an initial calibration for each of the calibration images, each with respect to its own target file. When you do so, make sure that the you are using a different "camera name" in the params\_file (for example, "cam1\_1", "cam1\_2", "cam1\_3", ..., cam1\_i).
+	
+	\item After finishing the previous step, for each calibration image you should have a file called "XXXXX\_i\_cal\_points" where "XXXXX\_i" stands for the camera names you put in the params file. 
+	
+	\item Make a new empty file called as the base name of the previous files (the "XXXXX" part of the "XXXXX\_i"); in the params\_file, change the camera name to the same value ("XXXXX"). Inside the new file just generated, copy and paste the data from all the "XXXXX\_i\_cal\_points" files.
+	
+	\item Make a copy of one of the camera files, and change its name to "XXXXX". This will make sure you have a camera file from which we start the final calibration.
+	
+	\item Run the final calibration as done in the regular calibration procedure. 
+\end{enumerate}
+
+
+  
+
+
+
+
+
+
+\begin{table}[!ht]
+	\centering
+	\caption{The \texttt{params\_file.yml} parameters for the \textbf{segmentation} step. All paths to files are relative to the \texttt{workflow.py} script. \label{tab:segment_params}}
+	\begin{tabular}{l m{13cm}}
+		\hline
+		Parameter & Description\\
+		\hline
+		
+		\texttt{image\char`_start} & The number of the image from which the loof begins. If this is \texttt{None} (default) the first image is set to 0.\\[.3em]
+		
+		\texttt{Number\char`_of\char`_images} & Number of images over which to do the segmentation. If it is 1, segmentation is done only on the image with the name given in \texttt{single\char`_image\char`_name}. If this is an integer, segmentation is performed on the first N images found in the directory \texttt{images\char`_folder}. If this is \texttt{None}, segmentation is performed over all the images in the directory \texttt{images\char`_folder} \\[.3em]
+		
+		\texttt{images\char`_folder} & path to the folder containing the images\\[.3em]
+		
+		\texttt{single\char`_image\char`_name} & If \texttt{Number\char`_of\char`_images} is 1, the segmentation will be done on the image whose name is given here. If \texttt{Number\char`_of\char`_images} is any other value, this parameter is not used. \\[.3em]
+		
+		\texttt{image\char`_extension} & extension of the images; for example, .tif\\[.3em]
+		
+		\texttt{raw\char`_format} & Set this to True if your images are in RAW format (e.g. .dng), and False otherwise (usually this should be set to False)\\[.3em]
+		
+		\texttt{shape} & Can be either 'particles' or 'fibers'. The 'particles' option is used for isotropic particles to follow traditional PTV, and the 'fibers' option is used for analyzing the orientations in 3D of anisotropic particles (elongated fibers or rods), see Sec.~\ref{sec:fibers}. \\[.3em]
+		
+		\texttt{pca\_limit} & This parameter applies only when \texttt{shape} is set to 'fibers'. It specifies the maximum allowable ratio of eigenvalues from the PCA decomposition of fibers in image space. For values greater than 1, only fibers with an aspect ratio below this threshold will be segmented, and particles in the same frame will be ignored.  \\[.3em]
+		
+		\texttt{plot\_result} & if \texttt{False} will not plot the results; if \texttt{True} the results will be plotted but only if number of images is 1 \\[.3em]
+		
+		\texttt{mask} & if this is 1.0, no mask is used; if this is set to a path to a file, the file will be used as a mask for the segmentation, where the file should be a black and white image where white marks the region of interest \\[.3em]
+		
+		\texttt{ROI} & region of interest; specify by indicating the xmin, xmax, ymin, ymax coordinates \\[.3em]
+		
+		\texttt{threshold} & the brightness value for which a point is considered a particle after a local mean subtraction is performed \\[.5em]
+		
+		\texttt{remove\_background} & If string, then it is the path to a pre-calculated background image (see sec.~\ref{sec:preprocessing}). If False, background subtraction is not used.\\[.5em]
+		
+		\texttt{equilization\_map} & If string, then it is the path to a pre-calculated equalization map (see sec.~\ref{sec:preprocessing}). If None, equalization is not applied.\\[.5em]
+		
+		\texttt{DoG\_sigmas} & Either a list of two numbers [$\sigma_1$, $\sigma_2$] that represent the widths of two blurring operations, or None, in which case the filter is not applied.\\[.5em]
+		
+		\texttt{median} & the intger window size of a median noise removal filter; set to \texttt{None} in order to not apply the filter \\[.3em]
+		
+		\texttt{blur\_sigma} & the float standard deviation of a Gaussian blur filter; set to \texttt{None} in order to not apply the filter \\[.3em]
+		
+		\texttt{local\_filter} & the scale of Gaussian filter used to normalized brightness intensity (see~\ref{sec:segment_filters}); set to \texttt{None} in order to not apply the filter \\[.3em]
+		
+		\texttt{min\_xsize} or \texttt{min\_ysize} & minimum particle size (pixels) in $x$ or $y$ direction \\[.3em]
+		
+		\texttt{min\_mass} & minimum particle mass (mass is the sum of pixel grey values)\\[.3em]
+		
+		\texttt{max\_xsize} or \texttt{max\_ysize} & maximum particle size (pixels) in $x$ or $y$ direction \\[.3em]
+		
+		\texttt{max\_mass} & maximum particle area (mass is the sum of pixel grey values) \\[.3em]
+		
+		\texttt{plot\_result} & if \texttt{True} the segmented particles will be plotted over the processed image (after applying blur, local mean subtraction and masking); if \texttt{False} will not plot the results \\[.3em]
+		
+		\texttt{method} & The name of the segmenting method; can be either 'labeling' or 'dilation' \\
+		
+		\texttt{particle\_size} & in the 'dilation' method, this gives the diameter of blobs in the image (an integer number of pixels); this parameter is not used when method is set to 'labeling' \\
+		
+		\texttt{save\_name} & if \texttt{None} the results will not be saved in a file; if \texttt{path/to/file} will save the results in the given file name \\
+		
+		\hline
+	\end{tabular}
+\end{table}
+
+
+
+
+\subsection{Segmentation}\label{sec:workflow_segment}
+
+
+Segmentation is essentially the image analysis step of the PTV method, in which we extract the particles' image-space coordinates from the experiment images and save the coordinates in dedicated files. 
+
+
+\subsubsection{How to segment in MyPTV}
+
+The basics of the segmentation step are done via the \texttt{workflow.py} script with the \texttt{segmentation} command. To run the process follow these steps:
+
+\begin{enumerate}
+	\item We perform the segmentation first on a single image by specifying \texttt{Number\_of\_images: 1}, and giving an image name with \texttt{single\_image\_name}. We then tune the segmentation parameters and the image processing filters used (e.g. \texttt{ROI}, \texttt{threshold}, \texttt{blur\_sigma}, \texttt{method} etc (details below); the full list is given in Table~\ref{tab:segment_params}) to obtain optimal results; optionally repeat over several more images to ensure the results are satisfactory. To view the segmented particles over the image, use \texttt{plot\_result: True}, and make sure the results are not saved by using \texttt{save\_name: None}. 
+	
+	\item Once the parameters are determined, we set \texttt{Number\_of\_images: None}, and run the segmentation workflow again. This will then loop over all the images in the given folder (under \texttt{images\_folder}), and save the results in a text file by setting \texttt{save\_name: /file/name/to/use}
+\end{enumerate}
+
+
+
+\subsubsection{Image pre-processing}\label{sec:preprocessing}
+Image analysis is a key step in PTV and therefore, there are many algorithms used to improve the results of this step. Some of these methods require preparations that need to be made before the segmentation, and these preparations can be called pre-processing. There are two possible pre-processing steps currently available in MyPTV: 
+\begin{enumerate}
+	\item \textbf{\textit{Background images}}: In some cases where the imaging conditions are not perfect, background objects will appear in the images and obstruct the segmentation. To negate these effects we calculate a "static background image" (defined as the mean of the images) and during the segmentation this background image is subtracted from each image. This is done using the  workflow command \texttt{calculate\_BG\_image}, which is used to calculate the mean image and save it on the disk for later use during segmentation.
+	
+	The background image is defined here as the arithmetic mean of images from the image folder: 
+	\begin{equation}
+	\mathrm{BG} = \frac{1}{N_{im}}\Sigma \mathrm{Im}_i \,\, ;
+	\end{equation}
+	After that, the images are processed by taking the difference with the background
+	\begin{equation}
+	\mathrm{Im}' = |\mathrm{BG} - \mathrm{Im}|
+	\end{equation}
+	
+	\item \textbf{\textit{Intensity equalization}}: In some cases where illumination is not uniform, some particles will have different intensities in different regions of the images and thus will make segmentation more challenging. To negate this, we can create an equalization map", which attempts to equalize the brightness intensity of the particles at different locations in the images. We prepare this equalization map with the workflow command \texttt{calculate\_equilization\_map}. The map is then saved as a tif image on the disk and is used during the segmentation step to improve the segmentation results. 
+	
+	The equalization map is defined here be calculating the pixel-wise maximum intensity across all the images, and then applying a gaussian blur with a given standard deviation
+	\begin{equation}
+	\mathrm{EQmap} = \frac{\mathrm{GaussianBlur}(Max(\mathrm{Im}_i), \sigma)}{Max\left[ \mathrm{GaussianBlur}(Max(\mathrm{Im}_i), \sigma) \right]} + \epsilon
+	\end{equation}
+	After that, the images are processed by dividing each image with the equalization map
+	\begin{equation}
+	\mathrm{Im}' = \mathrm{Im} / \mathrm{EQmap} 
+	\end{equation}
+\end{enumerate}
+%
+An example for the result of these two steps is shown in Fig.~\ref{fig:image_preprocessing}. To actually apply these methods during segmentation, the background image and the equalization map are given as inputs during the segmentation process as detailed below. 
+
+
+
+\begin{figure}[h]
+	\centering
+	\includegraphics[width=\textwidth]{image_preprocessing.pdf}
+	\caption{Examples of background image, equalization map, original experimental image and the same image after background subtraction and intensity equalization.}
+	\label{fig:image_preprocessing}  
+\end{figure}
+
+
+
+
+\subsubsection{Two methods of segmentation} In the segmentation step, the program extracts the location of particles in the image. Segmentation in MyPTV is performed in one of two methods: \textbf{\textit{labeling}}, or \textbf{\textit{dilation}}, and includes several optional image processing steps. 
+%
+\begin{itemize}
+	\item \textbf{Labeling:} In this method, we first choose all pixels in an image whose gray value is higher than a given threshold. Then, such pixels that are touching each other are considered to be "blobs", so we group them together. For each blob, we calculate a \textit{center of mass}, being the gray value weighted average of the blob, a \textit{bounding box} size, and a \textit{mass}, being the sum of gray values of the blobs' pixels.
+	
+	\item \textbf{Dilation:} Searching for objects of a certain size. In this method, we are looking for pixels that their gray value is higher than that of all their neighbors within a box of a given size (\texttt{particle\_size}), and that their gray value is higher than a given threshold. After that, all the neighboring pixels inside the particle size box are considered to be a blob. We then calculate the center of mass of the blob to achieve a better estimation of its position, thus redefining the blob. This process is iterated a maximum of 3 times until convergence is obtained. Finally, we calculate the same blob's \textit{center of mass}, \textit{bounding box} size, \textit{mass}.
+\end{itemize}
+%
+While the dilation method can take more computational time, it can sometimes be used to solve segmentation of large objects where overlap is an issue (see Fig.~\ref{fig:Labeling_vs_Dilation}). 
+
+
+\begin{figure}[h!]
+	\centering
+	\includegraphics[width=9cm]{Labeling_vs_Dilation.pdf}
+	\caption{An example showing that segmentation using the dilation method can be very useful when segmenting large objects as it can resolve overlap issues.\label{fig:Labeling_vs_Dilation}}
+\end{figure}
+
+
+
+
+\subsubsection{Segmentation filters}\label{sec:segment_filters}
+
+To improve the results of particle segmentation in non-ideal images, MyPTV can be set to apply image processing before the blob extraction. The filters that can be used are: 
+%
+\begin{enumerate}
+	\item \textbf{Gaussian blur} - blurring the image with a given scale, used to remove salt and pepper kind of noise.
+	\item \textbf{Median filter} - subtraction of the local median in over a pixels local neighborhood. 
+	\item \textbf{Local filter} - used to filter out low intensity regions relative to their neighborhood; each pixel brightness is normalized with the local mean and variance at a given scale (blur standard deviation), and the image is then conditioned to pass only local high brightness pixels.
+	\item \textbf{Mask} - masking out of regions not needed for the analysis.
+	\item \textbf{DoG filter} - "Difference of Gaussian", the image is blurred with a gaussian filter once with one standard deviation and another time with another standard deviation and the two blurred images are then subtracted from one another.
+\end{enumerate}
+%
+These filters are often necessary to properly segment the particles in an image depending on the experimental conditions, such as uneven illumination or noisy images. Examples of the results of using several combinations of the filters on a calibration image is shown in Fig.~\ref{fig:image_filters}. 
+
+
+
+
+\begin{figure}[h!]
+	\centering
+	\includegraphics[width=12cm]{filters_effect.pdf}
+	\caption{The effect oft various image filters on the segmentation.\label{fig:image_filters}}
+\end{figure}
+
+
+
+
+
+
+\subsubsection{Fiber segmentation}\label{sec:fibers_segmentation}
+
+This module segments both positions and orientations of elongated particles in the image, here called \textit{fibers} or \textit{rods}. The segmentation principle for center recognition remains the same as for particles from section \ref{sec:workflow_segment}, while the 2D orientation is found with the principle of Principal Component Analysis (PCA). This method consists on selecting the pixel clusters making up a fiber blob and calculate the $2 \times 2$ covariance matrix $\textbf{C}$ using the matrix of pixel cluster coordinates centered at $\widetilde{\textbf{X}}_i = \left[ x_i - \langle x \rangle, y_i - \langle y \rangle \right]$
+\begin{equation*}
+\textbf{C} = \widetilde{\textbf{X}}^{T} \widetilde{\textbf{X}},
+\end{equation*}  
+where $[ \langle x \rangle, \langle y \rangle ]$ is the image fiber centroid. By performing an eigenvalue analysis of \textbf{C}, i.e. $\textbf{C}\textbf{e}_{i} = \lambda_{i} \textbf{e}_{i}$ with $i=\{1,2\}$ , the eigenvector $\textbf{e}_{1}$ corresponding to the largest eigenvalue $\lambda_1$  denotes the orientation vector of the fiber in the image (see Fig. \ref{fig:fibers_pca}(a)).
+
+
+
+\begin{figure}[ht!]
+	\centering
+	\includegraphics[width=12cm]{fiber_pca.jpg}
+	\caption{(a) An example of the segmentation of fibers in image space with the PCA analysis. (b) Consecutive superimposed images of heavy fibers settling in turbulence, with $\texttt{pca\_limit}=1.3$. As seen in the images, only fibers are segmented while particles in the background are left out. 
+	\label{fig:fibers_pca}}
+\end{figure}
+
+
+An additional feature of the PCA analysis is that the ratio between the larger and smaller eigenvalue $ \lambda_2 / \lambda_1$ gives an estimate of the fiber aspect ratio in image space. This parameter (\texttt{pca\_limit}) is used as a threshold to differentiate particles and fibers in the same image (see Fig. \ref{fig:fibers_pca}(b)).
+
+The latest version of this code uses the functions \texttt{regionprops} and \texttt{labelski} from the \texttt{skimage}\footnote{\url{https://scikit-image.org/}} library available for Python.
+
+%
+%
+
+
+
+
+
+
+
+
+\subsection{Matching}\label{sec:workflow_match}
+
+In the matching step, particles that were segmented from the various images are used to stereo-locate (triangulate) the 3D positions of particles in the lab-space coordinates. 
+
+
+
+One of the big challenges in the PTV method is to determine which particle in each image correspond to the same particle in other images. As the number of combinations can be very large for particle dense images this can be a time consuming computation. In MyPTV, we approach this issue using a new algorithm called "particle marching". In brief, the algorithm begins by assuming we have an initial guess for particle positions in an image, and we then check whether these initial guesses correspond to physical particles using the co-linearity condition. If an initial guess turns out to be correct, we store its location and if not, we throw it out. Then, in the next frame we use the particles found in the previous frame as new initial guess. For the first iteration of initial guess, we use two methods: 1) a random set of points in lab-space (the number of points is denoted N0 in MyPTV), 2) by dividing the measurement volume into smaller sub-volumes (called voxels, with a given size), and search for particles inside each voxel using the ray-traversal algorithm described in~\cite{Bourgoin2020}.
+     
+
+Getting the parameters N0 and the voxel size right was shown to yield good results. If they are given too large values this step could take up a lot of computational time. To optimize the values, run first only on several images to find optimal values, and only after that iterate over all frames by setting \texttt{N\_frames: None} and save the results. 
+A detailed description of the input parameters used in the matching step is shown in Tab.~\ref{tab:matching}.
+
+
+Note: to easily perform manual stereo matching of several points in a given image, use the manual matching GUI. See Section~\ref{sec:man_match} and Fig.~\ref{fig:man_match}.
+
+
+\begin{table}[!ht]
+	\centering
+	\caption{The \texttt{params\_file.yml} parameters for the \textbf{matching} step. All paths to files are relative to the \texttt{workflow.py} script.}
+	\label{tab:matching}
+	\begin{tabular}{l m{13cm}}
+		\hline
+		Parameter & Description\\[.1cm]
+		\hline
+		
+		\texttt{blob\_files} & Names of files that hold the segmented particles for each camera, separated by commas; for example: \texttt{blobs\_cam1, blobs\_cam2, blobs\_cam3} \\[.1cm]
+		
+		\texttt{frame\_start} & If \texttt{None} will start matching from the first available frame. If an integer it will start the matching from this given number. \\[.1cm]
+		
+		\texttt{N\_frames} & If \texttt{None} will match particles in all available frames; if an integer will match only particles in the first \texttt{N} frames. \\[.1cm]
+		
+		\texttt{march\_forwards} & If \texttt{True} then the particle marching sequence includes a pass forwards in time. \\[.1cm]
+		
+		\texttt{march\_backwards} & If \texttt{True} then the particle marching sequence includes a pass backwards in time. \\[.1cm]
+		
+		\texttt{camera\_names} & Names of cameras used separated by commas; for example, \texttt{cam1, cam2, cam3} \\[.1cm]
+		
+		\texttt{cam\_resolution} & Camera resolution; for example, \texttt{1280, 1024} \\[.1cm]
+		
+		\texttt{ROI} & Region of interest for the matching in lab space coordinates, and according to the format of \texttt{xmin, xmax, ymin, ymax, zmin, zmax} \\[.1cm]
+		
+		\texttt{voxel\_size} & Can be either a float or None. If it is a float, then this is the side length of voxels used in the \textit{Ray Traversal} algorithm; note - too high values lead to long computation times and too low value result in matching errors and long computation times. If this is None then Ray Traversal is not used to generate initial guesses. \\[.1cm]
+		
+		\texttt{N0} &  The number of random initial points to try as random initial guesses in each frame.\\[.1cm]
+		
+		\texttt{min\_cam\_match} & Only particle that are recognized by this many of more cameras are considered real particles. particles seen by fewer than this are thrown away. Needs to be 2 or higher. \\[.1cm]
+		
+		\texttt{max\_err} & Maximum value of the RMS triangulation error in lab space coordinates (e.g. millimeters). Too low values of this parameter will lead to no particles that are found, but too high values will lead to erroneous results. As a general guide, this should be set much lower than the typical separation distance between particles in the experiment.  \\[.1cm]
+		
+		\texttt{save\_name} & Path name used for saving the results; if \texttt{None} the results are not saved \\[.1cm]
+		
+		\hline
+	\end{tabular}
+\end{table}
+
+
+
+
+
+
+
+\subsection{Analyze disparity}\label{sec:workflow_analyze_disparity}
+
+
+As in every measurement system, 3D-PTV has its uncertainty; In 3D-PTV uncertainties are derived from various factors, starting from the quality of the calibration, through the quality of the image analysis performed (i.e. segmentation), and the use of the stereo-matching parameters. Our way of quantifying the results is by comparing the results of the end process (i.e. the particle positions in 3D) with the input to the system. Thus, in this step we are taking the positions of the particles we managed to calculate in the stereo-matching step, re-project these results on the various cameras, and then compare the initial results of our image analysis with the re-projection. The deviations from one another are called \textit{disparities}.
+By analyzing statistics of the disparities the uncertainty in our measurements can be estimated; furthermore, we can iteratively apply our analysis, and check the disparities in order to improve the results of our experiments.
+
+Analyzing the disparities can be done in three easy ways using MyPTV. By running the workflow command "\texttt{analyze\_disparities}", a graphical user interphase (GUI) opens. The GUI allows plotting three kinds of figures which help in quantifying the results: a histogram for the disparities, a scatter-plot for the triangulation error and the disparity, and a visual figure showing the original blobs overlaid by the rep-projected particles. The parameters file parameters for this command are found in Table~\ref{tab:analyze_disparity}. 
+
+
+
+\begin{table}[!ht]
+	\centering
+	\caption{The \texttt{params\_file.yml} parameters for the \textbf{analyze disparity} step. All paths to files are relative to the \texttt{workflow.py} script.}
+	\label{tab:analyze_disparity}
+	\begin{tabular}{l m{13cm}}
+		\hline
+		Parameter & Description\\[.1cm]
+		\hline
+		
+		\texttt{blob\_files} & Names of files that hold the segmented particles for each camera, separated by commas; for example: \texttt{blobs\_cam1, blobs\_cam2, blobs\_cam3} \\[.1cm]
+		
+		\texttt{particle\_filename} & Name of the file containing the  stereo-matching results\\[.1cm]
+		
+		\texttt{camera\_names} & Names of the cameras separated by commas; for example: \texttt{cam1, cam2, cam3} \\[.1cm]
+		
+		\texttt{max\_err} & The maximal error used in the stereo-matching step (in physical units, e.g. millimeters) \\[.1cm]
+		
+		\texttt{min\_cam\_match} & The minimum number of cameras that can be used to triangulate a particle, as used in the stereo-matching step \\[.1cm]
+		
+		\hline
+	\end{tabular}
+\end{table}
+
+
+
+
+
+
+
+
+
+
+\subsection{Tracking}\label{sec:workflow_track}
+
+The tracking step is used to link particles in the lab-space coordinates in time, thus forming the 3D trajectories. To initiate the tracking we use the workflow command \texttt{"tracking"}. 
+
+There are two tracking methods that have been implemented in MyPTV and the users can choose which one suits their needs best. The first algorithm is the "4 frames best estimate" tracking algorithm that was described in Ref.~\cite{Ouellette2006}. The second method, tentatively called here "multiframe" is a new adaptation of the best estimate algorithm. Its main advantage is that it is capable of linking particle trajectories over more than one frame, namely in cases where the particle was miss-identified in one of the images or if the was a glitch in its stereo matching. Its downside is that it might take longer time to process in particle-dense experiments and that it will not yield trajectories shorter than a given length tentatively called here the noise scale (\texttt{Ns}). The multiframe algorithm was not yet described in a paper, as it is a very recent addition. The description of the parameters used in the tracking step are given in Tab.~\ref{tab:tracking_params}. 
+
+
+
+
+
+
+
+
+\begin{table}[!ht]
+	\centering
+	\caption{The \texttt{params\_file.yml} parameters for the \textbf{tracking} step. All paths to files are relative to the \texttt{workflow.py} script.}
+	\label{tab:tracking_params}
+	\begin{tabular}{l m{12cm}}
+		\hline
+		Parameter & Description\\
+		\hline
+		
+		\texttt{particles\_file\_name} & path name of the file which holds the 3D coordinates of particles, namely the results of the matching step  \\[.2cm]
+		
+		\texttt{method} & Here we choose the algorithm used for the tracking; can be either 'multiframe' of 'fourframe' (see Sec.~\ref{sec:workflow_track}). \\[.2cm]
+		
+		\texttt{frame\_start} & if \texttt{None} will start tracking from the first available frame. If an integer it will start the tracking from this given number. \\[.2cm]
+		
+		\texttt{N\_frames} & if \texttt{None} will iterate over particles in all frames; if an integer will only track particles in the first \texttt{N} frames of the particles file\\[.2cm]
+		
+		\texttt{d\_max} & the maximum translation in lab space coordinates \\[.2cm]
+		
+		\texttt{dv\_max} & the maximum allowable change in velocity in lab space coordinates per frame (e.g. mm/frame) \\[.2cm]
+		
+		\texttt{max\_dt} & The maximum allowed skip in frames over which a trajectory will be formed if using the multiframe method; e.g. if a particle is seen in frame 1, 2, 5, and 6, it will only be fully tracked if \texttt{max\_dt}$\geq 2$. Note that the missing frames (3 and 4 in the example) are subsequently interpolated using a cubic polynomial. \\[.2cm]
+		
+		\texttt{Ns} & A parameter of the multiframe method. It should be an odd integer or a list of odd integers. During tracking, links are formed only if a local signal to noise ratio does not exceed a certain level. The signal to noise ratio is calculated over windows of size \texttt{Ns}, with typical sizes of a few samples (e.g. 11). Note that the algorithm cannot build trajectories shorter than \texttt{Ns}. If a list is given then tracking is iterated using all the values in the list.\\[.2cm]
+		
+		\texttt{NSR\_threshold} & The $NSR$ is a parameter of the multiframe algorithm used to assess the quality of a trajectories based on the notion that physical trajectories are smooth. The \texttt{NSR} takes values fraction positive values from 0 to infinity. A trajectory with $NSR=0$ is considered really good while one with $NSR>1$ is considered of quite low quality. Thus the \texttt{NSR\_threshold} is the highest acceptable \texttt{NSR} value. Trajectories with \texttt{NSR} above the given threshold are discarded. \\[.2cm]
+		
+		\texttt{mean\_flow} & Adds a constant mean flow parameter that
+		helps the tracking algorithm to track particles in flows with a constant drift; the format is [vx, vy, vz] in e.g. mm/frame. \\[.2cm]
+		
+		\texttt{plot\_candidate\_graph} & If this is set to \verb|True|, once tracking is done, it will show a graph of all the linking candidates. Red lines are links that were made and blue lines were candidates to be linked but they were rejected. \\[.2cm]
+		
+		
+		\texttt{save\_name} & name of the file in which the results shall be saved; if \texttt{None} the results are not saved on the drive\\
+		
+		\hline
+	\end{tabular}
+\end{table}
+
+
+
+
+
+\subsection{Calibration with particles}\label{sec:workflow_calibration_with_particles}
+
+After some trajectories have been obtained, we can refine the calibration of cameras by using this obtained data and re-run the calibration procedure with the measured particles. For more detailes see Sec.~\ref{sec:calibrate_with_particles_obj}. To start calibration with particles enter the command \texttt{calibration\_with\_particles} in the command line following the workflow command. Once this is done, a calibration sequence is initiated that uses the trajectory data.
+
+
+
+\begin{table}[!ht]
+	\centering
+	\caption{The \texttt{params\_file.yml} parameters for the calibration with particles step.}
+	\begin{tabular}{l m{13cm}}
+		\hline
+		Parameter & Description\\
+		\hline
+		
+		\texttt{traj\_filename} & the name of the file containing the trajectories from
+		which the calibration points are taken\\[.5em]
+		
+		\texttt{camera} & an instance of the camera we wish to try and re-calibrate\\[.5em]
+		
+		\texttt{cam\_number} & int, >= 1; the number (index) of the camera to be
+		calibrated. For example, to calibrate camera2, this should be set to 2\\[.5em]
+		
+		\texttt{blobs\_fname} & The name of the file that contains the segmented 
+		particles' data\\[.5em]
+		
+		\texttt{min\_traj\_len} & Only trajectories longer then this number will be used in the calibration\\[.5em]
+		
+		\texttt{max\_point\_number} & the maximum number of points that shall be taken to re-calibrate the camera. Note that too many points (say above 1000) might lead to long calculation times\\[.5em]
+		
+		\hline
+	\end{tabular}
+\end{table}
+
+
+
+
+
+
+
+
+\subsection{Smoothing}\label{sec:workflow_smooth}
+
+
+The smoothing step is used to smooth trajectories in time and to calculate the velocity and acceleration of particles. This is done by fitting polynomials over sliding windows of the trajectory where velocities and acceleration are calculated through a direct differentiation of the polynomial (see~\cite{Luthi2005}).
+
+
+
+\begin{table}[!ht]
+	\centering
+	\caption{The \texttt{params\_file.yml} parameters for the smoothing step. All paths to files are relative to the \texttt{workflow.py} script.}
+	\begin{tabular}{l m{13cm}}
+		\hline
+		Parameter & Description\\
+		\hline
+		
+		\texttt{trajectory\_file} & file name of the trajectories file, namely the results of the tracking step \\[.5em]
+		
+		\texttt{window\_size} & window size of the sliding polynomial (must be an odd number); if a trajectory is shorter than \texttt{window\_size} but longer than \texttt{min\_traj\_length}, then we use a window the size of the trajectory length \\[.5em]
+		
+		\texttt{polynom\_order} & degree of the polynomial used in the smoothing \\[.5em]
+		
+		\texttt{min\_traj\_length} & the length of the shortest trajectories to be smoothed; has to be larger than \texttt{min\_traj\_length} \\[.5em]
+		
+		\texttt{repetitions} & the smoothing operation will be repeated this many times over each trajectory \\[.5em]
+				
+		\texttt{save\_name} & file name to save the results; if \texttt{None} the results will not be save on the disk \\[.5em]
+		
+		\hline
+	\end{tabular}
+\end{table}
+
+    
+    
+
+
+\subsection{Stitching}\label{sec:workflow_stitch}
+
+This step is used to re-track trajectories once velocities are known and to "stitch" broken trajectories following the algorithm of Ref.~\cite{Xu2008}.
+
+
+\begin{table}[!ht]
+	\centering
+	\caption{The \texttt{params\_file.yml} parameters for the \texttt{stitching} command. All paths to files are relative to the \texttt{workflow.py} script.}
+	\begin{tabular}{l m{12cm}}
+		\hline
+		Parameter & Description\\
+		\hline
+		
+		\texttt{trajectory\_file} & name of the smoothed trajectory file used in the stitching \\
+		
+		\texttt{max\_time\_separation} & maximum time separation over which to stitch broken trajectories \\
+		
+		\texttt{max\_distance} & maximum distance in the position-velocity space \\
+		
+		\texttt{save\_name} & file name to save the results; if \texttt{None} the results will not be save on the disk \\
+		
+		\hline
+	\end{tabular}
+\end{table}
+
+
+
+
+
+
+
+
+
+
+\subsection{2D tracking guide} \label{sec:2D_tracking}
+
+
+In addition to the 3D particle tracking capabilities, MyPTV can also be used to track particles in 2D, namely using only one camera view of the particles. The main advantages of 2D experiments are that they are easier and since only one camera is needed, and that the tracking is easier in 2D because there are no particle occlusions. Note that 2D particle tracking in MyPTV doesn't simply track the particle's pixel locations, since this might give off errors due to camera aberrations or miss-alignment of the camera with the imaging plane. In practice this is done by making use of the optical model used in the 3D version, so this methodology is advantageous over simpler, pixel location, tracking approaches. 
+
+
+To track particles in 2D in MyPTV, we assume that all the particles shown in the image are located on a two-dimensional plane. In practice, this is done by setting a single $z$ coordinate (given by the user) for all particles and then tracking their motion over the $x$ and $y$ coordinates only (see Fig.~\ref{fig:2D_tracking}).
+
+
+\begin{figure}
+	\centering
+	\includegraphics[width=8cm]{2D_tracking_setup.pdf}
+	\caption{An example for experimental setup for 2D tracking. Note that the camera doesn't have to be perpendicular to the particles' plane and that the particles don't have to be at $z=0$. \label{fig:2D_tracking}}
+\end{figure}
+
+
+The 2D particle tracking procedure requires following these steps:
+%
+\begin{enumerate}
+	\item Prepare a calibration folder as described in Sec.~\ref{sec:workflow_exp_folder}
+	%
+	\item Go through camera calibration as shown in Sec.~\ref{sec:cal_guide}
+	%
+	\item Perform particle segmentation of the particle images, as described in Sec.~\ref{sec:workflow_segment}
+	%
+	\item Track the particles' coordinates using the workflow script using the \texttt{2D\_tracking} command (see Sec.~\ref{sec:workflow_commands}). The various parameters of the \texttt{params\_file} associated with 2D tracking are given in Tab.~\ref{tab:2d_tracking}
+	%
+	\item If needed, follow smoothing (Sec.~\ref{sec:workflow_smooth}) and stitching (Sec.~\ref{sec:workflow_stitch}) of the results
+\end{enumerate}
+%
+
+%
+\begin{table}[!ht]
+	\centering
+	\caption{The \texttt{params\_file.yml} parameters for 2D tracking. All paths to files are relative to the \texttt{workflow.py} script. \label{tab:2d_tracking}}
+	\begin{tabular}{l m{12cm}}
+		\hline
+		Parameter & Description\\[.2cm]
+		\hline
+		
+		\texttt{blob\_file} & The name of the file that contains the segmentation results \\[.2cm]
+		\texttt{frame\_start} & The number of the first frame from which we want to perform 2D tracking \\[.2cm]
+		\texttt{N\_frames} & The number of frames to be analyzed; If \texttt{None}, then all the frames will be analyzed \\[.2cm]
+		\texttt{camera\_name} & the name of the camera from which the images were taken (must be a calibrated camera) \\[.2cm]
+		\texttt{camera\_resolution} & A tuple representing the camera resolution, for example, (1280, 1024) \\[.2cm]
+		\texttt{z\_particles} & The value of the z coordinate of the plane on which the particles are found, e.g. 0.0 \\[.2cm]
+		\texttt{d\_max} &  The maximum allowable particle translation between frame in lab-coordinates\\[.2cm]
+		\texttt{dv\_max} & The maximum allowable change of velocity for the particles in lab-space coordinates per frame (e.g. mm/frame) \\[.2cm]
+		\texttt{save\_name} & The name of the file used to save the results \\[.2cm]
+		
+		\hline
+	\end{tabular}
+\end{table}
+
+
+
+
+
+
+
+
+
+
+
+\subsection{Manual Matching GUI} \label{sec:man_match}
+
+In certain applications a user might wish to probe the 3D positions of elements in the images manually. Examples might be, to test the quality of the calibration on regions outside of the calibration target, or to measure certain geometrical features of objects in the images. For that purpose MyPTV features a graphical user interface dedicated to doing this easily. To run the GUI, use the \texttt{manual\_matching} command of the \texttt{workflow.py} script. 
+
+
+To match a point we need to identify it from the different camera views. In the GUI we do this by clicking on the point we are after in the various images. See Fig.~\ref{fig:man_match} for instructions.
+
+%
+\begin{table}[!ht]
+	\centering
+	\caption{The \texttt{params\_file.yml} parameters for the manual matching operation. All paths to files are relative to the \texttt{workflow.py} script. \label{tab:man_match}}
+	\begin{tabular}{l m{12cm}}
+		\hline
+		Parameter & Description\\[.2cm]
+		\hline
+		%
+		\texttt{cameras} & a list that holds the names of the cameras used; for example [cam1, cam2, cam3]. Note that the camera files need to be in the same folder where we are running the workflow script\\[.2cm]
+		%
+		\texttt{images} & the paths of the images from which matching should be performed. \\[.2cm]
+		\hline
+	\end{tabular}
+\end{table}
+
+
+
+\begin{figure}
+	\centering
+	\includegraphics[width=12cm]{man_match.pdf}
+	\caption{Instructions of how to use the manual matching GUI \label{fig:man_match}}
+\end{figure}
+
+
+
+
+
+
+
+
+\subsection{Fiber tracking} \label{sec:fiber_tracking}
+
+This module reconstructs the orientation of fibers in 3D space. After segmenting the fibers as described in Sec. \ref{sec:fibers_segmentation}, and tracking their centroids as described in Sec. \ref{sec:workflow_track}, their orientations are reconstructed. There are two methods to recover orientations. The first method is with intersections of so-called \textit{epipolar planes}. As shown in Fig. \ref{fig:fiber_planes}, an epipolar plane is defined by three points: two of them are contained on the 2D fiber orientation in image space, and the third one is the camera center. Given two epipolar planes for a camera pair, there exists a unique intersection between them, which defines the fiber orientation vector $\textbf{p} = [p_x, p_y, p_z]$ in laboratory coordinates. The second, method works by minimizing the projection of the fiber on the image sensors, and it is based on the algorithm used in Ref.~\cite{Bounoua2018}.
+
+
+This principle of the plane intersection method is based on the same pin-hole model described in Eq. \eqref{eq:3dmodel}, and it is here briefly explained.
+Note that as it is based on the pinhole model, it is currently only available with the Tsai camera model in MyPTV. As shown in Fig. \ref{fig:fiber_planes}, for each camera image a synthetic point $B$ is created from the 2D position and orientation of a segmented fiber. Then, the 3D directional vectors $\vec{r}_X - \vec{O}$ and $\vec{r}_B - \vec{O}$, pointing from the camera center through the segmented fiber center $X$ and the synthetic point $B$, are calculated from Eq. \eqref{eq:3dmodel}. A plane projecting into 3D space is then obtained in each camera view by the vector triplet $\vec{r}_X - \vec{O}, \vec{r}_B - \vec{O}$, and $\vec{O}$. Finally, the intersection of two epipolar planes from a camera pair allows triangulating a line in 3D, which represents the fiber orientation.
+
+The orientation calculation generates substantial errors when the fiber is parallel to the baseline of the camera pairs, i.e. the line connecting the two camera centers. This occurs when the relative angle between epipolar planes is small, and the intersection line is ill-defined. For this reason, the code outputs a $NaN$ when the fiber is produced by epipolar planes with intersection angle less than the empirical threshold of $ 5^{\circ}$.
+
+\begin{figure}[ht!]
+	\centering
+	\includegraphics[width=12cm]{fiber_epipolar_planes.jpg}
+	\caption{Schematic description of two epipolar planes spanned by the two camera centers. Their intersection generates the symmetry axis $\textbf{p} = [p_x, p_y, p_z]$ of the fiber in laboratory coordinates. To define a plane, two points of a fiber in image space are here defined using the centroid, $X$, and the same point shifted with the 2D orientation vector, $B$. Figure adapted from Fabian Müller's Master thesis. \label{fig:fiber_planes}}
+\end{figure}
+
+This module can be used with more than two cameras. As an example, when three cameras are imaging a fiber, the three possible fiber orientations are first generated from the possible camera pairs combination $(1-2)$, $(1-3)$ and $(2-3)$. The candidate $(1-2)$ is then projected on the image space of the remaining camera $3$, and the \textit{orientation error} is computed as the angle between the projected candidate and the segmented fiber orientation in that camera. The same is repeated for the other two candidates, and the final fiber orientation is the one belonging to the camera pair with the minimum orientation error. 
+
+A multi-camera orientation reconstruction is discarded when the orientation error exceeds the value set as \texttt{ori\_lim}, which is set manually as a parameter. This limit depends on the fiber angular resolution in image space and must be estimated for each experiment as in the following example. Consider an experiment where the average length of a fiber in an image is $20 \ px$. Then the angular resolution of imaged fibers is estimated as $\tan^{-1}(1/20)\approx 3^{\circ}$. In this case, the \texttt{ori\_lim} parameter can be set as $\texttt{ori\_lim} = 5 \times (1 - \cos(3^{\circ})) \approx 0.005$, in this case to exceed 5 times the error given by the camera resolution.
+
+
+To summarize, to reconstruct fiber orientations we use again the workflow script. We do this via the following steps:
+
+\begin{enumerate}
+	
+	\item In the segmentation step, make sure that the 
+	'shape' parameter is set to 'fibers'.
+	
+	\item Perform the segmentation, matching, tracking and smoothing, as normally done for spherical particles. You will note that once the segmentation is done, two blob files will be saved for each image: a regular one for the blob positions, and another one for the blob shapes. 
+	
+	\item To calculate the orientations in 3D, use the workflow script with the action '\texttt{fiber\_orientations}'. Following this stage, a new results file will be saved with trajectories corresponding to the rotation angles of each particle. See Tab.~\ref{tab:fibers} for the documentation on the information needed. 
+	
+\end{enumerate}  
+
+In the current version of MyPTV, the reconstruction works only with two or three cameras.
+
+
+%
+\begin{table}[!ht]
+	\centering
+	\caption{The \texttt{params\_file.yml} parameters for the \texttt{fiber\_orientations} operation. All paths to files are relative to the \texttt{workflow.py} script. \label{tab:fibers}}
+	\begin{tabular}{l m{12cm}}
+		\hline
+		Parameter & Description\\[.2cm]
+		\hline
+		%
+		\texttt{camera\_names} & A list of the camera names, e.g. [cam1, cam2, cam3]. Note that the camera files need to be in the same folder where we are running the workflow script\\[.2cm]
+		%
+		\texttt{ori\_lim} & A parameter which defines the threshold for maximum orientation error when more than two cameras are used. Only relevant for the \texttt{PlaneIntersect} method.\\[.2cm]
+		%
+		\texttt{method} & The method used to calculate fiber orientations; can be either \texttt{PlaneIntersect} or \texttt{MinProjection}. Note that if \texttt{PlaneIntersect} method is used then only up to three cameras can be used and they must be of Tsai model. The \texttt{MinProjection} method can take any number of cameras and of any camera model. \\[.2cm]
+		%
+		\texttt{blob\_files} & The name of the files that hold the results of the \textbf{blob orientations}. \\[.2cm]
+		%
+		\texttt{trajectory\_file} & The file name with the results of the tracking stage. \\[.2cm]
+		%
+		\texttt{save\_name} & The file name that should be used to save the results of the orientation measurements. \\[.2cm]
+		\hline
+	\end{tabular}
+\end{table}
+
+
+\subsection{Fiber smoothing} \label{sec:fibers_smoothing}
+
+This module is used to smooth both the fiber centroids and orientations and put them together in the same file. Analogous to particles, this is done by fitting polynomials over sliding windows of the trajectory where velocities and acceleration are calculated through a direct differentiation of the polynomial (see~\cite{Luthi2005}). The data structure of the smoothed fiber data is similar to what is shown in Fig. \ref{fig:smoothedfile}, with the fiber orientation $\textbf{p}$, rotation rate $d \textbf{p}/dt$ and acceleration rate $d^2 \textbf{p}/dt^2$ components respectively from column 11 to 19, and with the frame number at column 20.
+
+\subsection{Fiber stitching} \label{sec:fibers_stitching}
+
+This module is used to stitch broken fiber trajectories using the same algorithm used for particles ~\cite{Xu2008}. Once the centroids are stitched together, the broken orientations are reconstructed using a polynomial fit.
+
+
+
+\subsection{Plotting the results} \label{sec:plot_trajectories}
+
+Once the post processing is finished, we might want to plot trajectories in order to visualize the results. There are two basic options to do so using the workflow script: 1) A basic 3D rendering of measured trajectories can be established with the workflow command \texttt{plot\_trajectories}. As example is shown in Fig.~\ref{fig:trajectory_plot}. The parameters for the plotting function are explained in Tab.~\ref{tab:plotting_parameter}. 2) Basic 3D animations of trajectories in a trajectory file can be prepared with the workflow command \texttt{animate\_trajectories}. See Tab.~\ref{tab:animation_parameter} for the animation parameters.
+
+
+
+\begin{figure}
+	\centering
+	\includegraphics[width=8cm]{trajectory_plot.pdf}
+	\caption{Trajectory segments plotted using the workflow \texttt{plot\_trajectories} command. A 30 frames long segment is shown from a turbulent flow dataset taken from Ref.~\cite{Shnapp2023}. \label{fig:trajectory_plot}}
+\end{figure}
+
+
+%
+\begin{table}[!ht]
+	\centering
+	\caption{The \texttt{params\_file.yml} parameters for the \texttt{plot\_trajectories} operation. All paths to files are relative to the \texttt{workflow.py} script. \label{tab:plotting_parameter}}
+	\begin{tabular}{l m{12cm}}
+		\hline
+		Parameter & Description\\[.2cm]
+		\hline
+		%
+		\texttt{file\_name} & the path to the file that contains the trajectories; the file can be either in trajectories format or in smoothed trajectories format. \\[.2cm]
+		%
+		\texttt{min\_lenth} & only trajectories that have more samples than this number will be plotted.\\[.2cm]
+		%
+		\texttt{write\_trajID} & If True this will desplay the trajectory ID on top of them.\\[.2cm]
+		%
+		\texttt{t0} and \texttt{te} & Used to delineate the time range for which we plot the data. We only plot the samples in the time range starting at frame \texttt{t0} and ending at frame \texttt{te}. Set \texttt{t0=0} and \texttt{te=-1} to plot trajectories at all times available. \\[.2cm]
+		%
+		\hline
+	\end{tabular}
+\end{table}
+
+
+
+
+\begin{table}[!ht]
+	\centering
+	\caption{The \texttt{params\_file.yml} parameters for the \texttt{plot\_trajectories} operation. All paths to files are relative to the \texttt{workflow.py} script. \label{tab:animation_parameter}}
+	\begin{tabular}{l m{12cm}}
+		\hline
+		Parameter & Description\\[.2cm]
+		\hline
+		%
+		\texttt{file\_name} & the path to the file that contains the trajectories; the file can be either in trajectories format or in smoothed trajectories format. \\[.2cm]
+		%
+		\texttt{min\_lenth} & only trajectories that have more samples than this number will be plotted.\\[.2cm]
+		%
+		\texttt{f\_start} and \texttt{f\_end} & Used to delineate the time range for which we plot the data. We only plot the samples in the time range starting at frame \texttt{t0} and ending at frame \texttt{te}. Set \texttt{f\_start=None} and \texttt{f\_end=None} to plot trajectories at all times available. \\[.2cm]
+		%
+		\texttt{fps} & This number is used as the frame per second for the animation.\\[.2cm]
+		%
+		\texttt{tail\_length} & The length of trajectory segments shown at each time step.\\[.2cm] 
+		\hline
+	\end{tabular}
+\end{table}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+\clearpage
+
+
+\section{Imaging module - \texttt{imaging\_mod.py}}\label{sec:image_mod}
+
+
+The imaging module is used to handle the translation from 2D image space coordinates to lab space coordinates and vice versa through the 3D model. 
+
+
+
+\subsection{The \texttt{camera} object}\label{sec:camera}
+
+An object that stores the camera external and internal parameters and handles the projections to and from image space and lab space. Inputs are:
+
+\begin{enumerate}
+	\item \texttt{name} - string, name for the camera. This is the name used when saving and loading the camera parameters.
+	\item \texttt{resolution} - tuple (2), two integers for the camera number of pixels
+	\item \texttt{cal\_points\_fname} - string (optional), path to a file with calibration coordinates for the camera. The format fro the calibration point file is given in Section~\ref{sec:calpointreader} (see Fig.~\ref{fig:calpointfile}).
+\end{enumerate}
+
+
+The important functionality options are:
+
+
+\begin{enumerate}
+	\item \texttt{get\_r(eta, zeta)} - Will solve eq.~\ref{eq:3dmodel} for the orientation vector $\vec{b} = \vec{r} - \vec{O}$, given an input of pixel coordinates $(\eta, \, \zeta)$.
+	
+	\item \texttt{projection(x)} - Will reverse solve equation~\eqref{eq:3dmodel} to find the image space coordinates $(\eta, \, \zeta)$, of an input 3D point, (\texttt{x=}$\vec{r}$).
+	
+	\item \texttt{save(dir\_path)} - Will save the camera parameters in a file called after the camera name in the given directory path, see Fig.~\ref{fig:camfiles}.
+	
+	\item \texttt{load(dir\_path)} - Will load the camera parameters in a file called after the camera name in the given directory path, see Fig.~\ref{fig:camfiles}.
+\end{enumerate}
+
+
+
+After calibration we can save the camera parameters on the hard disc. The camera files have the structure shown in Fig.~\ref{fig:camfiles}.
+
+\begin{figure}[!ht]
+	\centering
+	\includegraphics[width=\textwidth]{camera_files.pdf}
+	\caption{The structure of a camera file. The files are simple text files where each row corresponds to a specific parameter and the values in each row are separated by a white space. \label{fig:camfiles}}
+\end{figure}
+
+
+
+
+
+
+
+
+\subsection{The \texttt{imsys} object}
+
+
+An object that holds several camera instances and can be used to perform stereo-matching. The important functionalities are:
+
+
+\begin{enumerate}
+	\item \texttt{stereo\_match(coords, d\_max)} - Takes as an input a dictionary with coordinates in image space from the several cameras and calculates the triangulation position. \\ The coordinate dictionary has keys that are the camera number and the values which are the coordinates in each camera. d\_max is maximum allowable distance for the triangulation.
+	
+\end{enumerate}
+
+
+
+
+
+
+
+
+\subsection{The \texttt{Cal\_image\_coord} object}\label{sec:calpointreader}
+
+This is a class used for reading information given in the optional argument \texttt{cal\_points\_fname} of the \texttt{camera} class (Sec.~\ref{sec:camera}). It is used internally and generally users will not have to deal with this. This class will read and interpret text files with tab separated valued, where the columns' meanings are: [x image space, y image space, x lab space, y lab space, z lab space], and each row is a single point of some known calibration target.
+
+The input for this class is:
+\begin{enumerate}
+	\item \texttt{fname} - String, the path to your calibration point file. The file is holds tab separated values with the meaning of: [x image, y image, x lab, y lab, z lab], see Fig.~\ref{fig:calpointfile}.
+\end{enumerate}
+
+
+
+
+
+
+
+
+\section{Camera calibration - \texttt{calibrate\_mod.py}}
+
+
+The \texttt{calibrate\_mod.py} module, with the \texttt{calibrate} object, is used to find the camera calibration parameters. We calibrate each camera by taking an image of a \textit{calibration target} - a body with markings of known coordinates in lab space - and search for the camera parameters that minimize the distance between the projection of the known points in image space and the image taken with the camera. In addition to that, after a calibration is made and trajectories have been obtained, the calibration might be refined by using the \texttt{calibrate\_with\_particles} object; this is particularly helpfull in cases where some of the cameras slightly moved in between the taking the calibration images and the recording of the tracer particles.
+
+
+
+\subsection{The \texttt{calibrate} object}\label{sec:calibrate_obj}
+
+Used to solve for the camera parameters given an input list of image space and lab space coordinates. The inputs are:
+
+\begin{enumerate}
+	\item \texttt{camera} - An instance of a \texttt{camera} object which we would like to calibrate.
+	\item \texttt{lab\_coords} - a list of lab space coordinates of some known calibration target. 
+	\item \texttt{img\_coords} - a list of image space coordinates that is ordered in accordance with the lab space coordinates. 
+\end{enumerate}
+
+
+
+The important functionalities are:
+%
+\begin{enumerate}
+	
+	\item \texttt{searchCalibration(maxiter=5000, fix\_f=True)} - When this is run, we use a nonlinear least squares search to find the camera parameters that minimize the cost function (item 3 below). This function is used to find the $\vec{O}$, $\vec{\theta}$, $f$, and $x_h, \, y_h$ parameters (in case \texttt{fix\_f=False}, it will not solve for $f$. \texttt{maxiter} is the maximum number of iterations allowed for the least squares search.
+	
+	\item \texttt{fineCalibration(maxiter=500)} - This function will solve for the coefficients of the quadratic polynomial used for the nonlinear correction term ($[E]$). 
+	
+	\item \texttt{mean\_squared\_err} - This is our cost function, being the sum of distances between the image space coordinates and the projection of the given lab space coordinates.
+	
+\end{enumerate}
+%
+To find an optimal calibration solution, we might need to run each function several times, and run the coarse and fine calibrations one after the other until a satisfactory solution is obtained. Once it is obtained, we should keep in mind to save the results using the \texttt{save} functionality of the \texttt{camera} object. 
+
+
+
+
+
+\subsection{The \texttt{calibrate\_with\_particles} object}\label{sec:calibrate_with_particles_obj}
+
+A class used to refine the calibration using particles data. In short,
+after the primary clibration is done, matching and tracking can be used
+to obtain trajectories from the experimental data. Assuming that this resulted in trajectories that were successfully measured, we can leverage
+the trajectories obtained to minimize further the calibration error. The refinement is done by assuming that the positions of particles along the resolved trajectories are "true" positions in lab-space, and thus, the blobs corresponding to these particles are used in a calibration sequence to minimize the calibration error. The assumption is that longer trajectories with low triangulation error are considered more reliable as compared to shorter trajectories, so we use only "long enough" trajectories 
+in this process.
+
+The inputs are:
+
+\begin{enumerate}
+	\item \texttt{traj\_filename} - the name of the file containing the trajectories from
+	which the calibration points are taken.
+	
+	\item \texttt{camera} - an instance of the camera we wish to try and re-calibrate
+	
+	\item \texttt{cam\_number} - int, >= 1; the number (index) of the camera to be
+	calibrated. For example, to calibrate camera2, this should be set to 2.
+	
+	\item \texttt{blobs\_fname} - The name of the file that contains the segmented 
+	particles' data.
+	
+	\item \texttt{min\_traj\_len} - Only trajectories longer then this number will be used in the calibration
+	
+	\item \texttt{max\_point\_number} - the maximum number of points that shall be taken
+	to re-calibrate the camera. Note that too many points (say above 1000) might lead to long calculation times. 
+\end{enumerate}
+
+
+The important functionalities are:
+
+\begin{enumerate}
+	
+	\item \texttt{get\_calibrate\_instance} - This function returns an instance of the \texttt{calibrate} object with the calibration points taken from the trajectory file. We then use this object to refine the calibration using the regular procedure (Sec.~\ref{sec:calibrate_obj}).
+
+\end{enumerate}
+
+
+
+
+
+\subsection{The \texttt{gui\_final\_cal.py} file}
+
+The \texttt{gui\_final\_cal.py} script is used to launch a \texttt{tkinter} based graphical user interface that is utilized to run various functionalities of the calibration process. The GUI is shown in  Fig.~\ref{fig:calibration_gui}, and the various buttons are explained in Tab.~\ref{tab:calibration_gui}.
+
+
+
+
+\subsection{The \texttt{gui\_initial\_cal.py} file}
+
+The \texttt{gui\_initial\_cal.py} script is used to launch a \texttt{tkinter} based graphical user interface that is utilized to run various functionalities of the calibration process. The GUI is shown in  Fig.~\ref{fig:init_cal_gui} and it is explained in section~\ref{sec:init_calibration}.
+
+
+
+
+
+
+
+
+
+
+
+
+\section{Particle segmentation - \texttt{segmentation\_mod.py}} 
+
+
+This module handles the image analysis part of MyPTV, taking in raw camera images containing particles and output their image space coordinates. For the segmentation we first blur the image to remove salt and pepper noise, then we highlight particles using a local mean subtraction around each pixel, and then use a global threshold to mark foreground and  pixels. Finally, the connected foreground pixels are considered to be particles, and we estimate the blob's center using a brightness weighted average of blob pixels.
+
+
+
+\subsection{The \texttt{particle\_segmentation} object} 
+
+Used to segment particles in a given image. This class is used internally to iterate over frames in a single folder by the \texttt{loop\_segmentation} class. However, it is recommended to check the segmentation parameters manually using this \texttt{particle\_segmentation} over several images in order to tune the particle searching parameters. The inputs are:
+%
+\begin{enumerate}
+	\item \texttt{image} - the image for segmentation
+	\item \texttt{threshold=10} - the global filter's threshold brightness value, so pixels with brightness higher than this number are considered foreground 
+	\item \texttt{mask=1.0} - A mask matrix can be used to specify rigions of interest within the image
+	\item \texttt{sigma=None} - If float, this is taken as the standard deviation of a Gaussian blurring filter; if it is None, no bluring is performed
+	\item \texttt{median=None} - If integer this is taken as the window size for a median noise removal filter; if None, no median filter is performed
+	\item \texttt{local\_filter=None} - Parameters for a local mean subtraction. If it's an interger it is taken as the window size; is it None, no mean subtraction is performed.
+	\item a bunch of threshold pixel sizes and mass in all directions and in area.
+	\item \texttt{method} - String. The name of the method used for segmentation (either 'labeling' or 'dilation', see Sec.~\ref{sec:workflow_segment}). Default is 'labeling'.
+	\item \texttt{particle\_size=3} - The particle size used in the dilation method.
+\end{enumerate}
+
+
+The important funcitonalities are:
+%
+\begin{enumerate}
+	\item \texttt{get\_blobs} - Will return a list of blob centers, their box size and their area.
+	
+	\item \texttt{plot\_blobs()} - Uses matplotlib to plot the results of the segmentation. A very useful functionality in the testing of segmentation parameters!
+	
+	\item \texttt{save\_results(fname)} - Will save the segmented particles in a text file. The file is arranged in six columns with the following attributes: (x center position, y center position, x size, y size, area, image number), see Fig.~\ref{fig:blobfile}.
+\end{enumerate}
+
+
+
+
+
+
+\subsection{The \texttt{loop\_segmentation} object} 
+
+
+An object used for looping over images in a given directory to segment particles and save the results in a file. The inputs are nearly identical to those of \texttt{particle\_segmentation}.
+
+
+important functionalities are:
+%
+\begin{enumerate}
+	\item \texttt{segment\_folder\_images()} - Will loop over the images in the given directory and segment particles according to the given parameters
+	\item \texttt{save\_results(fname)} - Will save the segmented particles in a text file. The file is arranged in six columns with the following attributes: (x center position, y center position, x size, y size, area, image number), see Fig.~\ref{fig:blobfile}.
+\end{enumerate}
+
+\begin{figure}[!ht]
+	\centering
+	\includegraphics[width=10cm]{blob_file.pdf}
+	\caption{An example of a text file holding the segmentation resuls and the description of the different columns. \label{fig:blobfile}} 
+\end{figure}
+
+
+
+
+
+
+
+
+\section{Particle matching - \texttt{particle\_matching\_mod.py}} \label{sec:matching}
+
+The module used to link particles in the different images through stereo matching and estimating their 3D positions. 
+
+
+
+\subsection{The \texttt{matching\_with\_marching\_particles\_algorithm} object}
+
+
+One of the main issue in this process is that stereo matching all possible candidates is an NP hard problem, so to track numerous particles in each frame we have to choose which particles are likely to produce a 3D particle coordinate. To solve this we are using an algorithm called particle marching. The principles are as follows:
+
+1) Given an initial guess for a particle position in lab space coordinates, we can project it onto camera space coordinates of our camera system. The results of the projection can be denoted [(x1, y1), ..., (xn, yn)], where n is the number of cameras in our imaging system.
+
+2) The segmentation results from the experiment will be called blobs. For each point (xi, yi) from (1), we choose the blob that has the smallest distance to it. If the nearest neighbor blob in a certain camera was already used up previously, then we take the 2nd nearest blob (or the 3rd,...). We denote the nearest neighbor blobs we found as [(xNN1, yNN1), ..., (xNNn, yNNn)]. 
+
+3) Taking the NN blobs, we try to see if the epipolar lines associated with them cross each other. If more than a threshold number of lines cross, then the point at which they crossed is considered the position of a real particle. Otherwise, the initial guess is deemed bad and we dump it.
+
+The thing that is left it to have a method for choosing initial guesses for the lab space particles. We are using for that a combination of three methods - 
+
+1) If particles were found in the previous frame (say frame number i-1), then these positions are used as initial guesses for frame i. This allows to have continuous trajectories already from the matching process and really speeds up the process. It is also possible to do the same process going backwards, i.e. using particles from frame i+1 as the initial guesses. From this concept comes the name of this algorithm.
+
+2) Random guesses across the measurement volume. This is not so efficient but it does work and it allows starting up the marching process.
+
+3) Using the ray traversal algorithm over pairs of cameras to get initial guesses. This works quite good, however when there are many blobs in each frame it can take up a lot of time. This also allows starting up the marching process.
+
+
+
+%Thus, particle matching in MyPTV uses two algorithms in conjunction. First is a novel algorithm that uses 2D time tracking of blobs to deduce which candidates are more likely to produce traceable particles in 3D. Second is the Ray Traversal algorithm proposed in Ref~\cite{Bourgoin2020}, in which the lab space volume is divided to voxels and stereo matching is attempted for rays within each voxel. Using the two algorithms in conjunction was found to yield a 50\% reduction in computational time and more traceable trajectories (45\% more trajectories were found in a test). 
+
+
+
+
+\subsection{The \texttt{match\_blob\_files} object (Legacy)}
+
+
+This is the object that we use to get triangulated particles results from the segmented blob files (a file as the one in Fig.~\ref{fig:blobfile} for each camera). For each frame it first runs the first algorithm using time information, and only then uses the Ray traversal algorithm on the blobs that were not successfully connected. The inputs are:
+%
+\begin{enumerate}
+	\item \texttt{blob\_fnames} - a list of the (srting) file names containing the segmented blob data. The list has to be sorted according the order of cameras in the \texttt{img\_system}.
+	
+	\item \texttt{img\_system} - an instance of the \texttt{img\_system} class with the calibrated cameras.
+	
+	\item \texttt{RIO} - A nested list of 3X2 elements. The first holds the minimum and  maximum values of $x$ coordinates, the second is same for $y$, and  the third for $z$ coordinates. 
+	
+	\item \texttt{voxel\_size} - the side length of voxel cubes used in the ray traversal algorithm. Given in lab space coordinates (e.g. mm). Note - a too large voxel size will result in high computational times due a high number of candidates, while a too small voxel size might lead to erroneous intersection of rays, leading to matching errors. Thus, this parameter should be optimized.
+	
+	\item \texttt{max\_blob\_dist} - the largest distance for which blobs are considered neighbours in the image space coordinates (namely, the largest permissible blob displacement in pixels).
+	
+	\item \texttt{max\_err=None} - Maximum acceptable uncertainty in particle position. If None, (defult), than no bound is used.
+	
+	\item \texttt{reverse\_eta\_zeta=False} - Should be false if the eta and zeta coordinates need to be in reverse order so as to match the calibration. This may be needed if the calibration data points were given where the x and y coordinates are transposed (as happens, e.g., if using matplotlib.pyplot.imshow).
+\end{enumerate}
+
+
+The important functionalities are:
+%
+\begin{enumerate}
+	\item \texttt{get\_particles()} - Use this to match blobs into particles in 3D.
+	\item \texttt{save\_results(fname)} - Save the results in a text file. The format has 4 + number of cameras columns separated by tabs:
+	(x, y, z, [N columns corresponding to the blob number in each camera] , frame number, see Fig.~\ref{fig:particlefile}).
+\end{enumerate}
+
+
+
+\begin{figure}[!ht]
+	\centering
+	\includegraphics[width=12cm]{particle_file.pdf}
+	\caption{An example of a text file holding the triangulated particles' resuls and the description of the different columns. In this example there were three cameras. The blob number columns give the index of the blobs corresponding to any particle at the this specific frame number; a value of -1 in one of the rows means that no blob was used to stereo-match the particle in this row for this particular camera. \label{fig:particlefile}} 
+\end{figure}
+
+
+
+
+\subsection{The \texttt{matching} object  (Legacy)}
+
+This object is the "engine" used to match particles using the Ray Traversal algorithm. In practice we run the relevant functions: \texttt{get\_voxel\_dictionary()} $\rightarrow$ \texttt{list\_candidates()} $\rightarrow$ \texttt{get\_particles()}, and after that the results are held in the attribute \texttt{matched\_particles}.
+
+
+
+
+\subsection{The \texttt{matching\_using\_time} object  (Legacy)}
+
+This object performs the matching of blobs using the 2D tracking heuristic. In principle, it is given a list of blobs that were successfully used to form 3D particles in the previous frame. Then, for each of the given blobs it searches for nearest neighbours in the current frame, and stereo-matches those blobs that were found (using the \texttt{.triangulate\_candidates()} method). 
+
+
+
+
+
+\subsection{The \texttt{initiate\_time\_matching} object  (Legacy)}
+
+This object is used to initiate the time searching algorithm on the first frame. It goes over the blobs at the first frame and searches for blobs that have nearest neighbours at the second frame. Those that have neighbours are used in a first run of the Ray Traversal algorithm, thus they are given priority in the search.
+
+
+
+
+
+
+
+
+
+
+
+
+
+\section{Tracking in 3D - \texttt{tracking\_mod.py}}
+
+This is the module that is used to track particles in 3D. There are currently three tracking methods implemented, nearest neighbour, two-frame, and four-frame, see Ref.~\cite{Ouellette2006}. Users are welcome to choose their preferred method and use it.
+
+
+
+\subsection{The \texttt{tracker\_four\_frames} object}\label{sec:four_frames}
+
+An object used to perform tracking through the 4-frame best estimate method \cite{Ouellette2006}. Input:
+%
+\begin{enumerate}
+	\item \texttt{fname} - a string name of a particle file (e.g. Fig.~\ref{fig:particlefile}
+	\item \texttt{mean\_flow=0.0} - either zero (default) of a numpy array of the mean flow vector, in units of the calibrations spatial units per frame (e.g. mm per frame). The mean flow is assumed not to change in space and time.
+	\item \texttt{d\_max\_=1e10} - maximum allowable translation between two frames for the nearest neighbour search, after subtracting the mean flow. 
+	\item \texttt{dv\_max\_=1e10} - maximum allowable change in velocity for the two-frame velocity projection search. The radius around the projection is therefore dv\_max/dt (where dt = 1 frame$^{-1}$)
+	\item \texttt{store\_candidates = False} - Boolean indicator. If it is true, then the tracker stores all the possible links that correspond to the tracking thresholds. In this case we can then plot a particle linking graph to analyze the tracking quality. If it is False, the tracker does not keep this information.  
+\end{enumerate}
+
+
+The important functionality is:
+%
+\begin{enumerate}
+	\item \texttt{track\_all\_frames()} - Will track particles through all the frames. 
+	
+	\item \texttt{return\_connected\_particles()} - Will retun the list of trajectories that were established.
+	
+	\item \texttt{save\_results(fname)} - Will save the results on the hard drive. The results are saved in a text file, where each row is a sample of a trajectory. The columns are specified as follows: [trajectory number, x, y, z, frame number], see Fig~\ref{fig:trajfile}.  
+	
+	\item \texttt{plot\_candidate\_graph()} - If the candidate links were stored, this method will plot a graph that shows the links that were made and the candidate links that could have been made but were eventually not made due to duplicate links for the same particle. 
+\end{enumerate}
+
+\begin{figure}
+	\centering
+	\includegraphics[width=10cm]{trajectory_files.pdf}
+	\caption{Example of a trajectory file and the column definitions. For Trajectory id being a non-negative integer, rows with the same Trajectory id correspond to the same trajectory; rows with Trajectory id being -1 are samples that could not be linked with the given tracking parameters.  \label{fig:trajfile}}
+\end{figure}
+
+
+
+
+\subsection{The \texttt{tracker\_two\_frames} object}
+
+An object used for tracking through the 2-frame method. The description is the same as in Section~\ref{sec:four_frames}
+
+
+
+\subsection{The \texttt{tracker\_nearest\_neighbour} object}
+
+An object used for tracking through the nearest neighbour method. The description is the same as in Section~\ref{sec:four_frames}
+
+
+
+
+
+
+
+
+
+\section{Trajectory smoothing - \texttt{traj\_smoothing\_mod.py}}
+
+This module is used to smooth trajectories and to calculate the velocity and acceleration of the particles. For the smoothing we are using the polynomial fitting method proposed and used in Refs.~\cite{Luthi2005, Shnapp2019}. In short, each component of the particle's position is fitted with a series of polynomials with a sliding window of fixed  and the derivatives are calculated by analytically differentiating the polynomial. The end result is a new file with smoothed trajectories. However note that we smooth and calculate velocities and accelerations only for trajectories longer than the window size for the smoothing (a user decided parameter). 
+
+
+\subsection{The \texttt{smooth\_trajectories} object}
+
+A class used to smooth trajectories in a list of trajectories. Due to the smoothing we also calculate the velocity and acceleration of the trajectories. The input trajectory list structure is the same as the files produced by the classes in \texttt{tracking\_mod.py}.
+
+Note - only trajectories whose length is larger than the window size will be smoothed and saved. Shorter trajectories are saved with zero velocity and accelerations.
+
+
+The inputs are:
+\begin{enumerate}
+	\item \texttt{traj\_list} -  a list of samples organized as trajectories. This should have the same data structure used in the saving function of the tracking algorithms (see Section~\ref{sec:four_frames}). 
+	\item \texttt{window} - The window size used in the sliding polynomial fitting.
+	\item \texttt{polyorder} - The order of the polynomial used in the fitting. 
+\end{enumerate}
+
+\begin{figure}[!ht]
+	\centering
+	\includegraphics[width=12cm]{smoothed_trajfile.pdf}
+	\caption{Example file holding the results of smoothed trajectories, and the description for each column. Note also the unsmoothed samples at the bottom of the file. \label{fig:smoothedfile}}
+\end{figure}
+
+The important functionality is:
+
+\begin{enumerate}
+	\item \texttt{smooth()} - performs the actual smoothing
+	\item \texttt{save\_results(fname)} - Saves the results on the hard drive using the given (string) file name. The resulting file is a text file such that each row is a sample of a trajectory, and with 11 columns. The columns have the following meaning:
+	[traj number, $x$, $y$, $z$, $v_x$, $v_y$, $v_z$, $a_x$, $a_y$, $a_z$, frame number], where $v_i$ and $a_i$ denote components of the velocity and acceleration vectors respectively, see Fig.~\ref{fig:smoothedfile}.
+\end{enumerate}
+
+
+
+
+
+
+
+\section{Trajectory stitching - \texttt{traj\_stitching\_mod.py}}\label{sec:stitching}
+
+This module applies the algorithm by Ref.~\cite{Xu2008} to connect trajectories that were broken along the process by tracking the trajectories again in the position--velocity space. We also extend this by interpolating the missing samples using a 3rd order polynomial, that is fitted to the existing 4 data points at the tips of the broken trajectories. This module is applied after the trajectory smoothing step.
+
+
+
+
+\subsection{The \texttt{traj\_stitching} object}
+
+This object performs the stitching process. Inputs:
+
+\begin{enumerate}
+	\item \texttt{traj\_list} - the list of smoothed trajectory, given as a Numpy array of shape (N,11), where N is the number of samples. The format is the same as the format generated after the smoothing process.
+	\item \texttt{Ts} - The maximum number of broken samples allowed in the connection.
+	\item \texttt{dm} - The maximum distance between the trajectory for which connections are made.
+\end{enumerate}
+
+
+
+The important functionalities are:
+
+\begin{enumerate}
+	\item \texttt{stitch\_trajectories()} - Will search for candidates and stitch the best fitting candidates. Run this function to perform the stitching. After running the new trajectory list is held as the attribute \texttt{new\_traj\_list}.
+	
+	\item \texttt{save\_results(fname)} - Will save the stitched trajectories in a text file with a given file name. The format for the saved file is the same as the one used in the smoothing trajectories (Fig.~\ref{fig:smoothedfile}).
+\end{enumerate}
+
+
+
+
+
+\bibliography{bib_myPTV}
+\bibliographystyle{unsrt}
+
+\end{document}
