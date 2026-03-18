@@ -22,8 +22,8 @@ class Tee(object):
 
 class ActionLogger(object):
     """
-    Context manager that captures console output and appends a single 
-    JSON object to a log file upon exit.
+    Context manager that captures console output (stdout and stderr) 
+    and appends a single JSON object to a log file upon exit.
     """
     def __init__(self, action, parameters, param_file, log_fname='myptvlog.jsonl'):
         import os
@@ -41,16 +41,21 @@ class ActionLogger(object):
             
         self.buffer = io.StringIO()
         self.original_stdout = sys.stdout
+        self.original_stderr = sys.stderr
         self.start_time = None
 
     def __enter__(self):
         self.start_time = datetime.now()
-        sys.stdout = Tee(self.original_stdout, self.buffer)
+        # Redirect both stdout and stderr to the same buffer
+        tee = Tee(self.original_stdout, self.buffer)
+        sys.stdout = tee
+        sys.stderr = Tee(self.original_stderr, self.buffer)
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         duration = (datetime.now() - self.start_time).total_seconds()
         sys.stdout = self.original_stdout
+        sys.stderr = self.original_stderr
         
         status = "success" if exc_type is None else "failed"
         error_msg = None
