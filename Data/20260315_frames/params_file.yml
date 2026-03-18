@@ -10,33 +10,33 @@
     plot_histogram: True
 
 - calculate_BG_image:
-    images_folder: Data/20260315_frames/Rec15/Cam1
-    image_extension: '.tif'
-    raw_format: False
-    N_img: 200
-    save_name: BG_cam3.tif
+    images_folder: Data/20260315_frames/original/Rec15/Cam4
+    image_extension: '.dng'
+    raw_format: True
+    N_img: 300
+    save_name: BG_cam4.tif
 
 - calculate_equilization_map:
-    images_folder: Images_cam3
-    image_extension: '.tif'
-    raw_format: False
-    BG_image: BG_cam3.tif
+    images_folder: original/Rec15/Cam1
+    image_extension: '.dng'
+    raw_format: True
+    BG_image: BG-EQ/BG_cam1.tif
     N_img: 200
     sigma: 100
-    save_name: EQmap_cam3.tif
+    save_name: BG-EQ/EQmap_cam1.tif
 
 - segmentation:
     Number_of_images: 1
     image_start: 0
     images_folder: /Users/user/Desktop/Research/Data/20260315_frames/Rec15/clean_1
-    single_image_name: 100.tif
+    single_image_name: 101.tif
     image_extension: '.tif'
     raw_format: False
     multiprocessing: True
     shape: particles
     mask: 1.0
     ROI: 0, 2020, 10, 2172
-    plot_result: True
+    plot_result: False
     threshold: 70
     remove_background: /Users/user/Desktop/Research/Data/20260315_frames/BG-EQ/Cam1-BG.tif
     equilization_map: None
