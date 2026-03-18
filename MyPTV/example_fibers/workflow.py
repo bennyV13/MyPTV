@@ -73,80 +73,84 @@ class workflow(object):
             if action not in self.allowed_actions:
                 raise ValueError(msg1+'\n'+msg2)
             
-            elif action == 'initial_calibration':
-                self.initial_calibration()
-                
-            elif action == 'final_calibration':
-                self.final_calibration()
-                
-            elif action == 'analyze_calibration_error':
-                self.calibration_error_estimation()
-                
-            elif action == 'calibration_with_particles':
-                self.calibration_with_particles()
-                
-            elif action == 'segmentation':
-                self.do_segmentation()
-                
-            elif action == 'matching':
-                self.do_matching()
-                
-            elif action == 'tracking':
-                self.do_tracking()
-                
-            elif action == '2D_tracking':
-                self.do_2d_tracking()
-                
-            elif action == 'smoothing':
-                self.do_smoothing()
+            from myptv.logging_utils import ActionLogger
+            action_params = self.get_action_params(action)
             
-            elif action == 'stitching':
-                self.do_stitching()
-            
-            elif action == 'manual_matching':
-                self.do_manual_matching()
+            with ActionLogger(action, action_params, self.param_file_path):
+                if action == 'initial_calibration':
+                    self.initial_calibration()
+                    
+                elif action == 'final_calibration':
+                    self.final_calibration()
+                    
+                elif action == 'analyze_calibration_error':
+                    self.calibration_error_estimation()
+                    
+                elif action == 'calibration_with_particles':
+                    self.calibration_with_particles()
+                    
+                elif action == 'segmentation':
+                    self.do_segmentation()
+                    
+                elif action == 'matching':
+                    self.do_matching()
+                    
+                elif action == 'tracking':
+                    self.do_tracking()
+                    
+                elif action == '2D_tracking':
+                    self.do_2d_tracking()
+                    
+                elif action == 'smoothing':
+                    self.do_smoothing()
                 
-            elif action == 'fiber_orientations':
-                self.do_orientations()
+                elif action == 'stitching':
+                    self.do_stitching()
+                
+                elif action == 'manual_matching':
+                    self.do_manual_matching()
+                    
+                elif action == 'fiber_orientations':
+                    self.do_orientations()
 
-            elif action == 'fiber_smoothing':
-                self.do_fiber_smoothing()
+                elif action == 'fiber_smoothing':
+                    self.do_fiber_smoothing()
 
-            elif action == 'fiber_stitching':
-                self.do_fiber_stitching()
+                elif action == 'fiber_stitching':
+                    self.do_fiber_stitching()
 
+                    
+                elif action == 'plot_trajectories':
+                    self.do_plot_trajectories()
+                    
+                elif action == 'animate_trajectories':
+                    self.do_animate_trajectories()
                 
-            elif action == 'plot_trajectories':
-                self.do_plot_trajectories()
+                elif action == 'run_extention':
+                    self.do_run_extention()    
                 
-            elif action == 'animate_trajectories':
-                self.do_animate_trajectories()
-            
-            elif action == 'run_extention':
-                self.do_run_extention()    
-            
-            elif action == 'help':
-                self.help_me()
+                elif action == 'help':
+                    self.help_me()
+                    
+                    
+                # legacy functions:
+                elif action == 'calibration':
+                    print('Note: you are running an outdated action!')
+                    print('consider using the initial_calibration and')
+                    print('final_calibration instead.')
+                    self.calibration_sequence()
                 
+                elif action == 'calibration_point_gui':
+                    print('Note: you are running an outdated action!')
+                    print('consider using the initial_calibration and')
+                    print('final_calibration instead.')
+                    self.calibration_point_gui()
                 
-            # legacy functions:
-            elif action == 'calibration':
-                print('Note: you are running an outdated action!')
-                print('consider using the initial_calibration and')
-                print('final_calibration actions instead.')
-                self.calibration_sequence()
-            
-            elif action == 'calibration_point_gui':
-                print('Note: you are running an outdated action!')
-                print('consider using the initial_calibration and')
-                print('final_calibration actions instead.')
-                self.calibration_point_gui()
-            
-            elif action == 'match_target_file':
-                print('Note: you are running an outdated action!')
-                print('consider using the initial_calibration and')
-                print('final_calibration actions instead.')
-                self.match_target_file()
+                elif action == 'match_target_file':
+                    print('Note: you are running an outdated action!')
+                    print('consider using the initial_calibration and')
+                    print('final_calibration instead.')
+                    self.match_target_file()
             
             
     
@@ -221,6 +225,18 @@ class workflow(object):
         
         return par_seg[par_seg['param']==param]['value'].iloc[0]
     
+    
+    
+    def get_action_params(self, action):
+        '''
+        Extract the parameters from the self.params DataFrame for the given action.
+        Returns a dictionary of key-value pairs (param and value).
+        '''
+        if action not in set(self.params['operation']):
+            return {}
+        
+        par_seg = self.params[self.params['operation'] == action]
+        return dict(zip(par_seg['param'], par_seg['value']))
     
     
     

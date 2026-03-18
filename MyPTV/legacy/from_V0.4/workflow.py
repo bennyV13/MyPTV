@@ -62,35 +62,39 @@ class workflow(object):
             if action not in self.allowed_actions:
                 raise ValueError(msg1+'\n'+msg2)
             
-            elif action == 'calibration':
-                self.calibration_sequence()
+            from myptv.logging_utils import ActionLogger
+            action_params = self.get_action_params(action)
             
-            elif action == 'calibration_point_gui':
-                self.calibration_point_gui()
+            with ActionLogger(action, action_params, self.param_file_path):
+                if action == 'calibration':
+                    self.calibration_sequence()
                 
-            elif action == 'calibration_with_particles':
-                self.calibration_with_particles()
-            
-            elif action == 'match_target_file':
-                self.match_target_file()
+                elif action == 'calibration_point_gui':
+                    self.calibration_point_gui()
+                    
+                elif action == 'calibration_with_particles':
+                    self.calibration_with_particles()
                 
-            elif action == 'segmentation':
-                self.do_segmentation()
+                elif action == 'match_target_file':
+                    self.match_target_file()
+                    
+                elif action == 'segmentation':
+                    self.do_segmentation()
+                    
+                elif action == 'matching':
+                    self.do_matching()
+                    
+                elif action == 'tracking':
+                    self.do_tracking()
+                    
+                elif action == 'smoothing':
+                    self.do_smoothing()
                 
-            elif action == 'matching':
-                self.do_matching()
-                
-            elif action == 'tracking':
-                self.do_tracking()
-                
-            elif action == 'smoothing':
-                self.do_smoothing()
-            
-            elif action == 'stitching':
-                self.do_stitching()
-                
-            elif action == 'help':
-                self.help_me()
+                elif action == 'stitching':
+                    self.do_stitching()
+                    
+                elif action == 'help':
+                    self.help_me()
             
             
     
@@ -165,6 +169,18 @@ class workflow(object):
         
         return par_seg[par_seg['param']==param]['value'].iloc[0]
     
+    
+    
+    def get_action_params(self, action):
+        '''
+        Extract the parameters from the self.params DataFrame for the given action.
+        Returns a dictionary of key-value pairs (param and value).
+        '''
+        if action not in set(self.params['operation']):
+            return {}
+        
+        par_seg = self.params[self.params['operation'] == action]
+        return dict(zip(par_seg['param'], par_seg['value']))
     
     
     
