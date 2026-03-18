@@ -4,10 +4,10 @@ import json
 import traceback
 from datetime import datetime
 
+
 class Tee(object):
     """
-    Wraps multiple file-like objects (e.g., sys.stdout and an io.StringIO buffer)
-    and writes to all of them.
+    A file-like object that multiplexes output to multiple streams.
     """
     def __init__(self, *files):
         self.files = files
@@ -19,16 +19,26 @@ class Tee(object):
         for f in self.files:
             f.flush()
 
+
 class ActionLogger(object):
     """
     Context manager that captures console output and appends a single 
     JSON object to a log file upon exit.
     """
     def __init__(self, action, parameters, param_file, log_fname='myptvlog.jsonl'):
+        import os
         self.action = action
         self.parameters = parameters
         self.param_file = param_file
-        self.log_fname = log_fname
+        
+        # determine the log file path:
+        # If param_file exists, save log in its directory.
+        if os.path.exists(param_file):
+            log_dir = os.path.dirname(os.path.abspath(param_file))
+            self.log_fname = os.path.join(log_dir, log_fname)
+        else:
+            self.log_fname = log_fname
+            
         self.buffer = io.StringIO()
         self.original_stdout = sys.stdout
         self.start_time = None
