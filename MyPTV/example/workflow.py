@@ -48,15 +48,16 @@ class workflow(object):
         self.allowed_actions = ['help', 'initial_calibration', 
                                 'final_calibration',
                                 'analyze_calibration_error',
-                                'calibration_with_particles', 'matching', 
+                                'calibration_with_particles', 
+                                'matching', 'analyze_disparity',
                                 'segmentation',
+                                'calculate_BG_image',
+                                'calculate_equilization_map',
                                 'smoothing', 'stitching', 'tracking', 
                                 'calibration', 'calibration_point_gui', 
                                 'match_target_file', '2D_tracking', 
                                 'manual_matching',
                                 'fiber_orientations',
-                                'fiber_smoothing',
-                                'fiber_stitching',
                                 'plot_trajectories',
                                 'animate_trajectories',
                                 'run_extention']
@@ -73,80 +74,86 @@ class workflow(object):
             if action not in self.allowed_actions:
                 raise ValueError(msg1+'\n'+msg2)
             
-            elif action == 'initial_calibration':
-                self.initial_calibration()
-                
-            elif action == 'final_calibration':
-                self.final_calibration()
-                
-            elif action == 'analyze_calibration_error':
-                self.calibration_error_estimation()
-                
-            elif action == 'calibration_with_particles':
-                self.calibration_with_particles()
-                
-            elif action == 'segmentation':
-                self.do_segmentation()
-                
-            elif action == 'matching':
-                self.do_matching()
-                
-            elif action == 'tracking':
-                self.do_tracking()
-                
-            elif action == '2D_tracking':
-                self.do_2d_tracking()
-                
-            elif action == 'smoothing':
-                self.do_smoothing()
+            from myptv.logging_utils import ActionLogger
+            action_params = self.get_action_params(action)
             
-            elif action == 'stitching':
-                self.do_stitching()
-            
-            elif action == 'manual_matching':
-                self.do_manual_matching()
+            with ActionLogger(action, action_params, self.param_file_path):
+                if action == 'initial_calibration':
+                    self.initial_calibration()
+                    
+                elif action == 'final_calibration':
+                    self.final_calibration()
+                    
+                elif action == 'analyze_calibration_error':
+                    self.calibration_error_estimation()
+                    
+                elif action == 'calibration_with_particles':
+                    self.calibration_with_particles()
+                    
+                elif action == 'segmentation':
+                    self.do_segmentation()
+                    
+                elif action == 'matching':
+                    self.do_matching()
+                    
+                elif action == 'analyze_disparity':
+                    self.do_analyze_disparity()
+                    
+                elif action == 'tracking':
+                    self.do_tracking()
+                    
+                elif action == '2D_tracking':
+                    self.do_2d_tracking()
+                    
+                elif action == 'smoothing':
+                    self.do_smoothing()
                 
-            elif action == 'fiber_orientations':
-                self.do_orientations()
-
-            elif action == 'fiber_smoothing':
-                self.do_fiber_smoothing()
-
-            elif action == 'fiber_stitching':
-                self.do_fiber_stitching()
-
+                elif action == 'stitching':
+                    self.do_stitching()
                 
-            elif action == 'plot_trajectories':
-                self.do_plot_trajectories()
+                elif action == 'manual_matching':
+                    self.do_manual_matching()
+                    
+                elif action == 'fiber_orientations':
+                    self.do_orientations()
+                    
+                elif action == 'plot_trajectories':
+                    self.do_plot_trajectories()
+                    
+                elif action == 'animate_trajectories':
+                    self.do_animate_trajectories()
                 
-            elif action == 'animate_trajectories':
-                self.do_animate_trajectories()
-            
-            elif action == 'run_extention':
-                self.do_run_extention()    
-            
-            elif action == 'help':
-                self.help_me()
+                elif action == 'run_extention':
+                    self.do_run_extention()    
                 
+                elif action == 'calculate_BG_image':
+                    self.do_calculate_BG_image()
+                    
+                elif action == 'calculate_equilization_map':
+                    self.do_calculate_equilization_map()
                 
-            # legacy functions:
-            elif action == 'calibration':
-                print('Note: you are running an outdated action!')
-                print('consider using the initial_calibration and')
-                print('final_calibration actions instead.')
-                self.calibration_sequence()
-            
-            elif action == 'calibration_point_gui':
-                print('Note: you are running an outdated action!')
-                print('consider using the initial_calibration and')
-                print('final_calibration actions instead.')
-                self.calibration_point_gui()
-            
-            elif action == 'match_target_file':
-                print('Note: you are running an outdated action!')
-                print('consider using the initial_calibration and')
-                print('final_calibration actions instead.')
-                self.match_target_file()
+                elif action == 'help':
+                    self.help_me()
+                    
+                    
+                # legacy functions:
+                elif action == 'calibration':
+                    print('Note: you are running an outdated action!')
+                    print('consider using the initial_calibration and')
+                    print('final_calibration actions instead.')
+                    self.calibration_sequence()
+                
+                elif action == 'calibration_point_gui':
+                    print('Note: you are running an outdated action!')
+                    print('consider using the initial_calibration and')
+                    print('final_calibration actions instead.')
+                    self.calibration_point_gui()
+                
+                elif action == 'match_target_file':
+                    print('Note: you are running an outdated action!')
+                    print('consider using the initial_calibration and')
+                    print('final_calibration actions instead.')
+                    self.match_target_file()
             
             
     
@@ -221,6 +228,18 @@ class workflow(object):
         
         return par_seg[par_seg['param']==param]['value'].iloc[0]
     
+    
+    
+    def get_action_params(self, action):
+        '''
+        Extract the parameters from the self.params DataFrame for the given action.
+        Returns a dictionary of key-value pairs (param and value).
+        '''
+        if action not in set(self.params['operation']):
+            return {}
+        
+        par_seg = self.params[self.params['operation'] == action]
+        return dict(zip(par_seg['param'], par_seg['value']))
     
     
     
@@ -465,8 +484,7 @@ class workflow(object):
                                       'min_traj_len')
         max_point_number = self.get_param('calibration_with_particles',
                                       'max_point_number')
-        cal_image = self.get_param('calibration_with_particles', 
-                                   'calibration_image')
+
         print('\n', 'starting calibration with particles')
         
         
@@ -480,6 +498,7 @@ class workflow(object):
             from myptv.TsaiModel.gui_final_cal import cal_gui
             from myptv.TsaiModel.camera import camera_Tsai
             from myptv.TsaiModel.calibrate import calibrate_with_particles_Tsai
+            from numpy import zeros
             
             # setting up a camera instance            
             cam = camera_Tsai(camera_name)
@@ -497,6 +516,7 @@ class workflow(object):
             
             # run the final calibration gui
             print('starting calibration GIU using calibration with particles\n')
+            cal_image = zeros(100,100,dtype='int8')
             gui = cal_gui(cal, cal_image) 
             
             
@@ -505,25 +525,81 @@ class workflow(object):
             from myptv.extendedZolof.gui_final_cal import cal_gui
             from myptv.extendedZolof.camera import camera_extendedZolof
             from myptv.extendedZolof.calibrate import calibrate_with_particles_EZ
+            from myptv.imaging_mod import camera_wrapper
+            from numpy import mean
             
             # setting up a camera instance            
-            cam = camera_extendedZolof(camera_name)
-            cam.load('./')
+            cam = camera_wrapper(camera_name, './')
+            cam.load()
             
             
             # set up the calibration object
-            cal_with_p = calibrate_with_particles_EZ(traj_filename, cam, 
-                                                       cam_number, 
-                                                       blobs_fname, 
-                                                       min_traj_len=min_traj_len,
-                                                       max_point_number=max_point_number)
+            cwp = calibrate_with_particles_EZ(traj_filename, cam, 
+                                                cam_number, 
+                                                blobs_fname, 
+                                                min_traj_len=min_traj_len,
+                                                max_point_number=max_point_number)
             
-            cal = cal_with_p.get_calibrate_instance()
+            cal = cwp.get_calibrate_instance()
+            
+            p = cwp.get_particle_disparity()
+            err = [sum(pi**2)**0.5 for pi in p]
+            print('')
+            print('mean disparity before: %.4f px'%(mean(err)))
+            print('max disparity before: %.4f px\n'%(max(err)))
             
             # run the final calibration gui
-            print('starting calibration GIU using calibration with particles\n')
-            gui = cal_gui(cal, cal_image) 
+            print('calibrating...\n')
+            cal.calibrate()
+            
+            p = cwp.get_particle_disparity()
+            err = [sum(pi**2)**0.5 for pi in p]
+            print('mean disparity before: %.4f px'%(mean(err)))
+            print('max disparity before: %.4f px\n'%(max(err)))
+            
+            
+            usr_input = input('save results? (1=yes, other=no)')
+            if usr_input=='1':
+                cam.camera.save()
+                print('saved')
+            
+            
         
+    def do_calculate_BG_image(self):
+        '''
+        Calculates and save static BG image, defined as the mean of images
+        '''
+        from myptv.segmentation_mod import calculate_BG_image
+        
+        dirname = self.get_param('calculate_BG_image', 'images_folder')
+        ext = self.get_param('calculate_BG_image', 'image_extension')
+        raw_format = self.get_param('calculate_BG_image', 'raw_format')
+        N_img = self.get_param('calculate_BG_image', 'N_img')
+        savename = self.get_param('calculate_BG_image', 'save_name')
+        
+        
+        calculate_BG_image(dirname, ext, savename, N_img=N_img,
+                       raw_format=raw_format)
+        
+        
+    
+    def do_calculate_equilization_map(self):
+        '''
+        Calculates and saves an image equilization map
+        '''
+        from myptv.segmentation_mod import calculate_equilization_map
+        
+        dirname = self.get_param('calculate_equilization_map', 'images_folder')
+        ext = self.get_param('calculate_equilization_map', 'image_extension')
+        raw_format = self.get_param('calculate_equilization_map', 'raw_format')
+        N_img = self.get_param('calculate_equilization_map', 'N_img')
+        sigma = self.get_param('calculate_equilization_map', 'sigma')
+        BG_image = self.get_param('calculate_equilization_map', 'BG_image')
+        savename = self.get_param('calculate_equilization_map', 'save_name')
+        
+        calculate_equilization_map(dirname, ext, sigma, savename, N_img=N_img,
+                               BG_image=BG_image, raw_format=raw_format)
+    
     
     
     def do_segmentation(self):
@@ -559,9 +635,11 @@ class workflow(object):
         method = self.get_param('segmentation', 'method')
         p_size = self.get_param('segmentation', 'particle_size')
         shape = self.get_param('segmentation', 'shape')
-        pca_limit = self.get_param('segmentation', 'pca_limit') 
         remove_BG = self.get_param('segmentation', 'remove_background')
+        eq_map = self.get_param('segmentation', 'equilization_map')
         raw_format = self.get_param('segmentation', 'raw_format')
+        DoG_sigmas = self.get_param('segmentation', 'DoG_sigmas')
+        multiprocessing = self.get_param('segmentation', 'multiprocessing')
         
         
         # reading preprepared mask
@@ -600,6 +678,26 @@ class workflow(object):
             mask_ROI[ROI[2]:ROI[3]+1, ROI[0]:ROI[1]+1] = 1
             mask = mask * mask_ROI
             mask = (mask / amax(mask)).astype('uint')
+            
+            
+        # getting equilization map
+        if eq_map is None:
+            print('\n','Not equilyzing')
+            
+        elif type(eq_map)==str:
+            if shape=='particles':
+                print('\n','using given equilization map')
+                eq_map = imread(eq_map)
+            
+            elif shape=='fibers':
+                raise TypeError('equilization not implemented yet for fibers')
+        
+        else:
+            raise TypeError('equilization map not None nor path to an eqmap')
+        
+        
+        if DoG_sigmas is not None and shape=='fibers':
+                raise TypeError('DoG not implemented yet for fibers; use None')
             
             
         def calculate_BG_image(dirname, extension):
@@ -654,6 +752,8 @@ class workflow(object):
                                                 image_start=image_start,
                                                 N_img=N_img,
                                                 remove_ststic_BG=BG,
+                                                equalize_image=eq_map,
+                                                DoG_sigma=DoG_sigmas,
                                                 sigma=sigma, 
                                                 median=median,
                                                 threshold=threshold, 
@@ -666,7 +766,8 @@ class workflow(object):
                                                 min_mass=min_mass,
                                                 mask=mask,
                                                 method=method,
-                                                raw_format=raw_format)
+                                                raw_format=raw_format,
+                                                multiprocessing=multiprocessing)
             
                 loopSegment.segment_folder_images()
                 
@@ -715,6 +816,8 @@ class workflow(object):
                                                         sigma=sigma, 
                                                         median=median,
                                                         BG_image=BG,
+                                                        EQ_map=eq_map,
+                                                        DoG_sigma=DoG_sigmas,
                                                         threshold=threshold, 
                                                         local_filter=local_filter, 
                                                         max_xsize=max_xsize, 
@@ -791,7 +894,7 @@ class workflow(object):
                                                 mask=mask,
                                                 method=method,
                                                 raw_format=raw_format,
-                                                pca_limit=pca_limit) #agambino
+                                                pca_limit=1.0)
                 
                 loopSegment.segment_folder_images()
                 
@@ -852,7 +955,7 @@ class workflow(object):
                                                         min_mass=min_mass,
                                                         mask=mask,
                                                         method=method,
-                                                        pca_limit=pca_limit)
+                                                        pca_limit=1.0)
                 
                 particleSegment.get_blobs()
                 particleSegment.apply_blobs_size_filter()
@@ -917,7 +1020,8 @@ class workflow(object):
         march_forwards = self.get_param('matching', 'march_forwards')
         march_backwards = self.get_param('matching', 'march_backwards')
         save_name = self.get_param('matching', 'save_name')
-                
+        
+        
         if N0==0 and voxel_size==None:
             raise ValueError('No initial guess method given (N0=0, voxel_size=None)')
         
@@ -1017,6 +1121,35 @@ class workflow(object):
             
         
         
+    def do_analyze_disparity(self):
+        '''
+        Will run the matching_quality_GUI from 
+        myptv -> makePlots -> quality_estimators.
+        '''
+        from myptv.makePlots.quality_estimators import matching_quality_GUI
+        from myptv.imaging_mod import camera_wrapper, img_system
+        
+        # fetching parameters
+        blob_files = self.get_param('analyze_disparity', 'blob_files')
+        blob_files = [val.strip() for val in blob_files.split(',')]
+        particle_filename = self.get_param('analyze_disparity', 'particle_filename')
+        camera_names = self.get_param('analyze_disparity', 'camera_names')
+        camera_names = [val.strip() for val in camera_names.split(',')]
+        max_err = self.get_param('analyze_disparity', 'max_err')
+        min_cam_match = self.get_param('analyze_disparity', 'min_cam_match')
+        
+        
+        cams = [camera_wrapper(cn, './') for cn in camera_names]
+        for c in cams: c.load()
+        imsys = img_system(cams)
+        dmax = max_err
+        min_cam_match = min_cam_match
+    
+        G = matching_quality_GUI(imsys, blob_files, particle_filename, dmax, 
+                                 min_cam_match=min_cam_match)
+        
+        
+        
     def do_tracking(self):
         '''
         Will perform the tracking using the file given parameters.
@@ -1045,8 +1178,6 @@ class workflow(object):
         
         if method not in ['multiframe', 'fourframe']:
             raise ValueError("method can only be 'multiframe' or 'four_frame'.")
-
-        
         
         
         if method=='fourframe':
@@ -1148,8 +1279,13 @@ class workflow(object):
             
             
             # doing the tracking
-            frame_skips = max([int(Ns/3), 1])
-            tmf.track_frames(f0=ts, fe=te, frame_skips=frame_skips)
+            if type(Ns)==list: 
+                frame_skips = max([int(min(Ns)/3), 1])
+                if any([ns%2==0 for ns in Ns]):
+                    raise ValueError('Ns needs to have only odd integers')
+                
+            else: frame_skips = max([int(Ns/3), 1])
+            tmf.track_frames(f0=ts, fe=te, frame_skips=frame_skips, Ns=Ns)
             
             # interpolating missing points
             tmf.interpolate_trajs()
@@ -1301,8 +1437,12 @@ class workflow(object):
 
         print('\ninitiating 2D tracking...')
 
-        cam = camera_wrapper(cam_name, '')
-        cam.load()
+        if cam_name==None:
+            cam = None
+        
+        else:
+            cam = camera_wrapper(cam_name, '')
+            cam.load()
         
         print('\nloading blobs and transforming to lab-space coordinates')
         t2d = track_2D(cam, fname, z_particles, d_max=d_max, dv_max = dv_max, 
@@ -1363,7 +1503,10 @@ class workflow(object):
         print(im_fname)
         
         gui = man_match_gui(camera_names, im_fname, cameras_folder='.')
+    
         
+    
+    
     
     
     def do_orientations(self):
@@ -1428,132 +1571,10 @@ class workflow(object):
             fto = fiber_traj_orientation(trajectory_file, blob_fn, cams)
             fto.get_ori_lst()
             fto.save_orientations(save_name)
-
-
     
-    def do_fiber_smoothing(self):
-        '''
-        Will smooth both the fiber centroids and orientations using the specified file given paramters.
-        '''
-        from numpy import loadtxt, savetxt
-        from myptv.traj_smoothing_mod import smooth_trajectories
-        from os import getcwd, listdir
-        from os.path import exists as pathExists
-        import os 
-        
-        # fetching the smoothing parameters
-        trajectory_file = self.get_param('fiber_smoothing', 'trajectory_file')
-        orientation_file = self.get_param('fiber_smoothing', 'orientation_file')
-        window = self.get_param('fiber_smoothing', 'window_size')
-        polyorder = self.get_param('fiber_smoothing', 'polynom_order')
-        min_traj_length = self.get_param('fiber_smoothing', 'min_traj_length')
-        repetitions = self.get_param('fiber_smoothing', 'repetitions')
-        save_name = self.get_param('fiber_smoothing', 'save_name')
-
-        if min_traj_length <= polyorder:
-            raise ValueError('min_traj_length must be larger than polyorder')
-
-        traj_list = loadtxt(trajectory_file)
-        ori_list = loadtxt(orientation_file)
-        print('Starting to smooth fiber trajectories.')
-
-        sm_traj = smooth_trajectories(traj_list,
-                            window, 
-                            polyorder,
-                            repetitions=repetitions,
-                            min_traj_length=min_traj_length)
-        sm_traj.smooth()
-        sm_ori = smooth_trajectories(ori_list,
-                            window, 
-                            polyorder,
-                            repetitions=repetitions,
-                            min_traj_length=min_traj_length)
-        sm_ori.smooth()
-
-        smoothed_fiber_data = []
-        smoothed_fiber_data = [a[:10] + b[1:] for a, b in zip(sm_traj.smoothed_trajs, sm_ori.smoothed_trajs)]
-
-        # saving the data
-        if save_name is not None:
-            cwd_ls = listdir(getcwd())
-            if save_name in cwd_ls or pathExists(save_name):
-                print('\n The file name "%s" already exists in'%save_name)
-                print(' the working directory. Should I save anyways?')
-                usr = input('(1=yes, else=no)')
-                if usr == '1':
-                    print('\n', 'Saving the smoothed data (%s).'%save_name)
-
-                    fmt = ['%d', '%.3f', '%.3f', '%.3f', '%.6f', '%.6f', '%.6f', '%.9f', '%.9f', '%.9f', '%.3f', '%.3f', '%.3f', '%.6f', '%.6f', '%.6f', '%.9f', '%.9f', '%.9f', '%.3f']
-                    save_path = os.path.join(r'./', save_name) 
-                    savetxt(save_path, smoothed_fiber_data, fmt=fmt, delimiter='\t')
-
-                else:
-                    print('\n', 'Skipped saving file.')
-            
-            else:
-                print('\n', 'Saving the smoothed data (%s).'%save_name)
-
-                fmt = ['%d', '%.3f', '%.3f', '%.3f', '%.6f', '%.6f', '%.6f', '%.9f', '%.9f', '%.9f', '%.3f', '%.3f', '%.3f', '%.6f', '%.6f', '%.6f', '%.9f', '%.9f', '%.9f', '%.3f']
-                save_path = os.path.join(r'./', save_name) 
-                savetxt(save_path, smoothed_fiber_data, fmt=fmt, delimiter='\t')
-        
-        print('\n', 'Done.')
-
-
-
-    def do_fiber_stitching(self):
-        '''
-        Will perfrom fiber stitching using the file given parameters.
-        '''
-        from numpy import loadtxt, savetxt #agambino
-        from myptv.fibers.fiber_stitching_mod import traj_ori_stitching
-        from myptv.traj_smoothing_mod import smooth_trajectories #smooth everything at the end of stitching
-        from os import getcwd, listdir
-        from os.path import exists as pathExists
-        import os #agambino
-
-        
-        # fetching the stitching parameters
-        trajectory_file = self.get_param('fiber_stitching', 'trajectory_file')
-        Ts = self.get_param('fiber_stitching', 'max_time_separation')
-        dm = self.get_param('fiber_stitching', 'max_distance')
-        polyorder = self.get_param('fiber_stitching', 'polynom_order')
-        window_size = self.get_param('fiber_stitching', 'window_size')
-        save_name = self.get_param('fiber_stitching', 'save_name')
-
-        traj_list = loadtxt(trajectory_file)
-        print('Starting to smooth fiber trajectories.')
-
-        ts = traj_ori_stitching(traj_list, Ts, dm,polyorder,window_size) #agambino
-        ts.stitch_trajectories()
-
-        # saving the data
-        if save_name is not None:
-            cwd_ls = listdir(getcwd())
-            if save_name in cwd_ls or pathExists(save_name):
-                print('\n The file name "%s" already exists in'%save_name)
-                print(' the working directory. Should I save anyways?')
-                usr = input('(1=yes, else=no)')
-                if usr == '1':
-                    print('\n', 'Saving the smoothed data (%s).'%save_name)
-
-                    fmt = ['%d', '%.3f', '%.3f', '%.3f', '%.6f', '%.6f', '%.6f', '%.9f', '%.9f', '%.9f', '%.3f', '%.3f', '%.3f', '%.6f', '%.6f', '%.6f', '%.9f', '%.9f', '%.9f', '%.3f']
-                    save_path = os.path.join(r'./', save_name) 
-                    savetxt(save_path, ts.new_traj_list, fmt=fmt, delimiter='\t')
-
-                else:
-                    print('\n', 'Skipped saving file.')
-            
-            else:
-                print('\n', 'Saving the smoothed data (%s).'%save_name)
-
-                fmt = ['%d', '%.3f', '%.3f', '%.3f', '%.6f', '%.6f', '%.6f', '%.9f', '%.9f', '%.9f', '%.3f', '%.3f', '%.3f', '%.6f', '%.6f', '%.6f', '%.9f', '%.9f', '%.9f', '%.3f']
-                save_path = os.path.join(r'./', save_name) 
-                savetxt(save_path, ts.new_traj_list, fmt=fmt, delimiter='\t')
-        
-        print('\n', 'Done.')
-
-
+    
+    
+    
     
     def do_plot_trajectories(self):
         '''
