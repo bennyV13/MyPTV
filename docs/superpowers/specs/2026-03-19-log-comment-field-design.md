@@ -10,11 +10,13 @@ This design specifies the addition of a `comment` field to all log entries in `m
 ## 2. Migration Logic (`scripts/migrate_log_comments.py`)
 - **Input:** Path to `myptvlog.jsonl`.
 - **Process:**
+  - Create a backup of the original file (`.bak`).
   - Read the file line-by-line.
   - Parse each line as a JSON object.
+  - If the line is malformed, log an error and skip or handle gracefully.
   - If the `"comment"` key is missing, add `"comment": ""`.
   - Write the updated JSON object back to a temporary file.
-- **Output:** The original `myptvlog.jsonl` will be replaced with the updated content.
+- **Output:** The original `myptvlog.jsonl` will be replaced with the updated content after verification.
 
 ## 3. Library Update (`MyPTV/myptv/logging_utils.py`)
 - **ActionLogger.__init__:**
@@ -29,6 +31,8 @@ This design specifies the addition of a `comment` field to all log entries in `m
 - Create a test file `MyPTV/tests/test_logging_comment.py`.
 - Mock the log file path and run `ActionLogger` with various comment values.
 - Assert the resulting JSON contains the `comment` field with the expected value.
+- **Idempotency Test:** Verify that running the migration script twice does not duplicate fields or corrupt the file.
+- **Error Handling Test:** Verify the script handles malformed JSON lines without crashing.
 
 ### Manual Verification
 - Run the migration script on `Data/20260315_frames/myptvlog.jsonl`.
