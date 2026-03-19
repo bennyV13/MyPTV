@@ -10,6 +10,7 @@ This project focuses on improving the **Particle Tracking Velocimetry (PTV)** wo
 
 ## Project Mandates
 *   **Automatic Git Updates:** Always stage and commit local changes to the current branch as the final action before returning to the user. Use descriptive commit messages summarizing the fixes and improvements.
+*   **Multi-Agent Development:** Use isolated Git Worktrees in `.worktrees/` for complex tasks or parallel sub-agents. Never work directly in the root directory for independent sub-tasks. Always use the `using-git-worktrees` skill for setup.
 
 ## Completed Improvements (`gui_initial_cal.py`)
 
