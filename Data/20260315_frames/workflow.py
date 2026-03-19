@@ -1663,13 +1663,20 @@ class workflow(object):
         '''
         p = self.get_action_params('create_blob_mask')
         from myptv.masking_mod import generate_blob_polygon_mask
+        
+        # Check for optional parameters
+        max_sides = p.get('max_sides', None)
+        alpha = p.get('alpha', None)
+        
         try:
             generate_blob_polygon_mask(
                 p['blob_file'],
-                p['resolution'],
+                p['reference_image'],
                 p['padding'],
                 p['output_bit_depth'],
-                p['save_name']
+                p['save_name'],
+                max_sides=max_sides,
+                alpha=alpha
             )
         except Exception as e:
             print(f"\nError creating blob mask: {e}")
