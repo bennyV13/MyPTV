@@ -5,7 +5,7 @@
 **Status:** Approved
 
 ## 1. Overview
-This feature allows users to generate a binary mask image (`.tif`) based on the convex hull of a formation of segmented blobs. This is useful for defining a Region of Interest (ROI) that tightly follows the actual particle distribution, reducing noise in subsequent processing steps.
+This feature allows users to generate a binary mask image (`.tif`) based on the convex hull of a formation of segmented blobs. This is useful for defining a Region of Interest (ROI) that tightly follows the actual calibration space, reducing noise in subsequent processing steps.
 
 ## 2. Requirements
 - **Input:** A standard MyPTV blob file (space-separated text, columns 0=y, 1=x).
@@ -23,7 +23,7 @@ This feature allows users to generate a binary mask image (`.tif`) based on the 
 
 ### 3.1. Core Logic: `MyPTV/myptv/masking_mod.py`
 A new module responsible for:
-1.  **Loading Blobs:** Extracting $(y, x)$ coordinates.
+1.  **Loading Blobs:** Extracting $(y, x)$ coordinates from columns 0 and 1 of the blob file.
 2.  **Convex Hull:** Using `scipy.spatial.ConvexHull` to find the boundary vertices.
 3.  **Polygon Expansion (Padding):**
     - For each vertex $V_i$, calculate the unit normal vectors $\hat{n}_{i-1,i}$ and $\hat{n}_{i,i+1}$ of the adjacent edges.
