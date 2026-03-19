@@ -25,11 +25,12 @@ class ActionLogger(object):
     Context manager that captures console output (stdout and stderr) 
     and appends a single JSON object to a log file upon exit.
     """
-    def __init__(self, action, parameters, param_file, log_fname='myptvlog.jsonl'):
+    def __init__(self, action, parameters, param_file, log_fname='myptvlog.jsonl', comment=""):
         import os
         self.action = action
         self.parameters = parameters
         self.param_file = param_file
+        self.comment = comment
         
         # determine the log file path:
         # If param_file exists, save log in its directory.
@@ -69,6 +70,7 @@ class ActionLogger(object):
             "parameters": self.parameters,
             "status": status,
             "duration_seconds": duration,
+            "comment": self.comment,
             "output": self.buffer.getvalue(),
             "error": error_msg
         }
