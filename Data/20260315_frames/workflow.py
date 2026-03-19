@@ -60,7 +60,8 @@ class workflow(object):
                                 'fiber_orientations',
                                 'plot_trajectories',
                                 'animate_trajectories',
-                                'run_extention']
+                                'run_extention',
+                                'create_blob_mask']
         
         
         # perform the wanted action:
@@ -131,6 +132,9 @@ class workflow(object):
                     
                 elif action == 'calculate_equilization_map':
                     self.do_calculate_equilization_map()
+
+                elif action == 'create_blob_mask':
+                    self.do_create_blob_mask()
                 
                 elif action == 'help':
                     self.help_me()
@@ -1651,6 +1655,26 @@ class workflow(object):
         
         return None
         
+    
+    
+    def do_create_blob_mask(self):
+        '''
+        This is used to create a polygon mask around a blob file.
+        '''
+        p = self.get_action_params('create_blob_mask')
+        from myptv.masking_mod import generate_blob_polygon_mask
+        try:
+            generate_blob_polygon_mask(
+                p['blob_file'],
+                p['resolution'],
+                p['padding'],
+                p['output_bit_depth'],
+                p['save_name']
+            )
+        except Exception as e:
+            print(f"\nError creating blob mask: {e}")
+            return
+            
     
     
     
