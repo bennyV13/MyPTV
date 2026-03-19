@@ -29,23 +29,23 @@
     Number_of_images:  None
     image_start: 0
     images_folder: /Users/user/Desktop/Research/Data/20260315_frames/clean/Rec15/clean_cam4
-    single_image_name: 010.tif
+    single_image_name: 110.tif
     image_extension: '.tif'
     raw_format: False
     multiprocessing: True
     shape: particles
     mask: 1.0
     ROI: 0, 2176, 0, 2172
-    plot_result: False
-    threshold: 16
+    plot_result: True
+    threshold: 3
     remove_background: BG-EQ/BG_cam4.tif
-    equilization_map: BG-EQ/EQmap_cam4.tif
+    equilization_map: None
     DoG_sigmas: None
     median: None
     blur_sigma: 0
     local_filter: None
-    min_xsize: 0
-    min_ysize: 0
+    min_xsize: 1
+    min_ysize: 1
     min_mass: 0.0
     max_xsize: 1500.0
     max_ysize: 1500.0
@@ -55,13 +55,13 @@
     save_name: blobs_cam4
 
 - matching:
-    blob_files: blobs_cam4, blobs_cam4, blobs_cam4
+    blob_files: blobs_cam1, blobs_cam2, blobs_cam3, blobs_cam4
     frame_start: 0
     N_frames: None
     march_forwards: True
     march_backwards: True
-    camera_names: cam4, cam4, cam4
-    ROI: 0.0, 70.0, 0.0, 70.0, -25.0, 15.0
+    camera_names: cam1, cam2, cam3, cam4
+    ROI: 0.0, 100.0, 0.0, 100.0, -50.0, 0.0
     voxel_size: 20
     N0: 100
     max_err: 0.25
@@ -158,9 +158,9 @@
     extention_params_file: the_path_to_the_extentions_params_file
 
 - create_blob_mask:
-    blob_file: Data/20260315_frames/blobs_cam1
+    blob_file: Data/20260315_frames/blobs_cam4
     resolution: [2176, 2176]
     padding: 20
     output_bit_depth: 8
-    save_name: Data/20260315_frames/mask_cam1.tif
+    save_name: Data/20260315_frames/mask_cam4.tif
 
