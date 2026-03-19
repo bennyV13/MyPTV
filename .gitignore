@@ -1,5 +1,6 @@
 .env
 .gemini/
+.worktrees/
 conductor/
 venv/
 check_image_shape.py
@@ -23,4 +24,3 @@ MyPTV/*
 !MyPTV/myptv/
 !MyPTV/example/
 !MyPTV/example_fibers/
-!MyPTV/tests/
