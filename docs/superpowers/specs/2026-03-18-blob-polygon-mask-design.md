@@ -10,13 +10,14 @@ This feature allows users to generate a binary mask image (`.tif`) based on the 
 ## 2. Requirements
 - **Input:** A standard MyPTV blob file (space-separated text, columns 0=y, 1=x).
 - **Output:** A binary mask image (`.tif`) where pixels inside the expanded polygon are 1 (white) and outside are 0 (black).
-- **Parameters:**
+- Parameters:
     - `blob_file`: Path to the input blobs.
     - `resolution`: [width, height] of the camera image.
     - `padding`: Integer value in pixels to expand the polygon boundary.
+    - `output_bit_depth`: Bit depth of the output mask (e.g., 8 or 16).
     - `save_name`: Path to save the resulting mask.
-- **Workflow:** Integrated as a first-class step in `workflow.py`.
-- **Validation:** Interactive Matplotlib plot showing blobs and the calculated polygon for user approval before saving.
+- Workflow: Integrated as a first-class step in `workflow.py`.
+- Validation: Interactive Matplotlib plot showing blobs and the calculated polygon for user approval before saving.
 
 ## 3. Architecture & Components
 
@@ -33,14 +34,23 @@ A new module responsible for:
     - Plot the expanded polygon boundary as a line.
     - Provide a "Save" and "Abort" mechanism (e.g., via GUI button or keypress).
 5.  **Rasterization:** Using `skimage.draw.polygon` to fill the mask.
-6.  **Saving:** Using `skimage.io.imsave` to write the `.tif` file.
+6.  **Saving:** Using `skimage.io.imsave` to write the `.tif` file with the specified `output_bit_depth`.
 
 ### 3.2. Workflow Integration: `Data/20260315_frames/workflow.py`
 - Add `create_blob_mask` to `allowed_actions`.
 - Implement `self.create_blob_mask()` to bridge parameters to `masking_mod`.
 
 ### 3.3. Configuration: `Data/20260315_frames/params_file.yml`
-- Add a new `create_blob_mask` section to define parameters.
+- Add a new `create_blob_mask` section to define parameters:
+    ```yaml
+    - create_blob_mask:
+        blob_file: Data/20260315_frames/blobs_cam1
+        resolution: [2176, 2176]
+        padding: 20
+        output_bit_depth: 8
+        save_name: Data/20260315_frames/mask_cam1.tif
+    ```
+
 
 ## 4. Success Criteria
 - The generated mask accurately represents the blob formation with the specified pixel padding.
