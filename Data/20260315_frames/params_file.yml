@@ -158,9 +158,11 @@
     extention_params_file: the_path_to_the_extentions_params_file
 
 - create_blob_mask:
-    blob_file: Data/20260315_frames/blobs_cam4
-    resolution: [2176, 2176]
-    padding: 20
+    blob_file: Data/20260315_frames/blobs_star
+    reference_image: Data/20260315_frames/BG-EQ/BG_cam4.tif
+    padding: 0
     output_bit_depth: 8
-    save_name: Data/20260315_frames/mask_cam4.tif
+    max_sides: 40
+    alpha: 255
+    save_name: Data/20260315_frames/mask_star.tif
 
