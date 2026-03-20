@@ -41,4 +41,4 @@ This design specifies the addition of a `comment` field to all log entries in `m
 
 ## 5. Deployment Plan
 - Use a sub-agent in an isolated worktree for the migration and code changes.
-- Final action: Stage and commit changes to the `gemini-changes` branch.
+- Final action: Stage and commit changes to the `logger` branch.

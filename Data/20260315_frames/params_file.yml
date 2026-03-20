@@ -10,11 +10,11 @@
     plot_histogram: True
 
 - calculate_BG_image:
-    images_folder: /Users/user/Desktop/Research/Data/20260315_frames/clean/Rec15/clean_4
+    images_folder: clean/Rec15/clean_cam3
     image_extension: '.tif'
     raw_format: False
     N_img: 300
-    save_name: BG-EQ/BG_cam4.tif
+    save_name: BG-EQ/BG_cam3.tif
 
 - calculate_equilization_map:
     images_folder: /Users/user/Desktop/Research/Data/20260315_frames/clean/Rec15/clean_2
@@ -28,31 +28,31 @@
 - segmentation:
     Number_of_images:  None
     image_start: 0
-    images_folder: /Users/user/Desktop/Research/Data/20260315_frames/clean/Rec15/clean_cam4
+    images_folder: /Users/user/Desktop/Research/Data/20260315_frames/clean/Rec15/clean_cam3
     single_image_name: 110.tif
     image_extension: '.tif'
     raw_format: False
     multiprocessing: True
     shape: particles
-    mask: 1.0
+    mask: masks/mask_cam3.tif
     ROI: 0, 2176, 0, 2172
     plot_result: True
-    threshold: 3
-    remove_background: BG-EQ/BG_cam4.tif
+    threshold: 0
+    remove_background: BG-EQ/BG_cam3.tif
     equilization_map: None
     DoG_sigmas: None
     median: None
     blur_sigma: 0
     local_filter: None
-    min_xsize: 1
-    min_ysize: 1
-    min_mass: 0.0
-    max_xsize: 1500.0
-    max_ysize: 1500.0
-    max_mass: 3000000
+    min_xsize: 0
+    min_ysize: 0
+    min_mass: 0
+    max_xsize: 15000.0
+    max_ysize: 15000.0
+    max_mass: 1000
     method: labeling
     particle_size: 8  
-    save_name: blobs_cam4
+    save_name: blobs_cam3
 
 - matching:
     blob_files: blobs_cam1, blobs_cam2, blobs_cam3, blobs_cam4
@@ -158,11 +158,11 @@
     extention_params_file: the_path_to_the_extentions_params_file
 
 - create_blob_mask:
-    blob_file: Data/20260315_frames/blobs_star
-    reference_image: Data/20260315_frames/BG-EQ/BG_cam4.tif
-    padding: 0
+    blob_file: calibration/cam3_CalBlobs
+    reference_image: calibration/cam3.tif
+    padding: 20
     output_bit_depth: 8
     max_sides: 40
     alpha: 255
-    save_name: Data/20260315_frames/mask_star.tif
+    save_name: masks/mask_cam3.tif
 
