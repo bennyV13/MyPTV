@@ -28,7 +28,7 @@ class workflow(object):
     in a dedicated text file.
     '''
     
-    def __init__(self, param_file, action):
+    def __init__(self, param_file, action, comment=""):
         '''
         input -
         
@@ -38,11 +38,14 @@ class workflow(object):
         action - string; the name of the PTV action to be performed. Accepted
                  values are: 'segmentation', 'matching', 'tracking',
                  'smoothing', and 'stitching'.
+        
+        comment - string; a comment to be added to the log entry.
         '''
         
         # read the parameter file:
         self.param_file_path = param_file
         self.params = self.read_params_file()
+        self.comment = comment
         
         
         self.allowed_actions = ['help', 'initial_calibration', 
@@ -78,7 +81,7 @@ class workflow(object):
             from myptv.logging_utils import ActionLogger
             action_params = self.get_action_params(action)
             
-            with ActionLogger(action, action_params, self.param_file_path):
+            with ActionLogger(action, action_params, self.param_file_path, comment=self.comment):
                 if action == 'initial_calibration':
                     self.initial_calibration()
                     
@@ -1840,12 +1843,17 @@ class workflow(object):
 
 if __name__ == '__main__':
     
-    import sys
-    fname, action = sys.argv[1], sys.argv[2]
+    import argparse
+    parser = argparse.ArgumentParser(description='Run MyPTV workflow.')
+    parser.add_argument('fname', help='Parameters file name')
+    parser.add_argument('action', help='Action to perform')
+    parser.add_argument('--comment', default='', help='Comment for the log entry')
+    args = parser.parse_args()
+
     print('\n','given inputs -')
-    print('params file name:', fname)
-    print('action:', action, '\n')
-    wf = workflow(fname, action)
+    print('params file name:', args.fname)
+    print('action:', args.action, '\n')
+    wf = workflow(args.fname, args.action, comment=args.comment)
     
     
     
