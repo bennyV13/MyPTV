@@ -16,8 +16,8 @@ def migrate_log(log_path):
     try:
         # Use a temporary file to write the updated content
         fd, temp_path = tempfile.mkstemp(dir=os.path.dirname(log_path), text=True)
-        with os.fdopen(fd, 'w') as temp_file:
-            with open(log_path, 'r') as original_file:
+        with os.fdopen(fd, 'w', encoding='utf-8') as temp_file:
+            with open(log_path, 'r', encoding='utf-8') as original_file:
                 for line in original_file:
                     line = line.strip()
                     if not line:
