@@ -1,6 +1,6 @@
 - calibration:
     3D_model: extendedZolof
-    camera_name: cam4
+    camera_name: cam1
     resolution: 2176, 2176
     calibration_image: ./calibration/cam4.tif
     target_file: ./Calibration/target_file
@@ -66,17 +66,19 @@
     N0: 100
     max_err: 0.25
     min_cam_match: 3
-    save_name: particles
+    save_name: particles_b
 
 - analyze_disparity:
-    blob_files: blobs_cam4, blobs_cam4, blobs_cam4
-    particle_filename: particles
-    camera_names: cam4, cam4, cam4
+    blob_files: blobs_cam1, blobs_cam2, blobs_cam3, blobs_cam4
+    frame_start: 0
+    N_frames: 10
+    camera_names: cam1, cam2, cam3, cam4
+    particle_filename: particles_20b
     max_err: 0.25
     min_cam_match: 3
 
 - tracking:
-    particles_file_name: particles
+    particles_file_name: particles_20b
     method: multiframe
     frame_start: 0
     N_frames: None
@@ -87,13 +89,13 @@
     NSR_threshold: 0.25
     mean_flow: [0.0, 0.0, 0.0]
     plot_candidate_graph: False
-    save_name: trajectories
+    save_name: trajectories_20b
 
 - calibration_with_particles:
-    camera_name: cam4
-    traj_filename: './trajectories'
-    cam_number: 1 
-    blobs_fname: 'blobs_cam4'
+    camera_name: cam1
+    traj_filename: './trajectories_20b'
+    cam_number: 1
+    blobs_fname: 'blobs_cam1'
     min_traj_len: 4
     max_point_number: 1000
 
