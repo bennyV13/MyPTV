@@ -61,6 +61,9 @@ class ActionLogger(object):
         error_msg = None
         if exc_type:
             error_msg = "".join(traceback.format_exception(exc_type, exc_val, exc_tb))
+            error_msg = error_msg.replace('\n', '. ')
+
+        output_str = self.buffer.getvalue().replace('\n', '. ')
 
         log_entry = {
             "timestamp": self.start_time.isoformat(),
@@ -69,7 +72,7 @@ class ActionLogger(object):
             "parameters": self.parameters,
             "status": status,
             "duration_seconds": duration,
-            "output": self.buffer.getvalue(),
+            "output": output_str,
             "error": error_msg
         }
 
