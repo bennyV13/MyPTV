@@ -3,6 +3,7 @@
 .gemini/
 .worktrees/
 .pytest_cache/
+.superpowers/
 __pycache__/
 *.pyc
 conductor/
