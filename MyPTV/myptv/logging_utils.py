@@ -74,9 +74,9 @@ class ActionLogger(object):
             "parameters": self.parameters,
             "status": status,
             "duration_seconds": duration,
-            "comment": comment_str,
             "output": output_str,
-            "error": error_msg
+            "error": error_msg,
+            "comment": comment_str
         }
 
         with open(self.log_fname, 'a') as f:
