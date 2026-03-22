@@ -69,14 +69,14 @@ class ActionLogger(object):
 
         log_entry = {
             "timestamp": self.start_time.isoformat(),
+            "comment": comment_str,
             "action": self.action,
             "param_file": self.param_file,
             "parameters": self.parameters,
             "status": status,
             "duration_seconds": duration,
             "output": output_str,
-            "error": error_msg,
-            "comment": comment_str
+            "error": error_msg
         }
 
         with open(self.log_fname, 'a') as f:
