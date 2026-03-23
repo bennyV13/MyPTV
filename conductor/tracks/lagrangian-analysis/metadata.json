@@ -1,0 +1,8 @@
+{
+  "track_id": "lagrangian-analysis",
+  "name": "Lagrangian Data Analysis Pipeline",
+  "status": "active",
+  "description": "Automated pipeline from PTV trajectories to volumetric statistics.",
+  "data_source": "Data_and_analysis/20260315_frames/trajecotries_stitched",
+  "fps": 25
+}
