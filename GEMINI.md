@@ -9,6 +9,8 @@ This project focuses on improving the **Particle Tracking Velocimetry (PTV)** wo
 3.  **Intelligent Automation:** Use geometry-aware algorithms to suggest and filter calibration points.
 
 ## Project Mandates
+*   **Workspace Structure:** This project is part of a 3-sibling workspace (`MyPTV/`, `Data_and_analysis/`, `Project_Management/`).
+*   **Project Governance:** All planning, documentation, and `conductor` tracks are strictly managed within the **`Project_Management/`** repository. When "updating the plan" or "checking conductor," always refer to this repository.
 *   **Automatic Git Updates:** Always stage and commit local changes to the current branch as the final action before returning to the user. Use descriptive commit messages summarizing the fixes and improvements.
 *   **Multi-Agent Development:** Use isolated Git Worktrees in `.worktrees/` for complex tasks or parallel sub-agents. Never work directly in the root directory for independent sub-tasks. Always use the `using-git-worktrees` skill for setup.
 

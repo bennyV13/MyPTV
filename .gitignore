@@ -1,3 +1,4 @@
+# Global ignores
 .env
 .DS_Store
 .gemini/
@@ -6,31 +7,23 @@
 .superpowers/
 __pycache__/
 *.pyc
-conductor/
 venv/
-check_image_shape.py
-analyzing_softwares_copy/
 mcp_crash_log.txt
 myptv-log-searcher.skill
 
-# Ignore all Data contents by default
-Data/*
+# Ignore heavy images
+*.tif
+*.dng
+*.jpg
+*.jpeg
+*.png
+*.pdf
 
-# Allow specific files in the research data folder
-!Data/20260315_frames/
-Data/20260315_frames/*
-!Data/20260315_frames/workflow.py
-!Data/20260315_frames/params_file.yml
-!Data/20260315_frames/myptvlog.jsonl
-
-# All of MyPTV root contents ignored
-MyPTV/*
-
-# Except the core package and examples
-!MyPTV/myptv/
-!MyPTV/example/
-!MyPTV/example_fibers/
-!MyPTV/tests/
-!MyPTV/requirements.txt
-!MyPTV/setup.py
-!MyPTV/Readme.md
+# Only track these project management folders/files
+# Everything else is ignored by being in another repo
+MyPTV/
+Data/
+Data_and_analysis/
+Analysis/
+analyzing_softwares_copy/
+check_image_shape.py
