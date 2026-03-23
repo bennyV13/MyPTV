@@ -34,3 +34,94 @@ class PointManager:
         Returns the dictionary of grouped points.
         """
         return self.groups
+
+
+from myptv.extendedZolof.camera import camera_extendedZolof
+from myptv.extendedZolof.calibrate import calibrate_extendedZolof
+import itertools
+
+
+class OptimizerCore:
+    """
+    Core implementation of the Greedy Calibration Optimizer.
+    """
+    def __init__(self, cam_name, point_manager, k=3):
+        self.cam_name = cam_name
+        self.pm = point_manager
+        self.k = k
+        self.group_keys = self.pm.get_groups().keys()
+
+    def get_mse(self, points):
+        """
+        Calculates the mean squared error for a given subset of points.
+        """
+        x_list = points[:, :2] # camera coordinates
+        X_list = points[:, 2:] # lab coordinates
+        
+        # Initialize a temporary camera to avoid side-effects
+        # This assumes camera instance can be created just by name for EZ.
+        cam = camera_extendedZolof(self.cam_name)
+        cal = calibrate_extendedZolof(cam, x_list, X_list)
+        cal.calibrate()
+        return cal.mean_squared_err()
+
+    def optimize_local(self):
+        """
+        Runs the greedy search starting from a random subset.
+        """
+        # Start with a random selection
+        current_selection = {}
+        for key in self.group_keys:
+            group_data = self.pm.groups[key]
+            indices = np.random.choice(len(group_data), min(self.k, len(group_data)), replace=False)
+            current_selection[key] = indices
+
+        best_mse = self._evaluate_selection(current_selection)
+        
+        improved = True
+        while improved:
+            improved = False
+            
+            # Loop through each group (column)
+            for key in self.group_keys:
+                group_data = self.pm.groups[key]
+                n_points = len(group_data)
+                
+                # Save the original indices to restore them if needed
+                original_indices = current_selection[key]
+                
+                # Try all possible combinations of k points in this group
+                all_combos = list(itertools.combinations(range(n_points), min(self.k, n_points)))
+                
+                group_best_mse = best_mse
+                group_best_indices = original_indices
+                
+                for combo in all_combos:
+                    # Replace only the selection for this group
+                    current_selection[key] = combo
+                    mse = self._evaluate_selection(current_selection)
+                    
+                    if mse < group_best_mse:
+                        group_best_mse = mse
+                        group_best_indices = combo
+                
+                # If we found a better combo for this group, update and continue
+                if group_best_mse < best_mse:
+                    best_mse = group_best_mse
+                    current_selection[key] = group_best_indices
+                    improved = True
+                else:
+                    # Restore original if no improvement found
+                    current_selection[key] = original_indices
+                    
+        return best_mse, self._get_full_points(current_selection)
+
+    def _evaluate_selection(self, selection_dict):
+        points = self._get_full_points(selection_dict)
+        return self.get_mse(points)
+
+    def _get_full_points(self, selection_dict):
+        all_points = []
+        for key, indices in selection_dict.items():
+            all_points.append(self.pm.groups[key][list(indices)])
+        return np.vstack(all_points)
