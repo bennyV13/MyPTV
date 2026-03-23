@@ -15,6 +15,8 @@ The fundamental building blocks and base classes for the entire Lagrangian frame
 Scripts for moving data into the pipeline and between different formats.
 - **`traj2npy.py`**: Loads raw trajectory data, cleans outliers (Z-score/MAD), and saves it as a consolidated `.npy` array for fast loading.
 - **`traj2npy_multiple.py`**: Similar to `traj2npy`, but processes and merges multiple files.
+- **`remove_irrelevent.py`**: Filters trajectory data by removing -1 IDs, zero-velocity/acceleration rows, and points outside the ROI.
+- **`convert_velocity.py`**: Converts particle velocities from mm/frame to mm/sec using a specified frame rate.
 - **`pickle2csv.py`**: Converts a pickled snapshot of voxels into a flat CSV, suitable for import into other tools (Excel, Origin, etc.).
 
 ### Processing Pipeline
@@ -45,8 +47,9 @@ Convert your raw PTV results (trajectories) into an optimized binary format for 
 
 ### Step 2: Voxel Generation & Partitioning
 Define your analysis volume (ROI) and grid resolution. Create the geometry and assign your points to their corresponding spatial cells.
-*   **Step 2a: Voxel Generation**: Uses `voxel_space.py` (internally called by the partitioning script) to construct the 3D grid or concentric shells.
-*   **Step 2b: Partitioning**: Assigns trajectory points to the generated voxels based on spatial coordinates.
+*   **Step 2a: Data Cleaning & Unit Conversion**: Use `remove_irrelevent.py` to filter non-physical trajectories and `convert_velocity.py` to convert velocities to mm/sec. This should be performed inside `divide_points_to_cube_voxels.py` or before the partitioning call.
+*   **Step 2b: Voxel Generation**: Uses `voxel_space.py` (internally called by the partitioning script) to construct the 3D grid or concentric shells.
+*   **Step 2c: Partitioning**: Assigns trajectory points to the generated voxels based on spatial coordinates.
 *   **Run:** `divide_points_to_cube_voxels.py`.
 *   **Output:** `voxels_points.pkl`.
 

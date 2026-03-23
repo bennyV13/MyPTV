@@ -24,8 +24,9 @@ The analysis will follow a sequential path:
 ### Step 2: Voxel Generation & Partitioning (`divide_points_to_cube_voxels.py`)
 - **Action**: Define the grid geometry (Cartesian ROI or cylindrical shells) and assign trajectory points to these voxels.
 - **Sub-steps**:
-    - **Step 2a: Voxel Generation**: Uses `voxel_space.py` to create the initial ROI grid geometry.
-    - **Step 2b: Partitioning**: Assigns PTV trajectory points to the newly created voxels.
+    - **Step 2a: Data Pre-processing**: Use `remove_irrelevent.py` to filter trajectories (remove -1 IDs and zero-velocity rows) and `convert_velocity.py` to convert from mm/frame to mm/sec.
+    - **Step 2b: Voxel Generation**: Uses `voxel_space.py` to create the initial ROI grid geometry.
+    - **Step 2c: Partitioning**: Assigns PTV trajectory points to the newly created voxels.
 - **Output**: `voxels_points.pkl`.
 
 ### Step 3: Statistical Computation (`calculate_stats.py`)
