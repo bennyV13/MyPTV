@@ -26,7 +26,7 @@ The analysis will follow a sequential path:
 - **Output**: `voxels_points.pkl`.
 
 ### Step 3: Statistical Computation (`calculate_stats.py`)
-- **Action**: Execute the multi-phase statistics pipeline (means, spatial derivatives, turbulence metrics).
+- **Action**: Execute the multi-phase statistics pipeline (means, spatial derivatives, turbulence metrics, and **mean collision rates**).
 - **Output**: `voxels_stats.pkl`.
 
 ### Step 4: Data Refinement (`remove_zero_vox.py`)
