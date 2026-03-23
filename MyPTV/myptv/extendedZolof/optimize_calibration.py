@@ -166,11 +166,16 @@ def main():
     
     optimizer = OptimizerCore(args.cam_name, pm, k=args.k)
     
+    # Calculate original MSE using all points
+    orig_mse = optimizer.get_mse(data)
+    print(f"Original MSE (all points): {orig_mse:.6f}")
+    
     print(f"Starting optimization (k={args.k}, m={args.m})...")
     best_mse, best_points = optimizer.run_multi_start(n_starts=args.m)
     
     print(f"\nOptimization finished!")
     print(f"Best MSE: {best_mse:.6f}")
+    print(f"Improvement: {orig_mse - best_mse:.6f}")
     
     if args.output:
         out_fname = args.output
@@ -179,6 +184,19 @@ def main():
         
     np.savetxt(out_fname, best_points, fmt='%.2f', delimiter='\t')
     print(f"Optimized points saved to: {out_fname}")
+
+    # Generate log report
+    log_fname = "calibration_optimization_log.txt"
+    with open(log_fname, 'a') as f:
+        import datetime
+        f.write(f"\n--- {datetime.datetime.now()} ---\n")
+        f.write(f"Camera: {args.cam_name}\n")
+        f.write(f"Points file: {args.points_file}\n")
+        f.write(f"k={args.k}, m={args.m}\n")
+        f.write(f"Original MSE: {orig_mse:.6f}\n")
+        f.write(f"Optimized MSE: {best_mse:.6f}\n")
+        f.write(f"Saved to: {out_fname}\n")
+    print(f"Report saved to: {log_fname}")
 
 
 if __name__ == '__main__':
