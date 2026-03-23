@@ -43,8 +43,10 @@ Convert your raw PTV results (trajectories) into an optimized binary format for 
 *   **Run:** `traj2npy.py` (or `traj2npy_multiple.py`).
 *   **Output:** `smoothed_trajectories.npy`.
 
-### Step 2: Partitioning
-Define your analysis volume (ROI) and grid resolution. Assign your points to their corresponding spatial cells.
+### Step 2: Voxel Generation & Partitioning
+Define your analysis volume (ROI) and grid resolution. Create the geometry and assign your points to their corresponding spatial cells.
+*   **Step 2a: Voxel Generation**: Uses `voxel_space.py` (internally called by the partitioning script) to construct the 3D grid or concentric shells.
+*   **Step 2b: Partitioning**: Assigns trajectory points to the generated voxels based on spatial coordinates.
 *   **Run:** `divide_points_to_cube_voxels.py`.
 *   **Output:** `voxels_points.pkl`.
 

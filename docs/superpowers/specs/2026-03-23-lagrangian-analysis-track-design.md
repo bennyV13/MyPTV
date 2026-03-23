@@ -21,8 +21,11 @@ The analysis will follow a sequential path:
 - **Action**: Load `smoothed_trajectories.npy` (or equivalent) and ensure it's in the optimized binary format.
 - **Role**: Prepares data for high-speed spatial partitioning.
 
-### Step 2: Partitioning (`divide_points_to_cube_voxels.py`)
-- **Action**: Define the grid geometry (Cartesian ROI) and assign trajectory points to voxels.
+### Step 2: Voxel Generation & Partitioning (`divide_points_to_cube_voxels.py`)
+- **Action**: Define the grid geometry (Cartesian ROI or cylindrical shells) and assign trajectory points to these voxels.
+- **Sub-steps**:
+    - **Step 2a: Voxel Generation**: Uses `voxel_space.py` to create the initial ROI grid geometry.
+    - **Step 2b: Partitioning**: Assigns PTV trajectory points to the newly created voxels.
 - **Output**: `voxels_points.pkl`.
 
 ### Step 3: Statistical Computation (`calculate_stats.py`)
