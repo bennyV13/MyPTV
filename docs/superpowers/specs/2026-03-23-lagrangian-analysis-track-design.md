@@ -17,27 +17,30 @@ The track will be located at `conductor/tracks/lagrangian-analysis/` and will in
 ## 3. Workflow (Full Refinement Pipeline)
 The analysis will follow a sequential path:
 
-### Step 1: Ingestion (`traj2npy.py`)
-- **Action**: Load `smoothed_trajectories.npy` (or equivalent) and ensure it's in the optimized binary format.
-- **Role**: Prepares data for high-speed spatial partitioning.
+### Step 1: Pre-processing (`remove_irrelevent.py`, `convert_velocity.py`)
+- **Action**: Use `remove_irrelevent.py` to filter trajectories (remove -1 IDs and zero-velocity rows) and `convert_velocity.py` to convert from mm/frame to mm/sec.
+- **Role**: Prepares raw data for ingestion by ensuring physical accuracy.
 
-### Step 2: Voxel Generation & Partitioning (`divide_points_to_cube_voxels.py`)
+### Step 2: Ingestion (`traj2npy.py`)
+- **Action**: Load the cleaned trajectories and save them into the optimized binary `.npy` format.
+- **Role**: Provides fast loading for high-speed spatial partitioning.
+
+### Step 3: Voxel Generation & Partitioning (`divide_points_to_cube_voxels.py`)
 - **Action**: Define the grid geometry (Cartesian ROI or cylindrical shells) and assign trajectory points to these voxels.
 - **Sub-steps**:
-    - **Step 2a: Data Pre-processing**: Use `remove_irrelevent.py` to filter trajectories (remove -1 IDs and zero-velocity rows) and `convert_velocity.py` to convert from mm/frame to mm/sec.
-    - **Step 2b: Voxel Generation**: Uses `voxel_space.py` to create the initial ROI grid geometry.
-    - **Step 2c: Partitioning**: Assigns PTV trajectory points to the newly created voxels.
+    - **Step 3a: Voxel Generation**: Uses `voxel_space.py` to create the initial ROI grid geometry.
+    - **Step 3b: Partitioning**: Assigns PTV trajectory points to the newly created voxels.
 - **Output**: `voxels_points.pkl`.
 
-### Step 3: Statistical Computation (`calculate_stats.py`)
+### Step 4: Statistical Computation (`calculate_stats.py`)
 - **Action**: Execute the multi-phase statistics pipeline (means, spatial derivatives, turbulence metrics, and **mean collision rates**).
 - **Output**: `voxels_stats.pkl`.
 
-### Step 4: Data Refinement (`remove_zero_vox.py`)
+### Step 5: Data Refinement (`remove_zero_vox.py`)
 - **Action**: Filter out empty or low-density voxels to ensure statistical significance in the final output.
 - **Output**: Refined `voxels_stats.pkl`.
 
-### Step 5: Visualization & Export
+### Step 6: Visualization & Export
 - **Export**: `pickle2csv.py` for CSV generation.
 - **Visualization**: `plot_lagrangian_results.py` for generating radial/vertical profiles.
 

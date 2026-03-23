@@ -40,30 +40,34 @@ Tools for creating plots, profiles, and maintaining consistent visual styles.
 
 The recommended step-by-step path for running a complete analysis.
 
-### Step 1: Ingestion
-Convert your raw PTV results (trajectories) into an optimized binary format for faster processing.
+### Step 1: Pre-processing (Cleaning & Unit Conversion)
+Filter and prepare your raw PTV results before ingestion.
+*   **Run:** `remove_irrelevent.py` (filter non-physical trajectories) and `convert_velocity.py` (convert to mm/sec).
+*   **Role**: Ensures data quality and correct physical units before binary conversion.
+
+### Step 2: Ingestion
+Convert your cleaned PTV results into an optimized binary format for faster processing.
 *   **Run:** `traj2npy.py` (or `traj2npy_multiple.py`).
 *   **Output:** `smoothed_trajectories.npy`.
 
-### Step 2: Voxel Generation & Partitioning
+### Step 3: Voxel Generation & Partitioning
 Define your analysis volume (ROI) and grid resolution. Create the geometry and assign your points to their corresponding spatial cells.
-*   **Step 2a: Data Cleaning & Unit Conversion**: Use `remove_irrelevent.py` to filter non-physical trajectories and `convert_velocity.py` to convert velocities to mm/sec. This should be performed inside `divide_points_to_cube_voxels.py` or before the partitioning call.
-*   **Step 2b: Voxel Generation**: Uses `voxel_space.py` (internally called by the partitioning script) to construct the 3D grid or concentric shells.
-*   **Step 2c: Partitioning**: Assigns trajectory points to the generated voxels based on spatial coordinates.
+*   **Step 3a: Voxel Generation**: Uses `voxel_space.py` (internally called by the partitioning script) to construct the 3D grid or concentric shells.
+*   **Step 3b: Partitioning**: Assigns trajectory points to the generated voxels based on spatial coordinates.
 *   **Run:** `divide_points_to_cube_voxels.py`.
 *   **Output:** `voxels_points.pkl`.
 
-### Step 3: Computation
+### Step 4: Computation
 Run the main statistical pipeline to compute means, fluctuations, and turbulence parameters.
 *   **Run:** `calculate_stats.py`.
 *   **Output:** `voxels_stats.pkl`.
 
-### Step 4: Refinement (Optional)
+### Step 5: Refinement (Optional)
 Prune low-data or empty voxels to clean up your results before plotting.
 *   **Run:** `remove_zero_vox.py`.
 *   **Output:** A refined `voxels_stats.pkl`.
 
-### Step 5: Visualization & Export
+### Step 6: Visualization & Export
 Generate your final analysis plots and export data for external use.
 *   **Run:** `plot_lagrangian_results.py` (for profiles).
 *   **Run:** `pickle2csv.py` (to export to CSV).
