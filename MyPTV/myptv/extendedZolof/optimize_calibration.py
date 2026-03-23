@@ -125,3 +125,61 @@ class OptimizerCore:
         for key, indices in selection_dict.items():
             all_points.append(self.pm.groups[key][list(indices)])
         return np.vstack(all_points)
+
+    def run_multi_start(self, n_starts=10):
+        """
+        Runs the local optimizer multiple times and returns the overall best.
+        """
+        best_overall_mse = float('inf')
+        best_overall_points = None
+        
+        for i in range(n_starts):
+            mse, points = self.optimize_local()
+            if mse < best_overall_mse:
+                best_overall_mse = mse
+                best_overall_points = points
+            print(f"  Start {i+1}/{n_starts}: MSE = {mse:.4f}")
+            
+        return best_overall_mse, best_overall_points
+
+
+def main():
+    import argparse
+    import os
+
+    parser = argparse.ArgumentParser(description='Optimize calibration points selection.')
+    parser.add_argument('cam_name', type=str, help='Camera name (e.g., cam1)')
+    parser.add_argument('points_file', type=str, help='Path to the cam*_cal_points file')
+    parser.add_argument('-k', type=int, default=3, help='Points per column (default: 3)')
+    parser.add_argument('-m', type=int, default=10, help='Number of random restarts (default: 10)')
+    parser.add_argument('-o', '--output', type=str, help='Output file name')
+
+    args = parser.parse_args()
+
+    print(f"Loading points from {args.points_file}...")
+    # Load with pandas to handle headers/delimiters better, but then to numpy
+    import pandas as pd
+    data = pd.read_csv(args.points_file, sep='\t', header=None).values
+    
+    pm = PointManager(data)
+    print(f"Found {len(pm.get_groups())} columns.")
+    
+    optimizer = OptimizerCore(args.cam_name, pm, k=args.k)
+    
+    print(f"Starting optimization (k={args.k}, m={args.m})...")
+    best_mse, best_points = optimizer.run_multi_start(n_starts=args.m)
+    
+    print(f"\nOptimization finished!")
+    print(f"Best MSE: {best_mse:.6f}")
+    
+    if args.output:
+        out_fname = args.output
+    else:
+        out_fname = args.points_file + "_optimized"
+        
+    np.savetxt(out_fname, best_points, fmt='%.2f', delimiter='\t')
+    print(f"Optimized points saved to: {out_fname}")
+
+
+if __name__ == '__main__':
+    main()

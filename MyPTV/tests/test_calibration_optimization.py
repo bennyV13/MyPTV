@@ -87,5 +87,23 @@ class TestOptimizerCore(unittest.TestCase):
             self.assertIn(1.0, best_points[:, 0])
             self.assertIn(2.0, best_points[:, 0])
 
+    def test_run_multi_start(self):
+        # We'll mock optimize_local to return different values on each call.
+        with unittest.mock.patch.object(OptimizerCore, 'optimize_local') as mock_opt:
+            mock_opt.side_effect = [
+                (0.5, np.array([[1.1]])),
+                (0.3, np.array([[1.0]])),
+                (0.4, np.array([[1.2]]))
+            ]
+            
+            pm = PointManager(self.data)
+            optimizer = OptimizerCore("cam1", pm, k=1)
+            
+            best_mse, best_points = optimizer.run_multi_start(n_starts=3)
+            
+            self.assertEqual(best_mse, 0.3)
+            np.testing.assert_array_equal(best_points, np.array([[1.0]]))
+            self.assertEqual(mock_opt.call_count, 3)
+
 if __name__ == '__main__':
     unittest.main()
