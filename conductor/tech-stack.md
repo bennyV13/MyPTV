@@ -1,15 +1,18 @@
-# Tech Stack: Calibration Optimization
+# Tech Stack: MyPTV Enhancement Suite
 
 ## Core Libraries
 - **Python 3.x**
-- **MyPTV**: `myptv.extendedZolof.camera`, `myptv.extendedZolof.calibrate`
+- **MyPTV**: core modules and `data_analysis` utilities.
 - **NumPy**: For array manipulation and coordinate grouping.
-- **Pandas**: (Optional) For easy I/O if needed, though `loadtxt` from NumPy is preferred for consistency with the existing codebase.
+- **Pandas**: For data grouping and analysis.
+- **SciPy**: For Savitzky-Golay smoothing and numerical derivatives.
+- **Matplotlib & Seaborn**: 2D scientific plotting.
+- **Plotly**: (Optional) Interactive HTML reporting.
 
 ## Development Tools
-- **Conductor**: For tracking progress and managing the implementation track.
+- **Conductor**: For tracking progress and managing the implementation tracks.
 - **Git**: For version control.
-- **Pytest**: For verifying the optimization algorithm against mock point data.
+- **Pytest/Unittest**: For verifying algorithms against mock data.
 
 ## Execution Environment
 - **Platform**: macOS (Darwin) as per current session.

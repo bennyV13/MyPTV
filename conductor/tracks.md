@@ -7,5 +7,5 @@
 
 ---
 
-- [ ] **Track: Trajectory data processing for Lagrangian analysis**
+- [x] **Track: Trajectory data processing for Lagrangian analysis**
 *Link: [./tracks/lagrangian-analysis_20260327/](./tracks/lagrangian-analysis_20260327/)*
