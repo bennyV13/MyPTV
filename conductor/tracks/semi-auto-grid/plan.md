@@ -1,5 +1,18 @@
 # Semi-Auto Grid Marking Implementation Plan
 
+> **STOPPED STATE SUMMARY (2026-03-27):**
+> Work on this track has been suspended. 
+> **Current Location:** The implementation exists ONLY in the `.worktrees/semi-auto-grid` worktree (branch `feature/semi-auto-grid`). It has NOT been merged into the main branch.
+> **What's Implemented:** 
+> - UI scaffolding (Target Listbox with multi-select and sorting).
+> - `grid_mode` toggle and basic state variables.
+> - `draw_grid_overlay` (renders Blue/Green/Yellow circles on canvas).
+> **What's Missing:**
+> - `refresh_projection` (the core logic that calculates and applies the mapping).
+> - `compute_grid_mapping` (the mathematical engine in `utils.py`).
+
+---
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Implement a semi-automatic grid marking feature in `gui_initial_cal.py` allowing 4-corner marking + iterative refinement.
