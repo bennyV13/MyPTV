@@ -19,11 +19,12 @@ myptv-log-searcher.skill
 *.png
 *.pdf
 
-# Only track these project management folders/files
+# Only track project management folders/files
 # Everything else is ignored by being in another repo
 MyPTV/
-Data/
 Data_and_analysis/
+Project_Management/
+Data/
 Analysis/
 analyzing_softwares_copy/
 check_image_shape.py
