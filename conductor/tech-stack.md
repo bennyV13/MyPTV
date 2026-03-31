@@ -8,6 +8,9 @@
 - **SciPy**: For Savitzky-Golay smoothing and numerical derivatives.
 - **Matplotlib & Seaborn**: 2D scientific plotting.
 - **Plotly**: (Optional) Interactive HTML reporting.
+- **React (TypeScript)**: Frontend framework for the web GUI.
+- **Vite**: Modern frontend build tool.
+- **FastAPI**: Lightweight web server for Python-Web integration.
 
 ## Development Tools
 - **Conductor**: For tracking progress and managing the implementation tracks.
