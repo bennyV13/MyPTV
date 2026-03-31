@@ -1,0 +1,8 @@
+{
+  "track_id": "web-gui-migration_20260331",
+  "type": "feature",
+  "status": "new",
+  "created_at": "2026-03-31T14:00:00Z",
+  "updated_at": "2026-03-31T14:00:00Z",
+  "description": "Migrate the initial calibration GUI to a web-based environment using React/TS for better cross-platform consistency."
+}
