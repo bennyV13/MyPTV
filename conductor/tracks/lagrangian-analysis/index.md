@@ -24,6 +24,7 @@ This track manages the sequential processing of stitched PTV trajectories into v
 ### Phase 4: Export & Visualization
 - [x] **Step 8: Export to CSV** - Convert results to CSV for external analysis using `pickle2csv.py`.
 - [x] **Step 9: Plotting** - Generate profiles and fields using `plot_lagrangian_results.py`.
+    - [Implementation Plan: docs/superpowers/plans/2026-03-15-universal-plotting-style.md](docs/superpowers/plans/2026-03-15-universal-plotting-style.md) (COMPLETED: Added `_apply_style` for visual consistency across all Lagrangian plots).
 
 ## Final Results Summary
 The Lagrangian analysis was successfully performed on the `trajecotries_stitched` dataset.
