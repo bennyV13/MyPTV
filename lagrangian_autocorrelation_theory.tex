@@ -1,0 +1,54 @@
+\documentclass[12pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{geometry}
+\geometry{a4paper, margin=1in}
+
+\title{Mathematical Basis of Lagrangian Autocorrelation in MyPTV}
+\author{Documentation Summary}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+The Lagrangian Autocorrelation Function (LACF) is a fundamental statistical tool in Particle Tracking Velocimetry (PTV) used to quantify how a particle's velocity $v(t)$ at a given time relates to its velocity at a later time $t + \tau$, where $\tau$ is the time lag. In the \texttt{MyPTV} library, this is implemented via the \texttt{get\_Lagrangian\_autocorrelation} function.
+
+\section{Mathematical Definition}
+The function calculates the autocorrelation coefficient $R(\tau)$ for a discrete time lag $\tau$ as the normalized covariance of the velocity time series. For a given velocity component $v$ (which can be $v_x, v_y, v_z$ or the Kinetic Energy $KE$), the autocorrelation $R(\tau)$ is defined as:
+
+\begin{equation}
+R(\tau) = \frac{\langle (v(t) - \mu_{v,0}) \cdot (v(t+\tau) - \mu_{v,\tau}) \rangle}{\sqrt{\sigma^2_{v,0} \cdot \sigma^2_{v,\tau}}}
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $\tau$ is the time lag (number of frames).
+    \item $v(t)$ is the velocity at the initial time in each pair.
+    \item $v(t+\tau)$ is the velocity at the lagged time.
+    \item $\langle \cdot \rangle$ denotes the ensemble average over all available trajectory pairs at lag $\tau$.
+    \item $\mu_{v,0}$ and $\mu_{v,\tau}$ are the means of the initial and lagged velocity samples, respectively.
+    \item $\sigma^2_{v,0}$ and $\sigma^2_{v,\tau}$ are the variances of the initial and lagged velocity samples.
+\end{itemize}
+
+\section{Numerical Implementation}
+In \texttt{MyPTV}, the \texttt{list\_corelation} function performs the following steps for each lag $\tau$:
+
+\begin{enumerate}
+    \item \textbf{Pair Collection:} It iterates through all trajectories in the provided list. For each trajectory of length $L$, it extracts pairs $(v_t, v_{t+\tau})$ for all $t$ such that $0 \le t < L-\tau$.
+    \item \textbf{Centering:} It subtracts the mean of all collected initial velocities ($\mu_{v,0}$) and lagged velocities ($\mu_{v,\tau}$) from their respective samples:
+    \begin{equation}
+    r_{1} = v(t) - \mu_{v,0}, \quad r_{2} = v(t+\tau) - \mu_{v,\tau}
+    \end{equation}
+    \item \textbf{Correlation Calculation:} It computes the final coefficient using the Pearson correlation formula:
+    \begin{equation}
+    R(\tau) = \frac{\text{mean}(r_1 \cdot r_2)}{\sqrt{\text{mean}(r_1^2) \cdot \text{mean}(r_2^2)}}
+    \end{equation}
+\end{enumerate}
+
+\section{Physical Significance}
+The resulting $R(\tau)$ decays from 1 (at $\tau=0$) towards 0 as the particle ``forgets'' its initial velocity due to turbulent fluctuations or flow complexity. The integral of $R(\tau)$ provides the Lagrangian integral time scale, a key parameter for characterizing diffusion and mixing in the water tank environment.
+
+\end{document}
