@@ -15,6 +15,7 @@ These functions provide fundamental tools for extracting statistics and profiles
 *   `get_mean_std_time_series(traj_list, kind='x')`: Returns statistics (sample count, mean, std) as a function of time frames.
 *   `get_mean_velocity_profiles(traj_list, start, stop, nbins, direction, kind)`: Calculates a spatial profile (e.g., mean velocity vs. Z-coordinate).
 *   `get_Lagrangian_autocorrelation(traj_list, kind='x')`: Calculates the velocity autocorrelation function for Lagrangian particles.
+*   `get_integral_timescale(R, dt=1.0)`: Calculates the Lagrangian integral time scale by integrating $R(\tau)$ until the first zero-crossing.
 *   `get_pairs(traj_list)`: Identifies common time instances between pairs of trajectories to calculate relative positions and velocities.
 
 ## 2. Relative Motion & Pairing
