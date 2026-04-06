@@ -8,6 +8,7 @@ This document summarizes the key functions and classes available in the `MyPTV` 
 These functions provide fundamental tools for extracting statistics and profiles from trajectory data.
 
 *   `load_trajs_as_arrays(fname)`: Loads a trajectory file (tab-separated) and returns a list of NumPy arrays, each representing a single trajectory sorted by frame.
+*   `convert_trajs_to_physical_units(traj_list, fps)`: Converts velocities and accelerations from mm/frame and mm/frame^2 to mm/s and mm/s^2.
 *   `get_velocity_list(traj_list, kind='x')`: Returns a flat list of all velocity samples for a given component ('x', 'y', 'z', or 'KE' for kinetic energy).
 *   `get_trajectory_velocities(traj_list, kind='x')`: Returns a nested list where each sublist is the velocity time series of one trajectory.
 *   `get_velocity_mean_std(traj_list, kind='x')`: Returns the mean and standard deviation of a velocity component across all trajectories.
