@@ -11,6 +11,7 @@ These functions provide fundamental tools for extracting statistics and profiles
 *   `convert_trajs_to_physical_units(traj_list, fps)`: Converts velocities and accelerations from mm/frame and mm/frame^2 to mm/s and mm/s^2.
 *   `get_velocity_list(traj_list, kind='x')`: Returns a flat list of all velocity samples for a given component ('x', 'y', 'z', or 'KE' for kinetic energy).
 *   `get_trajectory_velocities(traj_list, kind='x')`: Returns a nested list where each sublist is the velocity time series of one trajectory.
+*   `get_fluctuating_velocities(traj_list, kind='x')`: Calculates the fluctuating part of the velocity ($u'(t) = u(t) - \langle u(t) \rangle$) by subtracting the ensemble mean at each time step.
 *   `get_velocity_mean_std(traj_list, kind='x')`: Returns the mean and standard deviation of a velocity component across all trajectories.
 *   `get_trajectory_velocity_increments(traj, kind='x')`: Returns temporal increments of velocity ($V(t+\tau) - V(t)$) for various time lags $\tau$.
 *   `get_mean_std_time_series(traj_list, kind='x')`: Returns statistics (sample count, mean, std) as a function of time frames.
