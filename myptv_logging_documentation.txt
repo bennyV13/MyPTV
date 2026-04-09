@@ -1,0 +1,130 @@
+# MyPTV Logging System Documentation
+# File: myptvlog.jsonl (JSON Lines format)
+
+## 1. Core Logging Code (myptv/logging_utils.py)
+
+The 'ActionLogger' is responsible for capturing console output, 
+timing the execution, and appending a JSON entry to the log file.
+
+```python
+import sys
+import io
+import json
+import traceback
+from datetime import datetime
+
+class Tee(object):
+    """Multiplexes output to multiple streams (e.g., console + buffer)."""
+    def __init__(self, *files):
+        self.files = files
+    def write(self, obj):
+        for f in self.files:
+            f.write(obj)
+            f.flush()
+    def flush(self):
+        for f in self.files:
+            f.flush()
+
+class ActionLogger(object):
+    """
+    Context manager that captures console output (stdout and stderr) 
+    and appends a single JSON object to a log file upon exit.
+    """
+    def __init__(self, action, parameters, param_file, log_fname='myptvlog.jsonl', comment=""):
+        import os
+        self.action = action
+        self.parameters = parameters
+        self.param_file = param_file
+        self.comment = comment
+        
+        # Save log in the same directory as the parameter file if possible
+        if os.path.exists(param_file):
+            log_dir = os.path.dirname(os.path.abspath(param_file))
+            self.log_fname = os.path.join(log_dir, log_fname)
+        else:
+            self.log_fname = log_fname
+            
+        self.buffer = io.StringIO()
+        self.original_stdout = sys.stdout
+        self.original_stderr = sys.stderr
+        self.start_time = None
+
+    def __enter__(self):
+        self.start_time = datetime.now()
+        # Redirect both stdout and stderr to the same buffer
+        tee = Tee(self.original_stdout, self.buffer)
+        sys.stdout = tee
+        sys.stderr = Tee(self.original_stderr, self.buffer)
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        duration = (datetime.now() - self.start_time).total_seconds()
+        sys.stdout = self.original_stdout
+        sys.stderr = self.original_stderr
+        
+        status = "success" if exc_type is None else "failed"
+        error_msg = None
+        if exc_type:
+            error_msg = "".join(traceback.format_exception(exc_type, exc_val, exc_tb))
+            error_msg = error_msg.replace('\n', '. ')
+
+        output_str = self.buffer.getvalue().replace('\n', '. ')
+        comment_str = self.comment.replace('\n', '. ')
+
+        log_entry = {
+            "timestamp": self.start_time.isoformat(),
+            "comment": comment_str,
+            "action": self.action,
+            "param_file": self.param_file,
+            "parameters": self.parameters,
+            "status": status,
+            "duration_seconds": duration,
+            "output": output_str,
+            "error": error_msg
+        }
+
+        with open(self.log_fname, 'a') as f:
+            f.write(json.dumps(log_entry) + '\n')
+        
+        return False # Do not suppress exceptions
+```
+
+## 2. Usage in Workflow Engine (workflow.py)
+
+The logger is invoked within the main entry point of the project. 
+It wraps specific MyPTV operations (like segmentation or tracking) to ensure 
+that every run is reproducible and documented.
+
+### Example Implementation:
+```python
+# Inside the Workflow class in workflow.py:
+
+def run(self, action):
+    # 1. Extract parameters for the specific action from the YAML config
+    action_params = self.get_action_params(action)
+    
+    # 2. Initialize the logger context
+    with ActionLogger(action, action_params, self.param_file_path):
+        
+        # 3. Execute the actual MyPTV logic
+        if action == 'segmentation':
+            self.do_segmentation()
+            
+        elif action == 'tracking':
+            self.do_tracking()
+            
+        # Upon exiting this 'with' block, the log entry is automatically 
+        # written to myptvlog.jsonl.
+```
+
+## 3. How to Use via CLI
+
+The logging happens automatically whenever you run the workflow script:
+
+```bash
+# Example command that triggers logging:
+python workflow.py segmentation params.yml
+```
+
+This will create (or append to) a file named `myptvlog.jsonl` containing 
+all the details of that specific segmentation run.
