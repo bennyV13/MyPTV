@@ -1,0 +1,2 @@
+source /Users/user/.venvs/Research/bin/activate
+echo "Activated Research venv"

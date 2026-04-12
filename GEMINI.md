@@ -31,9 +31,11 @@ This project focuses on improving the **Particle Tracking Velocimetry (PTV)** wo
 *   **Keyboard Efficiency:** Bound **`Shift+S`** to the "Mark Point" command, allowing for a rapid keyboard-and-mouse calibration workflow.
 
 ## Technical Setup
-*   **Source Control:** Working on the `gemini-changes` branch.
-*   **Remote:** Forked to `https://github.com/bennyV13/MyPTV`.
-*   **Environment:** Installed in "editable mode" (`pip install -e .`) within a local `venv` to ensure all source code changes are instantly active.
+*   **Source Control**: Working on the `gemini-changes` branch.
+*   **Remote**: Forked to `https://github.com/bennyV13/MyPTV`.
+*   **Environment**: Installed in "editable mode" (`pip install -e .`) within a local `venv` to ensure all source code changes are instantly active.
+*   **Activation Preference**: I prefer using sourceable scripts in the project folder (e.g., `source activate_research`) to activate the correct environment from `~/.venvs`.
+
 
 ## Recommended Calibration Strategy
 For a water tank setup, we recommend the **24-Point Corner Strategy**:

@@ -1,0 +1,28 @@
+[core]
+	repositoryformatversion = 0
+	filemode = true
+	bare = false
+	logallrefupdates = true
+	ignorecase = true
+	precomposeunicode = true
+[remote "upstream"]
+	url = https://github.com/ronshnapp/MyPTV
+	fetch = +refs/heads/*:refs/remotes/upstream/*
+[branch "master"]
+	remote = upstream
+	merge = refs/heads/master
+	vscode-merge-base = upstream/master
+[remote "BPTV"]
+	url = https://github.com/bennyV13/MyPTV
+	gh-resolved = base
+	fetch = +refs/heads/*:refs/remotes/BPTV/*
+[branch "initial-calibration-gui-changes"]
+	vscode-merge-base = upstream/master
+[branch "logger"]
+	vscode-merge-base = upstream/master
+[branch "create-mask"]
+	vscode-merge-base = upstream/master
+[branch "feature/semi-auto-grid"]
+	vscode-merge-base = upstream/master
+[branch "lagrangian-analysis-review"]
+	vscode-merge-base = upstream/master
