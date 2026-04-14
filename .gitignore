@@ -28,5 +28,5 @@ Data/
 Analysis/
 analyzing_softwares_copy/
 check_image_shape.py
-
+STB/
 gha-creds-*.json

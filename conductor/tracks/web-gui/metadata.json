@@ -1,0 +1,8 @@
+{
+  "id": "web-gui",
+  "name": "Web-Based GUI",
+  "status": "Active",
+  "progress": 0,
+  "last_updated": "2026-04-09",
+  "description": "Migrate the initial calibration GUI to a web-based environment using React/TS and FastAPI."
+}
