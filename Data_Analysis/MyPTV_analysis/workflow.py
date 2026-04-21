@@ -306,24 +306,25 @@ class workflow(object):
         res = (float(res[0]), float(res[1]))
         
         
-        # checking that a camera file in the working directory
-        ls = os.listdir('.')                
-        
-        # make sure camera file exists
-        if cam_name not in ls:
+        # checking that a camera file exists
+        if not os.path.exists(cam_name):
             msg = 'No camera file was found. Start with initial calibration.'
             raise ValueError(msg)
             
         # detect the calibration folder
-        cal_folder = '.'
-        for fname in ls:
+        cam_dir = os.path.dirname(cam_name) or '.'
+        cam_base_name = os.path.basename(cam_name)
+        
+        ls_cam_dir = os.listdir(cam_dir)
+        cal_folder = cam_dir
+        for fname in ls_cam_dir:
             if fname in ['calibration', 'Calibration', 'cal', 'Cal']:
-                if os.path.isdir(os.path.join('.', fname)):
-                    cal_folder = os.path.join('.', fname)
+                if os.path.isdir(os.path.join(cam_dir, fname)):
+                    cal_folder = os.path.join(cam_dir, fname)
                     break
         
         # get the blob file and setup the camera instance
-        blob_file = os.path.join(cal_folder, cam_name+'_cal_points')
+        blob_file = os.path.join(cal_folder, cam_base_name+'_cal_points')
         
         if model_name == 'Tsai':
             from myptv.TsaiModel.gui_final_cal import cal_gui
@@ -410,7 +411,15 @@ class workflow(object):
         # read calibration point files and organize in a dictionary
         point_dic = {}
         for e, cn in enumerate(cam_names):
-            filename = './Calibration/%s_cal_points'%cn
+            
+            # search for the calibration point file
+            # 1) in the Calibration folder
+            # 2) in the same folder as the camera file
+            filename = './Calibration/%s_cal_points'%os.path.basename(cn)
+            if not os.path.exists(filename):
+                cam_dir = os.path.dirname(cn) or '.'
+                filename = os.path.join(cam_dir, os.path.basename(cn)+'_cal_points')
+            
             data = loadtxt(filename)
             for i in range(len(data)):
                 try:
@@ -676,7 +685,7 @@ class workflow(object):
         # get the shape of the images
         allfiles = os.listdir(dirname)
         n_ext = len(ext)
-        image_files = sorted(list(filter(lambda s: s[-n_ext:]==ext, allfiles)))
+        image_files = sorted(list(filter(lambda s: s[-n_ext:]==ext and not s.startswith('._'), allfiles)))
         if single_img_name in image_files:
             image0 = imread_func(os.path.join(dirname,single_img_name))
         else:
@@ -724,7 +733,7 @@ class workflow(object):
             
             allfiles = os.listdir(dirname)
             n_ext = len(extension)
-            fltr = lambda s: s[-n_ext:]==extension
+            fltr = lambda s: s[-n_ext:]==extension and not s.startswith('._')
             image_files = sorted(list(filter(fltr, allfiles)))
             image_files = [os.path.join(dirname, fn) for fn in image_files]
             

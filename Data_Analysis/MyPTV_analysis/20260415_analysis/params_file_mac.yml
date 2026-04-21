@@ -1,0 +1,175 @@
+- calibration:
+    3D_model: extendedZolof
+    camera_name: 20260415_analysis/cam4
+    resolution: 1728, 1700
+    calibration_image: /Volumes/Extra/20260415_sample/cal/cam4.tif
+    target_file: 20260415_analysis/target_file
+
+- analyze_calibration_error:
+    camera_names: 20260415_analysis/cam4, 20260415_analysis/cam4, 20260415_analysis/cam4, 20260415_analysis/cam4
+    plot_histogram: True
+
+- calculate_BG_image:
+    images_folder: /Volumes/Extra/20260415_sample/Rec11/cam1_v1
+    image_extension: '.tif'
+    raw_format: False
+    N_img: 300
+    save_name: 20260415_analysis/BG-EQ/BG_cam1_v1.tif
+
+- calculate_equilization_map:
+    images_folder: /Volumes/Extra/20260415_sample/Rec11/Cam1_v1
+    image_extension: '.tif'
+    raw_format: False
+    BG_image: 20260415_analysis/BG-EQ/BG_cam1_v1.tif
+    N_img: 200
+    sigma: 50
+    save_name: 20260415_analysis/BG-EQ/EQ_Cam1_v1.tif
+
+- calculate_BG_and_EQ:
+    enabled: True
+    save: True
+    save_processed_folder: BG-EQ/processed
+
+- segmentation:
+    plot_result: True
+    Number_of_images:  None
+    image_start: 0
+    images_folder: /Volumes/Extra/20260415_sample/Rec11/cam4_v2
+    single_image_name: 0000000029.tif
+    image_extension: '.tif'
+    raw_format: False
+    multiprocessing: True
+    shape: particles
+    mask: 20260415_analysis/masks/mask_cam4.tif
+    ROI: 0, 1728, 0, 1700
+    threshold: 6
+    remove_background: None
+    equilization_map:  20260415_analysis/BG-EQ/EQ_cam4.tif
+    DoG_sigmas: None
+    median: None
+    blur_sigma: 0
+    local_filter: None
+    min_xsize: 0
+    min_ysize: 0
+    min_mass: 40
+    max_xsize: 100.0
+    max_ysize: 100.0
+    max_mass: 1250
+    method: labeling
+    particle_size: 8
+    save_name: 20260415_analysis/ptv_results/Rec11_data/blobs_cam4
+
+- matching:
+    blob_files: 20260415_analysis/ptv_results/Rec11_data/blobs_cam1, 20260415_analysis/ptv_results/Rec11_data/blobs_cam2, 20260415_analysis/ptv_results/Rec11_data/blobs_cam3, 20260415_analysis/ptv_results/Rec11_data/blobs_cam4
+    frame_start: 0
+    N_frames: None
+    march_forwards: True
+    march_backwards: True
+    camera_names: 20260415_analysis/ptv_results/cal_params/cam1, 20260415_analysis/ptv_results/cal_params/cam2, 20260415_analysis/ptv_results/cal_params/cam3, 20260415_analysis/ptv_results/cal_params/cam4
+    ROI: 0.0, 100.0, 0.0, 100.0, -50.0, 0.0
+    voxel_size: 20
+    N0: 100
+    max_err: 0.25
+    min_cam_match: 3
+    save_name: 20260415_analysis/ptv_results/particles
+
+- analyze_disparity:
+    blob_files: 20260415_analysis/ptv_results/Rec11_data/blobs_cam1, 20260415_analysis/ptv_results/Rec11_data/blobs_cam2, 20260415_analysis/ptv_results/Rec11_data/blobs_cam3, 20260415_analysis/ptv_results/Rec11_data/blobs_cam4
+    frame_start: 0
+    N_frames: 300
+    camera_names: 20260415_analysis/ptv_results/cal_params/cam1, 20260415_analysis/ptv_results/cal_params/cam2, 20260415_analysis/ptv_results/cal_params/cam3, 20260415_analysis/ptv_results/cal_params/cam4
+    particle_filename: 20260415_analysis/ptv_results/particles
+    max_err: 0.25
+    min_cam_match: 3
+
+- tracking:
+    particles_file_name: 20260415_analysis/ptv_results/particles
+    method: multiframe
+    frame_start: 0
+    N_frames: None
+    d_max: 1.0
+    dv_max: 1.0
+    max_dt: 3
+    Ns: 5
+    NSR_threshold: 0.25
+    mean_flow: [0.0, 0.0, 0.0]
+    plot_candidate_graph: False
+    save_name: 20260415_analysis/ptv_results/Rec11_data/trajectories
+
+- calibration_with_particles:
+    camera_name: 20260415_analysis/ptv_results/cal_params/cam4
+    traj_filename: '20260415_analysis/ptv_results/Rec11_data/trajectories'
+    cam_number: 4
+    blobs_fname: '20260415_analysis/ptv_results/Rec11_data/blobs_cam4'
+    min_traj_len: 20
+    max_point_number: 1000
+
+- smoothing:
+    trajectory_file: 20260415_analysis/ptv_results/Rec11_data/trajectories
+    window_size: 3
+    polynom_order: 2
+    min_traj_length: 4
+    repetitions: 1
+    save_name: 20260415_analysis/ptv_results/Rec11_data/smoothed_trajectories
+
+- stitching:
+    trajectory_file: 20260415_analysis/ptv_results/Rec11_data/smoothed_trajectories
+    max_time_separation: 4
+    max_distance: 0.4
+    save_name: 20260415_analysis/ptv_results/Rec11_data/trajecotries_stitched
+
+- 2D_tracking:
+    blob_file: 20260415_analysis/ptv_results/Rec11_data/blobs_cam4
+    frame_start: 0
+    N_frames: None
+    camera_name: 20260415_analysis/cam4
+    camera_resolution: 1280, 1024
+    z_particles: 0.0
+    d_max: 1.0
+    dv_max: 1.0
+    save_name: 20260415_analysis/ptv_results/Rec11_data/trajectories_2D
+
+- manual_matching_GUI:
+    cameras: [cam4, cam4, cam4]
+    images: [./Images_cam4/01.tif, ./Images_cam4/01.tif, ./Images_cam4/01.tif]
+
+- fiber_orientations:
+    camera_names: cam4, cam4, cam4
+    method: MinProjection
+    ori_lim: 0.005
+    blob_files: blobs_cam4_directions, blobs_cam4_directions, blobs_cam4_directions
+    trajectory_file: trajectories
+    save_name: fiber_orientations
+
+- plot_trajectories:
+    file_name: ptv_results/Rec16_data/smoothed_trajectories
+    min_length: 10
+    write_trajID: False 
+    t0: 0
+    te: -1
+
+- animate_trajectories:
+    file_name: ptv_results/Rec16_data/smoothed_trajectories
+    min_length: 2 
+    f_start: None
+    f_end: None
+    fps: 25
+    tail_length: 3
+    elevation: 15
+    azimoth: 70
+    rotation_rate: 0.2
+
+- run_extention:
+    path_to_extention: the_absolute_path_to_the_script_containing_the_code 
+    action_name: the_name_of_the_class_that_needs_to_run  
+    extention_params_file: the_path_to_the_extentions_params_file
+
+- create_blob_mask:
+    blob_file: cam4_CalBlobs
+    reference_image: /Volumes/Extra/20260415_sample/cal/cam4.tif
+    padding: 20
+    output_bit_depth: 8
+    max_sides: 40
+    alpha: 255
+    save_name: 20260415_analysis/masks/mask_cam4.tif
+
