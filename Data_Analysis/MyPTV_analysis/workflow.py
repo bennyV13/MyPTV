@@ -489,16 +489,16 @@ class workflow(object):
         from  matplotlib.pyplot import subplots, show
         
         # fetch parameters from the file
-        camera_name =  self.get_param('calibration_with_particles',
+        camera_name_0 =  self.get_param('calibration_with_particles',
                                       'camera_name')
         #resolution = self.get_param('calibration_with_particles',
         #                     'resolution').split(',')
         #resolution = (float(resolution[0]), float(resolution[1]))
         traj_filename = self.get_param('calibration_with_particles',
                                       'traj_filename')
-        cam_number = self.get_param('calibration_with_particles',
+        cam_number_0 = self.get_param('calibration_with_particles',
                                       'cam_number') 
-        blobs_fname = self.get_param('calibration_with_particles',
+        blobs_fname_0 = self.get_param('calibration_with_particles',
                                       'blobs_fname')
         min_traj_len = self.get_param('calibration_with_particles',
                                       'min_traj_len')
@@ -507,81 +507,117 @@ class workflow(object):
 
         print('\n', 'starting calibration with particles')
         
-        
-        cam_file = open('./'+camera_name, 'r')
-        model = cam_file.readline().split()[0]
-        
-        print('\n Camera model: %s'%model)
-        
-        
-        if model == 'Tsai':
-            from myptv.TsaiModel.gui_final_cal import cal_gui
-            from myptv.TsaiModel.camera import camera_Tsai
-            from myptv.TsaiModel.calibrate import calibrate_with_particles_Tsai
-            from numpy import zeros
+        # Identify all cameras in the project to allow looping
+        try:
+            all_cam_names = self.get_param('matching', 'camera_names')
+            all_cam_names = [val.strip() for val in all_cam_names.split(',')]
+            all_blob_files = self.get_param('matching', 'blob_files')
+            all_blob_files = [val.strip() for val in all_blob_files.split(',')]
+        except:
+            try:
+                all_cam_names = self.get_param('analyze_disparity', 'camera_names')
+                all_cam_names = [val.strip() for val in all_cam_names.split(',')]
+                all_blob_files = self.get_param('analyze_disparity', 'blob_files')
+                all_blob_files = [val.strip() for val in all_blob_files.split(',')]
+            except:
+                all_cam_names = [camera_name_0]
+                all_blob_files = [blobs_fname_0]
+
+        # Prepare the list of cameras to process, starting with the primary one
+        to_process = []
+        primary_added = False
+        if camera_name_0 in all_cam_names:
+            idx = all_cam_names.index(camera_name_0)
+            to_process.append((camera_name_0, idx + 1, all_blob_files[idx]))
+            primary_added = True
+        else:
+            to_process.append((camera_name_0, cam_number_0, blobs_fname_0))
             
-            # setting up a camera instance            
-            cam = camera_Tsai(camera_name)
-            cam.load('./')
+        for i, name in enumerate(all_cam_names):
+            if name != camera_name_0:
+                to_process.append((name, i + 1, all_blob_files[i]))
+
+        # Loop through the cameras
+        for i, (camera_name, cam_number, blobs_fname) in enumerate(to_process):
             
+            if i > 0:
+                print('')
+                cont = input('do you want to continue to calibrate with particles %s? (y/n)'%camera_name)
+                if cont.lower() != 'y':
+                    continue
+
+            print('\n' + '-'*20)
+            print('Calibrating %s (camera %d)'%(camera_name, cam_number))
             
-            # set up the calibration object
-            cal_with_p = calibrate_with_particles_Tsai(traj_filename, cam, 
-                                                       cam_number, 
-                                                       blobs_fname, 
-                                                       min_traj_len=min_traj_len,
-                                                       max_point_number=max_point_number)
+            cam_file = open('./'+camera_name, 'r')
+            model = cam_file.readline().split()[0]
+            cam_file.close()
             
-            cal = cal_with_p.get_calibrate_instance()
+            print('Camera model: %s'%model)
             
-            # run the final calibration gui
-            print('starting calibration GIU using calibration with particles\n')
-            cal_image = zeros(100,100,dtype='int8')
-            gui = cal_gui(cal, cal_image) 
-            
-            
-        
-        if model == 'extendedZolof':
-            from myptv.extendedZolof.gui_final_cal import cal_gui
-            from myptv.extendedZolof.camera import camera_extendedZolof
-            from myptv.extendedZolof.calibrate import calibrate_with_particles_EZ
-            from myptv.imaging_mod import camera_wrapper
-            from numpy import mean
-            
-            # setting up a camera instance            
-            cam = camera_wrapper(camera_name, './')
-            cam.load()
-            
-            
-            # set up the calibration object
-            cwp = calibrate_with_particles_EZ(traj_filename, cam, 
-                                                cam_number, 
-                                                blobs_fname, 
-                                                min_traj_len=min_traj_len,
-                                                max_point_number=max_point_number)
-            
-            cal = cwp.get_calibrate_instance()
-            
-            p = cwp.get_particle_disparity()
-            err = [sum(pi**2)**0.5 for pi in p]
-            print('')
-            print('mean disparity before: %.4f px'%(mean(err)))
-            print('max disparity before: %.4f px\n'%(max(err)))
-            
-            # run the final calibration gui
-            print('calibrating...\n')
-            cal.calibrate()
-            
-            p = cwp.get_particle_disparity()
-            err = [sum(pi**2)**0.5 for pi in p]
-            print('mean disparity before: %.4f px'%(mean(err)))
-            print('max disparity before: %.4f px\n'%(max(err)))
-            
-            
-            usr_input = input('save results? (1=yes, other=no)')
-            if usr_input=='1':
-                cam.camera.save()
-                print('saved')
+            if model == 'Tsai':
+                from myptv.TsaiModel.gui_final_cal import cal_gui
+                from myptv.TsaiModel.camera import camera_Tsai
+                from myptv.TsaiModel.calibrate import calibrate_with_particles_Tsai
+                from numpy import zeros
+                
+                # setting up a camera instance            
+                cam = camera_Tsai(camera_name)
+                cam.load('./')
+                
+                # set up the calibration object
+                cal_with_p = calibrate_with_particles_Tsai(traj_filename, cam, 
+                                                           cam_number, 
+                                                           blobs_fname, 
+                                                           min_traj_len=min_traj_len,
+                                                           max_point_number=max_point_number)
+                
+                cal = cal_with_p.get_calibrate_instance()
+                
+                # run the final calibration gui
+                print('starting calibration GIU using calibration with particles\n')
+                cal_image = zeros(100,100,dtype='int8')
+                gui = cal_gui(cal, cal_image) 
+                
+            if model == 'extendedZolof':
+                from myptv.extendedZolof.gui_final_cal import cal_gui
+                from myptv.extendedZolof.camera import camera_extendedZolof
+                from myptv.extendedZolof.calibrate import calibrate_with_particles_EZ
+                from myptv.imaging_mod import camera_wrapper
+                from numpy import mean
+                
+                # setting up a camera instance            
+                cam = camera_wrapper(camera_name, './')
+                cam.load()
+                
+                # set up the calibration object
+                cwp = calibrate_with_particles_EZ(traj_filename, cam, 
+                                                    cam_number, 
+                                                    blobs_fname, 
+                                                    min_traj_len=min_traj_len,
+                                                    max_point_number=max_point_number)
+                
+                cal = cwp.get_calibrate_instance()
+                
+                p = cwp.get_particle_disparity()
+                err = [sum(pi**2)**0.5 for pi in p]
+                print('')
+                print('mean disparity before: %.4f px'%(mean(err)))
+                print('max disparity before: %.4f px\n'%(max(err)))
+                
+                # run the final calibration gui
+                print('calibrating...\n')
+                cal.calibrate()
+                
+                p = cwp.get_particle_disparity()
+                err = [sum(pi**2)**0.5 for pi in p]
+                print('mean disparity after: %.4f px'%(mean(err)))
+                print('max disparity after: %.4f px\n'%(max(err)))
+                
+                usr_input = input('save results? (1=yes, other=no)')
+                if usr_input=='1':
+                    cam.camera.save()
+                    print('saved')
             
             
         
