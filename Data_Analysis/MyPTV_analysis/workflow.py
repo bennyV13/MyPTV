@@ -631,6 +631,7 @@ class workflow(object):
         from numpy import zeros, amax
         from skimage.io import imread
         import os
+        from os.path import exists as pathExists, dirname as path_dirname
         
         # fetching parameters
         dirname = self.get_param('segmentation', 'images_folder')
@@ -661,7 +662,18 @@ class workflow(object):
         DoG_sigmas = self.get_param('segmentation', 'DoG_sigmas')
         multiprocessing = self.get_param('segmentation', 'multiprocessing')
         
-        
+        # Pre-check the save directory
+        if save_name is not None:
+            saveDir = path_dirname(save_name)
+            if saveDir != '' and not pathExists(saveDir):
+                try:
+                    from os import makedirs
+                    makedirs(saveDir)
+                    print(f"Created directory: {saveDir}")
+                except Exception as e:
+                    print(f"Warning: Could not create directory {saveDir} before starting. Error: {e}")
+                    print("The calculation will continue, but data might be saved to 'saved_data' if the primary path remains unreachable.")
+
         # reading preprepared mask
         if type(mask)==str:
             mask = imread(mask)
@@ -1018,7 +1030,7 @@ class workflow(object):
         from myptv.particle_matching_mod import matching_with_marching_particles_algorithm
         from myptv.imaging_mod import camera_wrapper, img_system
         from os import getcwd, listdir
-        from os.path import exists as pathExists
+        from os.path import exists as pathExists, dirname as path_dirname
         from time import localtime, strftime
         
         
@@ -1090,6 +1102,17 @@ class workflow(object):
                 msg = 'N_frames must be an integer or None (given %s).'%tp
                 raise TypeError(msg)
                 
+        # Pre-check the save directory
+        if save_name is not None:
+            saveDir = path_dirname(save_name)
+            if saveDir != '' and not pathExists(saveDir):
+                try:
+                    from os import makedirs
+                    makedirs(saveDir)
+                    print(f"Created directory: {saveDir}")
+                except Exception as e:
+                    print(f"Warning: Could not create directory {saveDir} before starting. Error: {e}")
+                    print("The calculation will continue, but data might be saved to 'saved_data' if the primary path remains unreachable.")
                 
         # mathing
         print('Starting stereo-matching at: ', strftime("%H:%M:%S", localtime()))
@@ -1178,7 +1201,7 @@ class workflow(object):
         from myptv.tracking_mod import traj_NSR, fill_in_trajectory
         from numpy import array
         from os import getcwd, listdir
-        from os.path import exists as pathExists
+        from os.path import exists as pathExists, dirname as path_dirname
         
         # fetching parameters
         particles_fm = self.get_param('tracking', 'particles_file_name')
@@ -1195,7 +1218,18 @@ class workflow(object):
         Ns = self.get_param('tracking', 'Ns')
         NSR_th = self.get_param('tracking', 'NSR_threshold')
         
-        
+        # Pre-check the save directory
+        if save_name is not None:
+            saveDir = path_dirname(save_name)
+            if saveDir != '' and not pathExists(saveDir):
+                try:
+                    from os import makedirs
+                    makedirs(saveDir)
+                    print(f"Created directory: {saveDir}")
+                except Exception as e:
+                    print(f"Warning: Could not create directory {saveDir} before starting. Error: {e}")
+                    print("The calculation will continue, but data might be saved to 'saved_data' if the primary path remains unreachable.")
+
         if method not in ['multiframe', 'fourframe']:
             raise ValueError("method can only be 'multiframe' or 'four_frame'.")
         
@@ -1567,13 +1601,9 @@ class workflow(object):
         Will perform a fiber orientation analysis
         '''
         from numpy import loadtxt, empty, array, zeros, pi, sign, savetxt, shape
-        from numpy import abs as absnp
-        from numpy.linalg import norm
-        from pandas import read_csv
-        #from myptv.fibers.fiber_orientation_mod import read_camera_data initialize_camera assign_2d_positions_and_orientations
-        from myptv.fibers.fiber_2cams_orientation_mod import run_2cams_orientation
-        from myptv.fibers.fiber_3cams_orientation_mod import run_3cams_orientation
-
+        from os.path import exists as pathExists, dirname as path_dirname
+        from os import makedirs
+        
         # fetching the parameters
         cam_names = self.get_param('fiber_orientations', 'camera_names')
         cam_names = [val.strip() for val in cam_names.split(',')]
@@ -1583,6 +1613,16 @@ class workflow(object):
         trajectory_file = self.get_param('fiber_orientations','trajectory_file')
         save_name = self.get_param('fiber_orientations', 'save_name')
         method = self.get_param('fiber_orientations','method')
+
+        # Pre-check the save directory
+        if save_name is not None:
+            saveDir = path_dirname(save_name)
+            if saveDir != '' and not pathExists(saveDir):
+                try:
+                    makedirs(saveDir)
+                    print(f"Created directory: {saveDir}")
+                except Exception as e:
+                    print(f"Warning: Could not create directory {saveDir} before starting. Error: {e}")
         
         allowed_methods = ['MinProjection', 'PlaneIntersect']
         if method not in allowed_methods:
