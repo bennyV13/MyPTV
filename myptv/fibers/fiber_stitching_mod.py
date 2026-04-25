@@ -1,27 +1,27 @@
 # -*- coding: utf-8 -*-
 """
-Created on Wed March 23 2022
 
-@author: ron
+@author: agambino
 
-An implementation of the trajectory segments stitching algorithm. We are 
+An implementation of the trajectory segments stitching algorithm, for fibers. We are 
 looking to connect together trajectories that, for some reason, were broken 
-during the tracking process, and to connect them together.
+during the tracking process, and to connect them together. Once the trajectories are
+stitched, the fiber orientations are connected with a polynomial fitting and then 
+smoothed.
 
 The algorithm is defined by Xu (2008): Haitao Xu, Tracking Lagrangian 
 trajectories in position–velocity space, Meas. Sci. Technol. 19 (2008)
-075105 (10pp) 
+075105 (10pp).
 """
 
-from numpy import array, gradient, dot, savetxt
-from myptv.utils import safe_savetxt
+from numpy import array, gradient, dot, savetxt, linalg, vstack, lexsort, unique, where, zeros, diff, square, sum, zeros_like, isnan #agambino
 from numpy import append as NPappend
 from myptv.utils import fit_polynomial
 from myptv.traj_smoothing_mod import smooth_traj_poly
 from itertools import groupby
 
 
-class traj_stitching(object):    
+class traj_ori_stitching(object):    
     '''
     Finds a list of trajectory pairs to connect to each
     other based on the algorithm of Xu(2008). For now we are not
@@ -31,7 +31,7 @@ class traj_stitching(object):
     first two data points of the connected trajectories.
     '''
     
-    def __init__(self, traj_list, Ts, dm):
+    def __init__(self, traj_list, Ts, dm, polyorder, window):
         '''
         inputs -
         traj_list - list, holding the trajectories. The algorithm relies
@@ -46,6 +46,8 @@ class traj_stitching(object):
         self.traj_list = traj_list
         self.Ts = Ts
         self.dm = dm
+        self.polyorder = polyorder
+        self.window = window
 
         # ===============================================================
         # for now we will not be using acceleration data in the stitching
@@ -53,7 +55,6 @@ class traj_stitching(object):
         # it is zero, so acceleration is not used.
         self.wa = 0.0
         # ===============================================================
-
 
     def get_traj(self, i):
         '''
@@ -157,7 +158,8 @@ class traj_stitching(object):
         for tr in trajs:
             id_ = tr[0,0]
             v = tr[:,4:7]
-            if (v==0).all():
+            #print(len(tr))
+            if (v==0).all() and len(tr)>1: #agambino
                 x = tr[:,1:4]
                 v = gradient(x, axis=0)
                 a = gradient(v, axis=0)
@@ -165,7 +167,7 @@ class traj_stitching(object):
                 tr[:,7:10] = a
             traj_dic[id_] = tr 
         
-        # make a dicionary whose keys are frame numbers and values are lists
+        # make a dictionary whose keys are frame numbers and values are lists
         # of the trajectories ids that start at these times
         t0_dic = {}
         for id_ in traj_ids:
@@ -262,31 +264,107 @@ class traj_stitching(object):
             # get the trajectory positions needed for the polynomial fitting
             x_i = tr_i[-2:,1:4]   # <-- last two data points of i
             x_j = tr_j[:2, 1:4]   # <-- first two data points of j
+            p_i = tr_i[-2:,10:13]   #agambino
+            p_j = tr_j[:2, 10:13]   #agambino
+
+            
             tm_fitting = [-1.0, 0.0, dt, dt+1.0]  # <-- time for fitting
+            #print('tm_fitting: ', tm_fitting)
             
             # the time needed to interpolate
             tm_interp = [float(i) for i in range(1,int(dt))]
-            
-            if len(tm_interp)>0:
+            #print('ecco: ', len(tm_interp))
+            if len(tm_interp)>1: # if len(tm_interp)=1, orientation stitching becomes bad, so we avoid it.
                 # in each direction fit a polynomial and fill missing samples
-                interp_samples_j = [[j,0,0,0,0,0,0,0,0,0,tm_+t_ie] 
+                interp_samples_j = [[j,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,tm_+t_ie] #agambino
                                   for tm_ in tm_interp]
+                interp_p_plus_j = [[0,0,0,tm_+t_ie] #agambino
+                                  for tm_ in tm_interp]
+                interp_p_minus_j = [[0,0,0,tm_+t_ie] #agambino
+                                  for tm_ in tm_interp]
+
                 for k in range(3):
+                    #polyfit positions
                     x_ = list(x_i[:,k]) + list(x_j[:,k])
-                    poly_coeffs = fit_polynomial(tm_fitting, x_, 3)
+                    poly_coeffs_x = fit_polynomial(tm_fitting, x_, 3)
+
+                    #polyfit orientations 
+                    p_plus = list(p_i[:,k]) + list(p_j[:,k]) #agambino      
+                    poly_coeffs_p_plus = fit_polynomial(tm_fitting, p_plus, 3) #agambino
+                    p_minus = list(p_i[:,k]) + list(-p_j[:,k]) #agambino      
+                    poly_coeffs_p_minus = fit_polynomial(tm_fitting, p_minus, 3) #agambino
+                    #print('ecco p_plus: ', p_plus)
+                    #print('ecco p_minus: ', p_minus)
+                    #print('k: ', k)
+                    #print('ecco len(tm_interp): ', len(tm_interp))
+
                     for e, tm_ in enumerate(tm_interp):
                         # interpolate position
                         tm_vect = [tm_**3, tm_**2, tm_, 1.0]
-                        x_interp = dot(poly_coeffs, tm_vect)
+                        x_interp = dot(poly_coeffs_x, tm_vect)
+                        p_plus_interp = dot(poly_coeffs_p_plus, tm_vect) #agambino
+                        p_minus_interp = dot(poly_coeffs_p_minus, tm_vect) #agambino
                         interp_samples_j[e][1+k] = x_interp
-                                           
-                # add the interpolated samples to the traj_list and update
-                # index hash table
-                Ntl = len(self.traj_list)
-                Ninterp = len(interp_samples_j)
-                self.traj_list = NPappend(self.traj_list, 
+                        interp_p_plus_j[e][k] = p_plus_interp #agambino
+                        interp_p_minus_j[e][k] = p_minus_interp #agambino
+
+                # to solve the sign ambiguity, we fit the polynomial over two set of orientations from different segments
+                p_incr_plus = sum(sum(square(diff(array(interp_p_plus_j)[:, :3], axis=0)), axis=1))
+                p_incr_minus = sum(sum(square(diff(array(interp_p_minus_j)[:, :3], axis=0)), axis=1))
+                #print('ecco p_incr_plus: ', p_incr_plus)
+                #print('ecco p_incr_minus: ', p_incr_minus)
+                #print('ecco interp_p_plus_j: ', interp_p_plus_j)
+                #print('ecco interp_p_minus_j: ', interp_p_minus_j)
+
+                if p_incr_plus >= p_incr_minus:
+                    for a in range(len(interp_samples_j)):  #agambino: normalization of new interpolated orientations
+                        interp_samples_j[a][10:13] = interp_p_minus_j[a][0:3]
+                        vnorm = linalg.norm(interp_samples_j[a][10:13])
+                        interp_samples_j[a][10:13] = interp_samples_j[a][10:13] / vnorm
+                elif p_incr_plus < p_incr_minus:
+                    for a in range(len(interp_samples_j)):  #agambino: normalization of new interpolated orientations
+                        interp_samples_j[a][10:13] = interp_p_plus_j[a][0:3]
+                        vnorm = linalg.norm(interp_samples_j[a][10:13])
+                        interp_samples_j[a][10:13] = interp_samples_j[a][10:13] / vnorm
+
+            else:
+                continue
+            '''
+            if len(tm_interp)>0:
+                # in each direction fit a polynomial and fill missing samples
+                interp_samples_j = [[j,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,tm_+t_ie] #agambino
+                                  for tm_ in tm_interp]
+                for k in range(3):
+                    #polyfit positions
+                    x_ = list(x_i[:,k]) + list(x_j[:,k])
+                    poly_coeffs_x = fit_polynomial(tm_fitting, x_, 3)
+
+                    #polyfit orientations 
+                    p_ = list(p_i[:,k]) + list(p_j[:,k]) #agambino      
+                    poly_coeffs_p = fit_polynomial(tm_fitting, p_, 3) #agambino
+
+
+                    for e, tm_ in enumerate(tm_interp):
+                        # interpolate position
+                        tm_vect = [tm_**3, tm_**2, tm_, 1.0]
+                        x_interp = dot(poly_coeffs_x, tm_vect)
+                        p_interp = dot(poly_coeffs_p, tm_vect) #agambino
+                        interp_samples_j[e][1+k] = x_interp
+                        interp_samples_j[e][10+k] = p_interp #agambino
+                
+                
+                for a in range(len(interp_samples_j)): #agambino: normalization of new interpolated orientations
+                    vnorm = linalg.norm(interp_samples_j[a][10:13])
+                    interp_samples_j[a][10:13] = interp_samples_j[a][10:13] / vnorm
+                    #print('ecco interp samples: ', interp_samples_j[a][10:13])
+                '''
+            # add the interpolated samples to the traj_list and update
+            # index hash table
+            Ntl = len(self.traj_list)
+            Ninterp = len(interp_samples_j)
+            self.traj_list = NPappend(self.traj_list, 
                                           interp_samples_j, axis=0)
-                self.index_id_hash[j] += list(range(Ntl, Ninterp + Ntl))
+            self.index_id_hash[j] += list(range(Ntl, Ninterp + Ntl))
             
             # change the traj_number of traj i to j
             for k in range(len(self.traj_list)):
@@ -314,35 +392,60 @@ class traj_stitching(object):
 #             traj = self.get_traj(id_)
 #             
 # =============================================================================
+
         self.new_traj_list = []
         trajs = [array(sorted(list(g), key=lambda a: a[-1])) for k,g in 
                  groupby(self.traj_list, key=lambda x: x[0]) if k!=-1]
-        for traj in trajs:
-            id_ = traj[0,0]
-            if id_ in connected_traj_j and len(traj)>=5:
-                pos = traj[:,1:4]
-                new_p, new_v, new_acc = smooth_traj_poly(pos.T, 5, 3)
-                for i in range(len(pos)):
-                    smp = [id_, 
-                           pos[i][0], pos[i][1], pos[i][2],
-                           new_v[0][i], new_v[1][i], new_v[2][i],
-                           new_acc[0][i], new_acc[1][i], new_acc[2][i],
-                           traj[i,-1]
-                           ]
-                    self.new_traj_list.append(array(smp))
-                
-            else:
-                for smp in traj:
-                    self.new_traj_list.append(smp)
+        trajs = vstack(trajs)
+        trajs = trajs[lexsort((trajs[:, 19], trajs[:, 0]))]
         
-        if -1 in self.index_id_hash.keys():
-            single_samples = self.get_traj(-1)
-            for smp in single_samples:
-                self.new_traj_list.append(smp)
-            
-        self.new_traj_list = array(self.new_traj_list)
+        trajs[:, 10:13] = self.traj_sign_switch(trajs[:, 0], trajs[:, 10:13])
+        #self.new_traj_list = array(trajs)
         
         
+        # smooth everything
+        spacing = int(self.window/2)+1
+        indunique = unique(trajs[:, 0])
+        for index in indunique:
+            traj = trajs[trajs[:, 0] == index, :]
+            #mask = isnan(traj[:, 10:14]).any(axis=1)
+            #traj = traj[~mask]            
+            if len(traj)<=int(self.window):
+                continue
+            new_x, new_v, new_acc = smooth_traj_poly(traj[:,1:4].T, self.window, self.polyorder, 1) #agambino
+            new_p, new_pdot, new_pdotdot = smooth_traj_poly(traj[:,10:13].T, self.window, self.polyorder, 1) #agambino
+            new_x = array(new_x).T
+            new_v = array(new_v).T
+            new_acc = array(new_acc).T
+            new_p = array(new_p).T
+            new_pdot = array(new_pdot).T
+            new_pdotdot = array(new_pdotdot).T
+            #new_v[:spacing,:] = 0
+            #new_v[-spacing:,:] = 0
+            #new_acc[:spacing,:] = 0
+            #new_acc[-spacing:,:] = 0
+            #new_pdot[:spacing,:] = 0
+            #new_pdot[-spacing:,:] = 0
+            #new_pdotdot[:spacing,:] = 0
+            #new_pdotdot[-spacing:,:] = 0
+            #traj[:, 1:4] = new_x
+            #traj[:, 4:7] = new_v
+            #traj[:, 7:10] = new_acc
+            #traj[:, 10:13] = new_p
+            #traj[:, 13:16] = new_pdot
+            #traj[:, 16:19] = new_pdotdot
+
+            mask = (traj[spacing:-spacing, 4:7] == 0).all(axis=1)
+
+            traj[spacing:-spacing][mask, 1:4] = new_x[spacing:-spacing][mask,:]
+            traj[spacing:-spacing][mask, 4:7] = new_v[spacing:-spacing][mask,:]
+            traj[spacing:-spacing][mask, 7:10] = new_acc[spacing:-spacing][mask,:]
+            traj[spacing:-spacing][mask, 10:13] = new_p[spacing:-spacing][mask,:]
+            traj[spacing:-spacing][mask, 13:16] = new_pdot[spacing:-spacing][mask,:]
+            traj[spacing:-spacing][mask, 16:19] = new_pdotdot[spacing:-spacing][mask,:]
+            trajs[trajs[:, 0] == index, :] = traj    
+
+        self.new_traj_list = array(trajs)    
         
     def stitch_trajectories(self):
         '''
@@ -365,12 +468,13 @@ class traj_stitching(object):
             except:
                 self.index_id_hash[id_] = [i]
         
-        
+
         print('searching for candidates to connect:')
         self.calc_dij()
         print('fetching the best matches...')
         self.find_best_stitch_candidates()
         
+
         N = len(self.dij_list)
         print('found %d connections to be made,'%N)
         print('connecting...')
@@ -385,8 +489,30 @@ class traj_stitching(object):
         whr = self.traj_list[:,0] != -1
         nsmp = len(self.traj_list[whr])*1.0
         print('at %.1f samples per trajectory on average'%(nsmp/ntr),'\n')    
+
+
             
-    
+    def traj_sign_switch(self, indd, ori): #agambino
+        '''
+        Function that restores orientation signs over a trajectory
+        '''
+        ori_straight = zeros_like(ori)
+        indd_unique = unique(indd)
+        for index in indd_unique:
+            traj_indd = where(indd == index)[0]
+            traj_ori = ori[traj_indd,:]
+            traj_ori_straight = zeros_like(traj_ori)
+            traj_ori_straight[0, :] = traj_ori[0, :]
+            for i in range(1, traj_ori.shape[0]):
+                dot_product = dot(traj_ori_straight[i-1,:], traj_ori[i,:])
+            
+                if dot_product < 0:
+                    traj_ori_straight[i,:] = -traj_ori[i,:]
+                else:
+                    traj_ori_straight[i,:] = traj_ori[i,:]
+            ori_straight[traj_indd,:] = traj_ori_straight
+        return ori_straight
+
     def save_results(self, fname):
         '''
         saves the results on the hard drive as a text file with a given file
@@ -394,6 +520,6 @@ class traj_stitching(object):
         '''
         fmt = ['%d', '%.3f', '%.3f', '%.3f', '%.3f', '%.3f', '%.3f', '%.3f', 
                '%.3f', '%.3f', '%.3f']
-        safe_savetxt(fname, self.new_traj_list, fmt=fmt, delimiter='\t')
+        savetxt(fname, self.new_traj_list, fmt=fmt, delimiter='\t')
             
             

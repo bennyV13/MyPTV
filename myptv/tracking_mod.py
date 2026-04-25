@@ -15,7 +15,6 @@ from numpy import sum as npsum
 from scipy.spatial import KDTree
 from pandas import read_csv
 import tqdm
-from myptv.utils import safe_savetxt
 
 
 
@@ -315,8 +314,9 @@ class tracker_four_frames(object):
         for i in range(len(data_to_save[0])-6):
             fmt.append('%d')
         fmt += ['%.3f', '%.3f']
-        safe_savetxt(fname , data_to_save,
-                     delimiter='\t', fmt=fmt)
+        savetxt(fname , data_to_save,
+                delimiter='\t', fmt=fmt)
+        
         
     def plot_candidate_graph(self):
         '''
@@ -538,8 +538,9 @@ class tracker_two_frames(object):
         Will save the results after tracking is done.
         '''
         fmt = ['%d', '%.3f', '%.3f', '%.3f', '%.3f']
-        safe_savetxt(fname ,self.return_connected_particles(),
-                     delimiter='\t', fmt=fmt)
+        savetxt(fname ,self.return_connected_particles(),
+                delimiter='\t', fmt=fmt)
+
 
 
 
@@ -686,8 +687,9 @@ class tracker_nearest_neighbour(object):
         for i in range(len(data_to_save[0])-6):
             fmt.append('%d')
         fmt += ['%.3f', '%.3f']
-        safe_savetxt(fname , data_to_save,
-                     delimiter='\t', fmt=fmt)
+        savetxt(fname , data_to_save,
+                delimiter='\t', fmt=fmt)
+
 
 
 
@@ -1231,7 +1233,7 @@ class tracker_multiframe(object):
         for i in range(len(to_save[0])-6):
             fmt.append('%d')
         fmt += ['%.3f', '%.3f']
-        safe_savetxt(fname , to_save, delimiter='\t', fmt=fmt)
+        savetxt(fname , to_save, delimiter='\t', fmt=fmt)
         
     
     

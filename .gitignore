@@ -21,7 +21,6 @@ myptv-log-searcher.skill
 
 # Only track project management folders/files
 # Everything else is ignored by being in another repo
-MyPTV/
 Data_and_analysis/
 Project_Management/
 Data/

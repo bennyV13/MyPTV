@@ -1,35 +1,28 @@
 # -*- coding: utf-8 -*-
 """
-Created on Fri Dec  7 18:02:07 2018
+Created on May 2024
 
-@authors: Alessandro Gambino and Eric Aschari, built on Ron's base code 
+@author: ron
 
+Contains code for segmenting particles (aka blobs) 
+and their silhouettes (aka edges) 
 
-Contains a class for segmentation of elongates particles
 """
 
-from numpy import ones, savetxt, meshgrid,array,square,stack,sqrt,mean,append,transpose,matmul
-from myptv.utils import safe_savetxt
+from numpy import ones, savetxt, meshgrid, array, gradient
 from numpy import sum as npsum
-import numpy as np
+from numpy import abs as npabs
+
 from skimage.io import imread
 from skimage import io
 
-from numpy import abs as npabs
-from numpy import median as npmedian
-
 from scipy.signal import convolve2d
-from scipy.ndimage import gaussian_filter, median_filter, label
-from scipy.ndimage.measurements import find_objects
-# from scipy.spatial import KDTree
+from scipy.ndimage import gaussian_filter, median_filter
+from scipy.ndimage.measurements import label, find_objects
 
-#agambino
-import math
-# import pandas as pd
-from skimage.measure import regionprops #, regionprops_table, centroid
-from skimage.measure import label as labelski
 
-class fiber_segmentation(object):
+
+class sheet_segmentation(object):
     '''a class for segmenting out particles (blobs) for a given image'''
     
     
@@ -39,7 +32,6 @@ class fiber_segmentation(object):
                  min_xsize=None, max_xsize=None,
                  min_ysize=None, max_ysize=None,
                  min_mass=None, max_mass=None,
-                 pca_limit=None,
                  method='labeling'):
         '''
         inputs - 
@@ -63,12 +55,14 @@ class fiber_segmentation(object):
         
         local_filter - int, the window size of the local mean subtraction 
                        filter. In this is None then the filter is not applied.
+        
+        BG_image - Either a given static image, in which case this image is
+                   subtracted from the given image by taking the difference,
+                   or this is None, in which case this operation is skipped.
                        
         min/max_( ) - size and area filters for the discovered blobs. If None
                       then filters are not applied.
-        
-        pca_limit - Ratio between height and width of the fitted elipsoid in PCA
-        
+                      
         method - string. The method used for labeling the blobds. Can be 
                  either 'dilation' or 'labeling'. In dilation, local maxima 
                  are sought in the image and the blobs are considered to be
@@ -89,7 +83,6 @@ class fiber_segmentation(object):
         self.bbox_limits = (min_xsize, max_xsize, min_ysize, max_ysize)
         self.mass_limits = (min_mass, max_mass)
         self.loc_filter = local_filter
-        self.pca_limit = pca_limit
         self.BG_image = BG_image
         
         if method not in ['dilation', 'labeling']:
@@ -186,7 +179,7 @@ class fiber_segmentation(object):
         brightness above the threshold brightness value.
         
         input -
-        coord - an tuple or list of size 2 with the x,y coordinates
+        coord - a tuple or list of size 2 with the x,y coordinates
         size - if None, size is set to be self.particle_size; otherwise it 
                shoud be an integer.
         '''
@@ -258,7 +251,7 @@ class fiber_segmentation(object):
     
     
     
-    def get_blobs(self): #agambino
+    def get_blobs_and_silhouettes(self):
         '''Returns a list of particle centers, their box size, and area
         
         The center is the weighted mean of the blob coordinates using
@@ -269,33 +262,39 @@ class fiber_segmentation(object):
         
         returns - blobs: a nested list of [ [(center), (box size), area], ...]
         '''    
-
+        # getting the binary image
         self.bin_im = self.get_binary_image() 
+        
+        # labeling connected foreground pixels to form "blobs"
+        blob_pixels = self.blob_labeling(self.bin_im)
+        
+        # making an image with the edges of the blobs
+        grad = gradient(self.labeled)
+        self.silhouette_image = npsum(array(grad*(self.labeled>0))**2, axis=0)
+        
+        stamp_y, stamp_x = meshgrid(range(self.im.shape[1]), 
+                                    range(self.im.shape[0]))
+        
         blobs = []
-        # label_img = labelski(self.bin_im)
-        label_img = label(self.bin_im)[0]
-        regions = regionprops(label_img)
-        for props in regions:
-            x, y = props.centroid
-            minr, minc, maxr, maxc = props.bbox
-            box_size = [maxr - minr, maxc - minc]
-            ori = props.orientation
-            center = [round(x, ndigits=2), round(y, ndigits=2)] 
-            if hasattr(props, 'axis_major_length'):
-                a = props.axis_major_length
-                b = props.axis_minor_length
-            else:
-                a = props.major_axis_length
-                b = props.minor_axis_length
-            pca_lim = a / b if b > 0 else -1
-            mass = a * b
-            if pca_lim >= self.pca_limit:
-                pca = [math.cos(ori), math.sin(ori), pca_lim]
-                endpoints = [x + math.cos(ori)*a/2, y + math.sin(ori)*a/2, 
-                             x - math.cos(ori)*a/2, y - math.sin(ori)*a/2,]
-                blobs.append( [center, box_size, mass, pca, endpoints] )
-                #print('ecco la pca_lim: ', pca_lim)
+        
+        for e, loc in enumerate(blob_pixels):
+            # 1. extracting blob parameters
+            mask = 1.0*(self.labeled[loc]>0)*(self.labeled[loc]==e+1)
+            mass = npsum(self.processed_im[loc] * mask)
+            X = npsum(stamp_x[loc] * self.processed_im[loc] * mask) / mass
+            Y = npsum(stamp_y[loc] * self.processed_im[loc] * mask) / mass
+            center = [round(X, ndigits=2), round(Y, ndigits=2)]
+            box_size = list(mask.shape)
+            blobs.append( [center, box_size, mass])
+            
+            # 2. extracting the pixels of the edges of each blob
+            mask = 1.0*(self.silhouette_image[loc]>0)*(self.labeled[loc]==e+1)
+            sill_x = (stamp_x[loc] * mask)[stamp_x[loc] * mask > 0]
+            sill_y = (stamp_y[loc] * mask)[stamp_x[loc] * mask > 0]
+            blobs[-1].append(list(zip(sill_x, sill_y)))
+            
         self.blobs = blobs
+            
    
         
    
@@ -328,6 +327,7 @@ class fiber_segmentation(object):
             self.blobs = list(filter(fltr, self.blobs))
             
             
+            
     def plot_blobs(self, vmin=None, vmax=None):
         import matplotlib.pyplot as plt
         
@@ -351,61 +351,43 @@ class fiber_segmentation(object):
         the given name fname.
         '''
         blob_list = []
-        for blb in self.blobs:
+        edges_list = []
+        
+        for e,blb in enumerate(self.blobs):
             blob_list.append([blb[0][0], blb[0][1], blb[1][0], blb[1][1],
                               blb[2], 0])
             
-        safe_savetxt(fname, blob_list, 
+            for px, py in blb[3]:
+                edges_list.append([e, px, py, 0])
+            
+            
+        savetxt(fname, blob_list, 
                 fmt=['%.02f','%.02f','%d','%d','%d','%d'], delimiter='\t')
         
-    def save_results_direction(self, fname):
-        '''
-        This is used to save the blobs found in a text file with 
-        the given name fname.
-        '''
-        blob_list = []
-        for blb in self.blobs:
-            blob_list.append([blb[0][0], blb[0][1], blb[1][0], blb[1][1],
-                              blb[2], 0, blb[3][0],blb[3][1]])
-            
-        safe_savetxt(fname, blob_list, 
-                fmt=['%.02f','%.02f','%d','%d','%d','%d','%.05f','%.05f'], delimiter='\t')
+        savetxt(fname+'_edges', edges_list, 
+                fmt=['%d','%d','%d','%d'], delimiter='\t')
         
         
-    def save_results_endpoints(self, fname):
-        '''
-        This is used to save the blobs found in a text file with 
-        the given name fname.
-        '''
-        blob_list = []
-        for blb in self.blobs:
-            blob_list.append([blb[0][0], blb[0][1], 0, 
-                              blb[4][0], blb[4][1], blb[4][2], blb[4][3]])
-            
-        safe_savetxt(fname, blob_list, 
-                fmt=['%.03f','%.03f','%d','%.03f','%.03f','%.03f','%.03f'], delimiter='\t')
         
         
 
         
         
         
-class loop_fiber_segmentation(object):
+class loop_sheet_segmentation(object):
     
-    '''A class for looping over images in a library to segment particles
+    '''A class for looping over images in a directory to segment particles
     and save the results in a file.'''
     
     def __init__(self, dir_name, extension='.tif',
-                 image_start = None,
+                 image_start = 0,
                  N_img = None, sigma=1.0, threshold=10, mask=1.0,
                  local_filter = 15, median = None, particle_size=3,
                  remove_ststic_BG = True,
                  min_xsize=None, max_xsize=None,
                  min_ysize=None, max_ysize=None,
                  min_mass=None, max_mass=None,
-                 pca_limit=None,
-                 method='labeling',
-                 raw_format=False): #agambino
+                 method='labeling'):
         '''
         dir_name - string with the name of the directory that holds the 
                    images. Images should have a sequential numbers in their
@@ -418,6 +400,12 @@ class loop_fiber_segmentation(object):
         N_img -     if None, then this will loop over all the images in the 
                     folder. If it is an integer, will loop over the first
                     N images in the folder.
+                    
+        remove_ststic_BG - If true, a "background image" is calculated for the
+                           images, defined as the median value of each pixel,
+                           and then background_subtraction is done by taking 
+                           the difference from the median. If this is False,
+                           then this operation is skipped.
                     
         The rest are parameters for the segmentation class. 
         '''
@@ -434,23 +422,14 @@ class loop_fiber_segmentation(object):
         self.mass_limits = (min_mass, max_mass)
         self.loc_filter = local_filter
         self.method = method
-        self.pca_limit = pca_limit
         self.BG_remove = remove_ststic_BG
-        self.raw_format=raw_format
-        
-        if self.raw_format == False:
-            self.imread_func = lambda x: io.imread(x)
-        
-        else:
-            import rawpy
-            self.imread_func = lambda x: rawpy.imread(x).raw_image
     
     
     def get_file_names(self):
         import os
         allfiles = os.listdir(self.dir_name)
         n_ext = len(self.extension)
-        fltr = lambda s: s[-n_ext:]==self.extension and not s.startswith('._')
+        fltr = lambda s: s[-n_ext:]==self.extension
         image_files = sorted(list(filter(fltr, allfiles)))
         
         if self.image_start is not None:
@@ -479,13 +458,20 @@ class loop_fiber_segmentation(object):
         else: 
             BG_images=self.image_files[::int(len(self.image_files)/400+1)][:200]
         
-        BG_images = [os.path.join(self.dir_name, im) for im in self.image_files]
+        BG_images = [os.path.join(self.dir_name, im) for im in BG_images]
         # reading the images for BG subtraction
-        ic = io.ImageCollection(BG_images)
         
-        self.BG = npmedian(ic, axis=0)
-    
-    
+        for i in range(len(BG_images)):
+            if i==0:
+                im0 = io.imread(BG_images[i])*1.0
+            else:
+                im0 += io.imread(BG_images[i])
+        
+        self.BG = im0 / len(BG_images)
+        #ic = io.ImageCollection(BG_images)
+        #self.BG = npmedian(ic, axis=0)
+        
+        
     def segment_folder_images(self):
         '''This loops over the image files in a folder'''
         import os
@@ -497,25 +483,28 @@ class loop_fiber_segmentation(object):
         else:
             N = self.N_img
         
+        print('found %d files\n'%N)
+            
         if self.BG_remove is True:
             self.calculate_BG()
-        
-        elif self.BG_remove is None: 
-            self.BG = None
-        
-        else:
+            
+        elif hasattr(self.BG_remove,'shape'):
             self.BG = self.BG_remove
             
+        else:
+            self.BG = None
         
-        i0 = (self.image_start is not None) * self.image_start
+        i0 = (self.image_start is not None) * self.image_start        
         
         blob_list = []
-        print('Starting loop segmentation.')
+        edges_list = []
+        
+        print('Starting loop segmentation.\n')
         for i in range(N):
             print('', end='\r')
             print(' frame: %d'%(i+i0), end='\r')
-            im = self.imread_func(os.path.join(self.dir_name, self.image_files[i]))
-            ps = fiber_segmentation(im,
+            im = imread(os.path.join(self.dir_name, self.image_files[i]))
+            sg = sheet_segmentation(im,
                                     sigma=self.sigma, 
                                     threshold=self.th,
                                     median=self.median,
@@ -528,15 +517,20 @@ class loop_fiber_segmentation(object):
                                     min_ysize=self.bbox_limits[2],
                                     min_mass=self.mass_limits[0],
                                     max_mass=self.mass_limits[1],
-                                    pca_limit=self.pca_limit,
                                     method = self.method,
                                     particle_size=self.p_size)
-            ps.get_blobs()
-            ps.apply_blobs_size_filter()
-            for blb in ps.blobs:
+            sg.get_blobs_and_silhouettes()
+            sg.apply_blobs_size_filter()
+            
+            for e,blb in enumerate(sg.blobs):
                 blob_list.append([blb[0][0], blb[0][1], blb[1][0], blb[1][1],
-                                  blb[2], i+i0, blb[3][0], blb[3][1]])
+                                  blb[2], i+i0])
+                for px, py in blb[3]:
+                    edges_list.append([e, px, py, i+i0])
+                    
         self.blobs = blob_list
+        self.edges = edges_list
+        
         
                                        
     def save_results(self, fname):
@@ -546,34 +540,47 @@ class loop_fiber_segmentation(object):
         The format of the results is
         center_x, center_y, size_x, size_y, area, frame_number
         '''
-        blob_list = []
-        for blb in self.blobs:
-            blob_list.append(blb[0:-2])
-            
-        safe_savetxt(fname, blob_list, 
+        savetxt(fname, self.blobs, 
                 fmt=['%.02f','%.02f','%d','%d','%d','%d'], delimiter='\t')
         
-        
-    def save_results_direction(self, fname):
-        '''
-        Will save the extracted blobs. 
-        
-        The format of the results is
-        center_x, center_y, size_x, size_y, area, frame_number, x,y
-        '''
-        safe_savetxt(fname, self.blobs, 
-                fmt=['%.02f','%.02f','%d','%d','%d','%d','%.05f','%.05f'], delimiter='\t')
+        savetxt(fname+'_edges', self.edges, 
+                fmt=['%d','%d','%d','%d'], delimiter='\t')
         
         
-    def save_results_endpoints(self, fname):
-        '''
-        Will save the extracted blobs. 
         
-        The format of the results is
-        center_x, center_y, size_x, size_y, area, frame_number, x,y
-        '''
-        safe_savetxt(fname, self.blobs, 
-                fmt=['%.03f','%.03f','%d','%.03f','%.03f','%.03f','%.03f'], delimiter='\t')
+        
+        
+        
+if __name__=='__main__':
+    
+    import matplotlib.pyplot as plt
+    
+    # dirname = '/home/ron/Desktop/Research/myptv_tests/sheet_segmentation'
+    # lss = loop_sheet_segmentation(dirname, image_start=0,
+    #                               threshold=0.5, sigma=0.5,
+    #                               remove_ststic_BG=False)
+    # lss.segment_folder_images()
+    # lss.save_results('blobs_cam1')
+    
+    
+    # =====================================
+    # Segment a particle in a single image:
+    
+    # fn = '/home/ron/Desktop/Research/myptv_tests/sheet_segmentation/im_cam4.tif'
+    # image = imread(fn, as_gray=True)
+    # sg = sheet_segmentation(image, sigma=None, threshold=20)
+    
+    # bin_im = sg.get_binary_image()
+    
+    # sg.get_blobs_and_silhouettes()
+    #=======================================
+    
+    # plt.imshow(sg.labeled)
+    
+    # for blb in sg.blobs:
+    #     sill_pixels = blb[3]
+    #     for px in sill_pixels:
+    #         plt.plot(px[1], px[0], 'bo', alpha=0.3)
         
     
     

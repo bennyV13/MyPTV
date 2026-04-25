@@ -8,10 +8,9 @@ Created on Fri Dec  7 18:02:07 2018
 contains a class for segmentation of circular particles
 """
 
-from myptv.tracking_2D_multiframe_mod import track_2D_multiframe
+from myptv.tracking_2D_mod import track_2D_multiframe
 # from myptv.TsaiModel.camera import camera_Tsai
 from myptv.tracking_mod import fill_in_trajectory
-from myptv.utils import safe_savetxt
 
 from pandas import read_csv
 
@@ -167,7 +166,7 @@ class particle_segmentation(object):
             # imEQ = imNoBG/self.EQ_map / npmax(imNoBG/self.EQ_map) * npmax(imNoBG)
             mx = npmax(imNoBG)
             imEQ = imNoBG/self.EQ_map
-            imEQ[imEQ>mx] = mx
+            imEQ[imEQ>mx]
             imEQ = imEQ.astype(self.im.dtype)
         else:
             imEQ = imNoBG
@@ -458,8 +457,9 @@ class particle_segmentation(object):
             blob_list.append([blb[0][0], blb[0][1], blb[1][0], blb[1][1],
                               blb[2], 0])
             
-        safe_savetxt(fname, blob_list,
+        savetxt(fname, blob_list, 
                 fmt=['%.02f','%.02f','%d','%d','%d','%d'], delimiter='\t')
+        
         
         
         
@@ -573,7 +573,7 @@ class loop_segmentation(object):
     def get_file_names(self):
         allfiles = os.listdir(self.dir_name)
         n_ext = len(self.extension)
-        fltr = lambda s: s[-n_ext:]==self.extension and not s.startswith('._')
+        fltr = lambda s: s[-n_ext:]==self.extension
         image_files = sorted(list(filter(fltr, allfiles)))
         
         if self.image_start is not None:
@@ -589,13 +589,32 @@ class loop_segmentation(object):
     
     def calculate_BG(self):
         '''
-        Calculates the background image. If there are more than 200 images, 
-        then the background is done using a subsample of 200 images, to keep 
-        the calculation from taking too long.
+        Calculates the background image, defined as the median of the given
+        images. If there are more than 200 images, then the background is done
+        using a subsample of 200 images, to keep the calculation from taking
+        too long.
         '''
-        self.BG = calculate_BG_image(self.dir_name, self.extension, 
-                                     savename=None, N_img=200, 
-                                     raw_format=self.raw_format)
+        
+        print('calculating background...\n')
+        # getting the subsample of images for BG calculation
+        if len(self.image_files)<=200:
+            BG_images = self.image_files
+            
+        else: 
+            BG_images=self.image_files[::int(len(self.image_files)/400+1)][:200]
+        
+        BG_images = [os.path.join(self.dir_name, im) for im in BG_images]
+        # reading the images for BG subtraction
+        
+        for i in range(len(BG_images)):
+            if i==0:
+                #im0 = io.imread(BG_images[i])*1.0
+                im0 = self.imread_func(BG_images[i])*1.0
+            else:
+                #im0 += io.imread(BG_images[i])
+                im0 += self.imread_func(BG_images[i])
+        
+        self.BG = im0 / len(BG_images)
         
         
         
@@ -669,8 +688,9 @@ class loop_segmentation(object):
         The format of the results is
         center_x, center_y, size_x, size_y, area, frame_number
         '''
-        safe_savetxt(fname, self.blobs,
+        savetxt(fname, self.blobs, 
                 fmt=['%.02f','%.02f','%d','%d','%d','%d'], delimiter='\t')
+        
         
         
 
@@ -719,7 +739,7 @@ def iter_frame(i, im, params):
 
 
 
-def calculate_BG_image(dir_name, extension, savename=None, N_img=200,
+def calculate_BG_image(dir_name, extension, savename, N_img=200,
                        raw_format=False):
     '''
     Calculates a mean image and saves it on the disk for image processing.
@@ -738,17 +758,15 @@ def calculate_BG_image(dir_name, extension, savename=None, N_img=200,
         if i==0:
             #im0 = io.imread(BG_images[i])*1.0
             im0 = imread_func(BG_images[i])*1.0
+            typ = im0.dtype
         else:
             #im0 += io.imread(BG_images[i])
             im0 += imread_func(BG_images[i])
     
-    BG = (im0 / len(BG_images))
+    BG = (im0 / len(BG_images)).astype('int16')
     
     # saving
-    if savename is not None:
-        io.imsave(savename, BG.astype('int16'), check_contrast=False)
-
-    return BG
+    io.imsave(savename, BG, check_contrast=False)
 
 
 
@@ -789,12 +807,7 @@ def calculate_equilization_map(dir_name, extension, sigma, savename, N_img=200,
     itr = tqdm.tqdm(range(len(EQ_imnames)), desc='calculating eq map')
     max_im = npmax([npabs(imread_func(EQ_imnames[i])-BG) for i in itr], axis=0)
     epsilon = 1e-6  # Prevent division by zero
-    mx_im = npmax(max_im)
-    if mx_im > 0:
-        max_im = max_im / mx_im + epsilon
-    else:
-        max_im = max_im + 1.0 + epsilon
-
+    max_im = max_im / npmax(max_im) + epsilon
     EQ_map = gaussian_filter(max_im, sigma).astype('float32')
     EQ_map = EQ_map.astype('float32')/npmax(EQ_map)
     
@@ -811,7 +824,7 @@ def get_img_list(dir_name, extension, N_img=200):
     # 1) Getting the images file names:
     allfiles = os.listdir(dir_name)
     n_ext = len(extension)
-    fltr = lambda s: s[-n_ext:]==extension and not s.startswith('._')
+    fltr = lambda s: s[-n_ext:]==extension
     image_files = sorted(list(filter(fltr, allfiles)))
     if len(image_files)==0:
         raise ValueError('No images found, check input variables')
@@ -958,8 +971,9 @@ class tracking_augmented_segmentation(track_2D_multiframe):
         for k in self.blobs.keys():
             tosave += list(self.blobs[k])
         
-        safe_savetxt(fname, tosave, delimiter='\t',
+        savetxt(fname, tosave, delimiter='\t', 
                 fmt=['%.02f','%.02f','%d','%d','%d','%d'])
+        
 
 
 

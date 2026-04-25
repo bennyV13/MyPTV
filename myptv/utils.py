@@ -14,46 +14,6 @@ Utility code to use for the MyPTV package.
 from numpy import dot, array, loadtxt, savetxt
 from numpy import append as NPappend
 from numpy.linalg import inv, norm
-import os
-from os.path import dirname as path_dirname
-
-
-def safe_savetxt(fname, data, **kwargs):
-    '''
-    A safe version of numpy.savetxt that ensures the directory exists
-    and falls back to a default folder if saving fails.
-    '''
-    saveDir = path_dirname(fname)
-    if saveDir != '' and not os.path.exists(saveDir):
-        try:
-            os.makedirs(saveDir)
-        except Exception as e:
-            print(f"Warning: Could not create directory {saveDir}. Error: {e}")
-
-    try:
-        savetxt(fname, data, **kwargs)
-    except Exception as e:
-        print(f"\nError saving to {fname}: {e}")
-        fallback_dir = 'saved_data'
-        if not os.path.exists(fallback_dir):
-            try:
-                os.makedirs(fallback_dir)
-            except Exception as e_fb:
-                print(f"Critical Error: Could not create fallback directory: {e_fb}")
-                return
-
-        # Use only the filename for fallback
-        base_name = os.path.basename(fname)
-        if base_name == '':
-            base_name = 'data_fallback.txt'
-        
-        fallback_path = os.path.join(fallback_dir, base_name)
-        print(f"Attempting to save to fallback: {fallback_path}")
-        try:
-            savetxt(fallback_path, data, **kwargs)
-            print("Successfully saved to fallback.")
-        except Exception as e2:
-            print(f"Critical Error: Fallback save also failed: {e2}")
 
 
 
@@ -324,7 +284,7 @@ class match_calibration_blobs_and_points(object):
         Saves the pairs of blobs and target points in a given file name.
         '''
         fmt = ['%.2f', '%.2f', '%.2f', '%.2f', '%.2f']
-        safe_savetxt(fname, self.point_pairs, fmt=fmt, delimiter='\t')
+        savetxt(fname, self.point_pairs, fmt=fmt, delimiter='\t')
         
         
     def plot_projections(self):
@@ -408,7 +368,7 @@ class get_residual_blobs(object):
         
         for i in range(len(self.residual_blobs)):
             fname = 'residual_blobs_%d'%i
-            safe_savetxt(fname, self.residual_blobs[i],delimiter='\t', fmt=fmt)
+            np.savetxt(fname, self.residual_blobs[i],delimiter='\t', fmt=fmt)
          
 
 

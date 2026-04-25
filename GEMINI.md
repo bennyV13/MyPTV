@@ -30,8 +30,12 @@ This project focuses on improving the **Particle Tracking Velocimetry (PTV)** wo
 *   **Multi-Axis Sorting:** Added the ability to instantly re-sort the coordinate list by **X, Y, or Z** to match the user's preferred marking order.
 *   **Keyboard Efficiency:** Bound **`Shift+S`** to the "Mark Point" command, allowing for a rapid keyboard-and-mouse calibration workflow.
 
+### 3. Workflow Monitoring
+*   **Centralized File-Save Logging:** Updated the core utility `safe_savetxt` and camera `save` methods to automatically print the full destination path whenever a file is written. This ensures transparency across all data-saving operations (matching, stitching, calibration, and logging).
+*   **Logging Synchronization:** Integrated a print message into the `ActionLogger` context manager to notify the user whenever the project log (`myptvlog.jsonl`) is updated.
+
 ## Technical Setup
-*   **Source Control**: Working on the `gemini-changes` branch.
+*   **Source Control**: Working on the `master` branch (the `gemini-changes` branch was deprecated as it was significantly outdated).
 *   **Remote**: Forked to `https://github.com/bennyV13/MyPTV`.
 *   **Environment**: Installed in "editable mode" (`pip install -e .`) within a local `venv` to ensure all source code changes are instantly active.
 *   **Activation Preference**: I prefer using sourceable scripts in the project folder (e.g., `source activate_research`) to activate the correct environment from `~/.venvs`.

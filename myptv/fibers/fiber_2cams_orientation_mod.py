@@ -10,7 +10,6 @@ from numpy import linalg
 from tqdm import tqdm
 from PIL import Image, ImageTk
 from tkinter import Label, Canvas, LabelFrame, Entry, Tk, Scrollbar, Button
-from myptv.utils import safe_savetxt
 import os
 import math
 import numpy as np
@@ -543,15 +542,13 @@ def run_2cams_orientation(cam_names,blob_fn,trajectory_file,save_name):
                 usr = input('(1=yes, else=no)')
                 if usr == '1':
                     print('\n', 'Saving the fiber orientation data (%s).'%save_name)
-                    safe_savetxt(save_path, res, fmt = ['%d','%.3f', '%.3f', '%.3f','%d','%d','%d','%.8f','%d'], delimiter='\t')
-
+                    np.savetxt(save_path, res, fmt = ['%d','%.3f', '%.3f', '%.3f','%d','%d','%.8f','%d'], delimiter='\t')
                 else:
                     print('\n', 'Skipped saving file.')
         
             else:
                 print('\n', 'Saving the fiber orientation data (%s).'%save_name)
-                safe_savetxt(save_path, res, fmt = ['%d','%.3f', '%.3f', '%.3f','%d','%d','%d','%.8f','%d'], delimiter='\t')
-
+                np.savetxt(save_path, res, fmt = ['%d','%.3f', '%.3f', '%.3f','%d','%d','%.8f','%d'], delimiter='\t')
         
         print('\n', 'Done.')
     

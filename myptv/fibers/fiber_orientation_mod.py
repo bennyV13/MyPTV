@@ -9,7 +9,6 @@ Created on Thu Mar 31 15:59:35 2022
 import numpy as np
 import math
 from scipy import linalg
-from myptv.utils import safe_savetxt
 
 
 class FiberOrientation(object):
@@ -385,7 +384,7 @@ class fiber_traj_orientation(object):
         for i in range(len(self.ori_lst[0])-6):
             fmt.append('%d')
         fmt += ['%.3f', '%.3f']
-        safe_savetxt(savename , self.ori_lst,
+        np.savetxt(savename , self.ori_lst,
                 delimiter='\t', fmt=fmt)
                 
     

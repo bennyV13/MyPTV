@@ -12,7 +12,6 @@ The method uses polynomial fitting after Luethi et al 2005.
 
 from myptv.utils import fit_polynomial
 from numpy import dot, array, savetxt
-from myptv.utils import safe_savetxt
 from tqdm import tqdm
 
 
@@ -156,7 +155,7 @@ class smooth_trajectories(object):
         '''
         fmt = ['%d', '%.3f', '%.3f', '%.3f', '%.6f', '%.6f', '%.6f', '%.9f', 
                '%.9f', '%.9f', '%.3f']
-        safe_savetxt(fname, self.smoothed_trajs, fmt=fmt, delimiter='\t')
+        savetxt(fname, self.smoothed_trajs, fmt=fmt, delimiter='\t')
 
 
 
