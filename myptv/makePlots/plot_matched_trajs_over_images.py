@@ -48,7 +48,7 @@ def plot_one_frame(particlesPath, cam, frameNum, imgDir, imgIndex, vmax=50,
     else:
         cmap = matplotlib.cm.get_cmap('Spectral')
     
-    imgPath = os.path.join(imgDir, sorted(os.listdir(imgDir))[imgIndex])
+    imgPath = os.path.join(imgDir, sorted([f for f in os.listdir(imgDir) if not f.startswith('._')])[imgIndex])
     image = plt.imread(imgPath)
     
     if fig is None:
@@ -130,7 +130,7 @@ if __name__=='__main__':
     
     # directory with the experimental images:
     imgDir = '/home/ron/Desktop/Research/myptv/example/Images_cam1'
-    imgPath = os.path.join(imgDir, sorted(os.listdir(imgDir))[frameNum])
+    imgPath = os.path.join(imgDir, sorted([f for f in os.listdir(imgDir) if not f.startswith('._')])[frameNum])
     
     # The MyPTV camera file that is used to reproject the trajectories on the images:
     cameraName = 'cam1'

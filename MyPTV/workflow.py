@@ -755,7 +755,7 @@ class workflow(object):
         # get the shape of the images
         allfiles = os.listdir(dirname)
         n_ext = len(ext)
-        image_files = sorted(list(filter(lambda s: s[-n_ext:]==ext, allfiles)))
+        image_files = sorted(list(filter(lambda s: (s[-n_ext:]==ext) and (not s.startswith('._')), allfiles)))
         if single_img_name in image_files:
             image0 = imread_func(os.path.join(dirname,single_img_name))
         else:
@@ -803,7 +803,7 @@ class workflow(object):
             
             allfiles = os.listdir(dirname)
             n_ext = len(extension)
-            fltr = lambda s: s[-n_ext:]==extension
+            fltr = lambda s: (s[-n_ext:]==extension) and (not s.startswith('._'))
             image_files = sorted(list(filter(fltr, allfiles)))
             image_files = [os.path.join(dirname, fn) for fn in image_files]
             
