@@ -863,6 +863,20 @@ class workflow(object):
                 
                 print('\n','blobs found:', len(loopSegment.blobs))
                 
+                # --- Added histogram plot ---
+                try:
+                    import sys
+                    import os
+                    hist_dir = os.path.join(os.getcwd(), 'Data_Analysis/MyPTV_analysis/20260415_analysis')
+                    if os.path.isdir(hist_dir):
+                        if hist_dir not in sys.path:
+                            sys.path.append(hist_dir)
+                        from histogram_in_cli import print_histogram_from_blobs
+                        print_histogram_from_blobs(loopSegment.blobs, title=save_name)
+                except Exception as e:
+                    print(f" (Histogram skipped: {e})")
+                # -----------------------------
+                
                 # saving the semented blobs:
                 if save_name is not None and type(save_name)==str:
                     cwd_ls = os.listdir(os.getcwd())
@@ -989,6 +1003,20 @@ class workflow(object):
                 loopSegment.segment_folder_images()
                 
                 print('\n','blobs found:', len(loopSegment.blobs))
+                
+                # --- Added histogram plot ---
+                try:
+                    import sys
+                    import os
+                    hist_dir = os.path.join(os.getcwd(), 'Data_Analysis/MyPTV_analysis/20260415_analysis')
+                    if os.path.isdir(hist_dir):
+                        if hist_dir not in sys.path:
+                            sys.path.append(hist_dir)
+                        from histogram_in_cli import print_histogram_from_blobs
+                        print_histogram_from_blobs(loopSegment.blobs, title=save_name)
+                except Exception as e:
+                    print(f" (Histogram skipped: {e})")
+                # -----------------------------
                 
                 # saving the semented blobs:
                 if save_name is not None and type(save_name)==str:
