@@ -16,6 +16,7 @@ for users.
 
 from pandas import DataFrame as df
 from yaml import safe_load
+from myptv.utils import print_histogram_from_blobs
 
 
 
@@ -865,14 +866,7 @@ class workflow(object):
                 
                 # --- Added histogram plot ---
                 try:
-                    import sys
-                    import os
-                    hist_dir = os.path.join(os.getcwd(), 'Data_Analysis/MyPTV_analysis/20260415_analysis')
-                    if os.path.isdir(hist_dir):
-                        if hist_dir not in sys.path:
-                            sys.path.append(hist_dir)
-                        from histogram_in_cli import print_histogram_from_blobs
-                        print_histogram_from_blobs(loopSegment.blobs, title=save_name)
+                    print_histogram_from_blobs(loopSegment.blobs, title=save_name)
                 except Exception as e:
                     print(f" (Histogram skipped: {e})")
                 # -----------------------------
@@ -1006,14 +1000,7 @@ class workflow(object):
                 
                 # --- Added histogram plot ---
                 try:
-                    import sys
-                    import os
-                    hist_dir = os.path.join(os.getcwd(), 'Data_Analysis/MyPTV_analysis/20260415_analysis')
-                    if os.path.isdir(hist_dir):
-                        if hist_dir not in sys.path:
-                            sys.path.append(hist_dir)
-                        from histogram_in_cli import print_histogram_from_blobs
-                        print_histogram_from_blobs(loopSegment.blobs, title=save_name)
+                    print_histogram_from_blobs(loopSegment.blobs, title=save_name)
                 except Exception as e:
                     print(f" (Histogram skipped: {e})")
                 # -----------------------------

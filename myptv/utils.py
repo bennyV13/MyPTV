@@ -369,6 +369,64 @@ class get_residual_blobs(object):
         for i in range(len(self.residual_blobs)):
             fname = 'residual_blobs_%d'%i
             np.savetxt(fname, self.residual_blobs[i],delimiter='\t', fmt=fmt)
+
+
+def _print_stats_and_histogram(particle_counts, bins=15, title=None):
+    """
+    Internal helper to print stats and a text-based histogram.
+    """
+    import numpy as np
+    if not particle_counts:
+        print("No data to plot histogram.")
+        return
+
+    if title:
+        print(f"\nStatistics for {title}:")
+    else:
+        print("\nStatistics:")
+    print(f"{'='*40}")
+    print(f"Total Frames: {len(particle_counts)}")
+    print(f"Mean Particles: {np.mean(particle_counts):.2f}")
+    print(f"Std Deviation:  {np.std(particle_counts):.2f}")
+    print(f"Min Particles:  {min(particle_counts)}")
+    print(f"Max Particles:  {max(particle_counts)}")
+
+    print("\nFrequency Distribution (Histogram):")
+    print(f"{'Range':<15} | {'Count':<6} | Distribution")
+    print(f"{'-'*15}-+-{'-'*6}-+-" + "-"*50)
+    
+    hist, bin_edges = np.histogram(particle_counts, bins=bins)
+    max_bar_width = 50
+    max_freq = max(hist) if len(hist) > 0 else 0
+
+    for i in range(len(hist)):
+        low = int(bin_edges[i])
+        high = int(bin_edges[i+1])
+        freq = hist[i]
+        bar = "#" * (int(freq * max_bar_width / max_freq)) if max_freq > 0 else ""
+        print(f"{low:6d} - {high:6d} | {freq:6d} | {bar}")
+
+
+def print_histogram_from_blobs(blobs, bins=15, title=None):
+    """
+    blobs is a list of [x, y, sx, sy, mass, frame_number, ...]
+    Frame number is expected at index 5.
+    """
+    from collections import Counter
+    if not blobs:
+        print("No blobs found.")
+        return
+        
+    counts = Counter()
+    for b in blobs:
+        if len(b) > 5:
+            counts[b[5]] += 1
+        else:
+            # Fallback for shorter lists if any
+            counts[b[-1]] += 1
+        
+    particle_counts = list(counts.values())
+    _print_stats_and_histogram(particle_counts, bins=bins, title=title)
          
 
 
