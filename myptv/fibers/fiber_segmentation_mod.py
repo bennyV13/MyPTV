@@ -90,6 +90,7 @@ class fiber_segmentation(object):
         self.loc_filter = local_filter
         self.pca_limit = pca_limit
         self.BG_image = BG_image
+        self.rejected_blobs = []
         
         if method not in ['dilation', 'labeling']:
             raise ValueError('method "%s" unknown.'%method)
@@ -288,10 +289,14 @@ class fiber_segmentation(object):
                 b = props.minor_axis_length
             pca_lim = a / b if b > 0 else -1
             mass = a * b
-            if pca_lim >= self.pca_limit:
-                pca = [math.cos(ori), math.sin(ori), pca_lim]
-                endpoints = [x + math.cos(ori)*a/2, y + math.sin(ori)*a/2, 
-                             x - math.cos(ori)*a/2, y - math.sin(ori)*a/2,]
+            
+            pca = [math.cos(ori), math.sin(ori), pca_lim]
+            endpoints = [x + math.cos(ori)*a/2, y + math.sin(ori)*a/2, 
+                         x - math.cos(ori)*a/2, y - math.sin(ori)*a/2,]
+            
+            if self.pca_limit is not None and pca_lim < self.pca_limit:
+                self.rejected_blobs.append( [center, box_size, mass, pca, endpoints] )
+            else:
                 blobs.append( [center, box_size, mass, pca, endpoints] )
                 #print('ecco la pca_lim: ', pca_lim)
         self.blobs = blobs
@@ -305,26 +310,32 @@ class fiber_segmentation(object):
         if self.bbox_limits[0] is not None:
             fltr = lambda b: b[1][0] > self.bbox_limits[0]
             self.blobs = list(filter(fltr, self.blobs))
+            self.rejected_blobs = list(filter(fltr, self.rejected_blobs))
         
         if self.bbox_limits[1] is not None:
             fltr = lambda b: b[1][0] < self.bbox_limits[1]
             self.blobs = list(filter(fltr, self.blobs))
+            self.rejected_blobs = list(filter(fltr, self.rejected_blobs))
         
         if self.bbox_limits[2] is not None:
             fltr = lambda b: b[1][1] > self.bbox_limits[2]
             self.blobs = list(filter(fltr, self.blobs))
+            self.rejected_blobs = list(filter(fltr, self.rejected_blobs))
         
         if self.bbox_limits[3] is not None:
             fltr = lambda b: b[1][1] < self.bbox_limits[3]
             self.blobs = list(filter(fltr, self.blobs))
+            self.rejected_blobs = list(filter(fltr, self.rejected_blobs))
             
         if self.mass_limits[0] is not None:
             fltr = lambda b: b[2] > self.mass_limits[0]
             self.blobs = list(filter(fltr, self.blobs))
+            self.rejected_blobs = list(filter(fltr, self.rejected_blobs))
         
         if self.mass_limits[1] is not None:
             fltr = lambda b: b[2] < self.mass_limits[1]
             self.blobs = list(filter(fltr, self.blobs))
+            self.rejected_blobs = list(filter(fltr, self.rejected_blobs))
             
             
     def plot_blobs(self, vmin=None, vmax=None):
@@ -341,6 +352,12 @@ class fiber_segmentation(object):
             ax.errorbar( [blb[0][1]], [blb[0][0]], 
                         xerr=blb[1][1]/2, yerr=blb[1][0]/2,
                         fmt='xr', lw=0.7, capsize=2)
+            
+        for blb in self.rejected_blobs:
+            ax.errorbar( [blb[0][1]], [blb[0][0]], 
+                        xerr=blb[1][1]/2, yerr=blb[1][0]/2,
+                        fmt='xr', lw=0.7, capsize=2)
+            ax.plot([blb[0][1]], [blb[0][0] - blb[1][0]/2 - 2], '*b', markersize=5)
         
         
         
@@ -573,9 +590,6 @@ class loop_fiber_segmentation(object):
         '''
         savetxt(fname, self.blobs, 
                 fmt=['%.03f','%.03f','%d','%.03f','%.03f','%.03f','%.03f'], delimiter='\t')
-        
-    
-    
 
 
 
