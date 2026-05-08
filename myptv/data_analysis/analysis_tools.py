@@ -64,6 +64,25 @@ def is_inside_a_box(tr, xmin, xmax, ymin, ymax, zmin, zmax):
 
 
 
+def convert_trajs_to_physical_units(traj_list, fps):
+    '''
+    Converts trajectory data from frame-based units to physical units.
+    vx, vy, vz (cols 4,5,6) : mm/frame -> mm/s (multiply by fps)
+    ax, ay, az (cols 7,8,9) : mm/frame^2 -> mm/s^2 (multiply by fps^2)
+    time (col 10)           : frame -> s (divide by fps)
+    '''
+    dt = 1.0 / fps
+    physical_trajs = []
+    for tr in traj_list:
+        tr_copy = tr.copy()
+        tr_copy[:, 4:7] *= fps           # Velocities
+        tr_copy[:, 7:10] *= (fps**2)     # Accelerations
+        tr_copy[:, 10] *= dt             # Time
+        physical_trajs.append(tr_copy)
+    return physical_trajs
+
+
+
 
 # ============================================================================
 #    Lagrangian Velocity Statistics:
@@ -85,7 +104,19 @@ def get_velocity_list(traj_list, kind='x'):
         
     elif kind=='KE':
         get_component = lambda tr: 0.5*(np.sum(tr[:,4:7]**2, axis=1))
+    
+    if kind=='ax':
+        get_component = lambda tr: tr[:,7]
+    
+    elif kind=='ay':
+        get_component = lambda tr: tr[:,8]
         
+    elif kind=='az':
+        get_component = lambda tr: tr[:,9]
+        
+    elif kind=='aKE':
+        get_component = lambda tr: 0.5*(np.sum(tr[:,7:10]**2, axis=1))
+            
     lst = [u for tr in traj_list for u in get_component(tr) ]
     
     return lst

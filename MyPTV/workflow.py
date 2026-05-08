@@ -720,6 +720,10 @@ class workflow(object):
         raw_format = self.get_param('segmentation', 'raw_format')
         DoG_sigmas = self.get_param('segmentation', 'DoG_sigmas')
         multiprocessing = self.get_param('segmentation', 'multiprocessing')
+        try:
+            pca_limit = self.get_param('segmentation', 'pca_limit')
+        except:
+            pca_limit = 1.0
         
         # Pre-check the save directory
         if save_name is not None:
@@ -992,7 +996,7 @@ class workflow(object):
                                                 mask=mask,
                                                 method=method,
                                                 raw_format=raw_format,
-                                                pca_limit=1.0)
+                                                pca_limit=pca_limit)
                 
                 loopSegment.segment_folder_images()
                 
@@ -1060,7 +1064,7 @@ class workflow(object):
                                                         min_mass=min_mass,
                                                         mask=mask,
                                                         method=method,
-                                                        pca_limit=1.0)
+                                                        pca_limit=pca_limit)
                 
                 particleSegment.get_blobs()
                 particleSegment.apply_blobs_size_filter()
