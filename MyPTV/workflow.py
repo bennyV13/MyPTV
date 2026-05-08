@@ -1670,7 +1670,7 @@ class workflow(object):
             print("\nWeb GUI stopped.")
 
 
-    def do_Orientations(self):
+    def do_orientations(self):
 
         '''
         A part of Eric Aschari's Fiber tracking extension (MyFTV):
