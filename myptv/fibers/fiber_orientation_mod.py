@@ -226,8 +226,12 @@ class fiber_ori_projection_method(object):
         for i in range(len(self.imgOri_lst)):
             
             # ensuring the format is right (first component positive)
+            if len(self.imgOri_lst[i]) == 0:
+                raise ValueError("One of the image orientation vectors is empty. "
+                                 "Check that the input blob files contain orientation data.")
+
             if self.imgOri_lst[i][0]<0:
-                self.imgOri_lst[i] = self.imgOri_lst * -1
+                self.imgOri_lst[i] = self.imgOri_lst[i] * -1
             
             # ensuring norm is 1
             self.imgOri_lst[i] = self.imgOri_lst[i] / np.linalg.norm(self.imgOri_lst[i])
@@ -316,6 +320,10 @@ class fiber_traj_orientation(object):
         self.blobs_ori = [] 
         for bfn in blobs_ori_filename:
             data = pd.read_csv(bfn, sep='\t', header=None)    
+            if data.shape[1] < 8:
+                raise ValueError(f"Blob file {bfn} only has {data.shape[1]} columns. "
+                                 "Expected at least 8 columns for fiber orientation analysis. "
+                                 "Please use the '_directions' files generated during segmentation.")
             self.blobs_ori.append(dict([(k,np.array(g)) for k,g in data.groupby(5)]))
         
         data = pd.read_csv(traj_filename, sep='\t', header=None)
@@ -342,15 +350,44 @@ class fiber_traj_orientation(object):
         for e, frm in enumerate(frames):
             # get the image space orientation at frame e
             imageOrients = []
+            used_cams = []
             for i in range(len(self.cams)):
                 ind_ie = int(blob_indexes[e][i])
-                imageOrients.append(self.blobs_ori[i][e][ind_ie,6:8])
+                
+                # Skip cameras that didn't see the fiber
+                if ind_ie == -1:
+                    continue
+                
+                # Use the frame number 'frm' as the key
+                try:
+                    blobs_in_frame = self.blobs_ori[i][int(frm)]
+                except KeyError:
+                    # This shouldn't happen if the trajectory is consistent
+                    continue
+                
+                # Check if the blob index is valid
+                if ind_ie >= len(blobs_in_frame):
+                    continue
+                    
+                imageOrients.append(blobs_in_frame[ind_ie,6:8])
+                used_cams.append(self.cams[i])
 
             # set up an fiberOrientations instance
             pos = traj[e,1:4]
             if len(traj_ori)>0: ori0=traj_ori[-1]
             else: ori0=None
-            FO = fiber_ori_projection_method(self.cams, imageOrients, pos, ori0=ori0)
+            
+            # We need at least 2 cameras to find a unique 3D orientation
+            if len(imageOrients) < 2:
+                # If we have only 1 camera, we can't find the orientation.
+                # We could use the previous one or a dummy.
+                if len(traj_ori) > 0:
+                    traj_ori.append(traj_ori[-1])
+                else:
+                    traj_ori.append((np.array([0,0,0]), 1.0))
+                continue
+
+            FO = fiber_ori_projection_method(used_cams, imageOrients, pos, ori0=ori0)
 
             # Minimize for the fiber orientation
             traj_ori.append(FO.Minimize_Ori())
