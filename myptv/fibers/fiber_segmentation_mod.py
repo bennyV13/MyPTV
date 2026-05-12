@@ -338,26 +338,64 @@ class fiber_segmentation(object):
             self.rejected_blobs = list(filter(fltr, self.rejected_blobs))
             
             
-    def plot_blobs(self, vmin=None, vmax=None):
+    def plot_blobs(self, vmin=None, vmax=None, draw_fiber_features=True, scale=100.0):
         import matplotlib.pyplot as plt
         
         if vmax is None:
             vmax = min([self.th*2, max(self.im.ravel())])
         
         fig, ax = plt.subplots()
-        ax.imshow(self.processed_im, vmin=vmin, vmax=vmax)
+        ax.imshow(self.processed_im, vmin=vmin, vmax=vmax, cmap='gray')
         
         for blb in self.blobs:
-            
-            ax.errorbar( [blb[0][1]], [blb[0][0]], 
-                        xerr=blb[1][1]/2, yerr=blb[1][0]/2,
-                        fmt='xr', lw=0.7, capsize=2)
+            if draw_fiber_features:
+                # blb structure: [center, box_size, mass, pca, endpoints]
+                # center is [row, col] == [y, x]
+                # box_size is [size_y, size_x]
+                row_y, col_x = blb[0]
+                size_y, size_x = blb[1]
+                dy = blb[3][0] * scale
+                dx = blb[3][1] * scale
+
+                # plot point
+                ax.plot(col_x, row_y, "ro", markersize=1)
+                
+                # plot blue box
+                rect = plt.Rectangle((col_x - size_x/2, row_y - size_y/2), size_x, size_y,
+                                     edgecolor='blue', facecolor='none', linewidth=3)
+                ax.add_patch(rect)
+
+                # plot yellow arrow
+                ax.arrow(col_x, row_y, dx, dy, color="yellow",
+                         head_width=3, length_includes_head=True)
+            else:
+                ax.errorbar( [blb[0][1]], [blb[0][0]], 
+                            xerr=blb[1][1]/2, yerr=blb[1][0]/2,
+                            fmt='xr', lw=0.7, capsize=2)
             
         for blb in self.rejected_blobs:
-            ax.errorbar( [blb[0][1]], [blb[0][0]], 
-                        xerr=blb[1][1]/2, yerr=blb[1][0]/2,
-                        fmt='xr', lw=0.7, capsize=2)
-            ax.plot([blb[0][1]], [blb[0][0] - blb[1][0]/2 - 2], '*b', markersize=5)
+            if draw_fiber_features:
+                row_y, col_x = blb[0]
+                size_y, size_x = blb[1]
+                dy = blb[3][0] * scale
+                dx = blb[3][1] * scale
+
+                # plot point
+                ax.plot(col_x, row_y, "co", markersize=1)
+                
+                # plot dashed cyan box
+                rect = plt.Rectangle((col_x - size_x/2, row_y - size_y/2), size_x, size_y,
+                                     edgecolor='cyan', facecolor='none', linewidth=2, linestyle='--')
+                ax.add_patch(rect)
+
+                # plot cyan arrow
+                ax.arrow(col_x, row_y, dx, dy, color="cyan",
+                         head_width=3, length_includes_head=True)
+            else:
+                ax.errorbar( [blb[0][1]], [blb[0][0]], 
+                            xerr=blb[1][1]/2, yerr=blb[1][0]/2,
+                            fmt='xr', lw=0.7, capsize=2)
+                ax.plot([blb[0][1]], [blb[0][0] - blb[1][0]/2 - 2], '*b', markersize=5)
         
         
         
