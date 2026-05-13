@@ -1,3 +1,4 @@
+import os
 import numpy as np
 from scipy.spatial import ConvexHull
 import matplotlib.pyplot as plt
@@ -189,6 +190,11 @@ def generate_blob_polygon_mask(blob_file, reference_image, padding, output_bit_d
     
     val = 255 if output_bit_depth == 8 else 65535
     mask[rr, cc] = val
+    
+    # Ensure directory exists
+    dir_name = os.path.dirname(save_name)
+    if dir_name != '' and not os.path.exists(dir_name):
+        os.makedirs(dir_name)
     
     io.imsave(save_name, mask, check_contrast=False)
     print(f"Mask saved to {save_name} with {len(padded_hull)} sides.")
