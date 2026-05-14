@@ -82,5 +82,7 @@ class ActionLogger(object):
         with open(self.log_fname, 'a') as f:
             f.write(json.dumps(log_entry) + '\n')
         
+        print(f"Project log updated: {os.path.abspath(self.log_fname)}")
+        
         # We don't suppress exceptions
         return False
