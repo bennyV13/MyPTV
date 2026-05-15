@@ -197,45 +197,68 @@ class animate_trajectories(object):
         self.min_length = min_length
         self.angles = view_angles
         self.rotation = rotation_rate
+        self.fig = None
+        self.ax = None
         
         
-        
-    def update(self, frame):
-        frame = self.frames[self.counter]
+    def setup_plot(self):
+        v_lst = []
+        for i in self.longs:
+            tr = self.trajectories[i]
+            dt = int(self.min_length/2)
+            dx = sum([(tr[dt,j] - tr[0,j])**2 for j in [1,2,3]])**0.5
+            v_lst.append(dx/dt)
+            
+        self.vscale = percentile(v_lst, 95)
+        self.fig = plt.figure(figsize=(9,9))
+        self.ax = self.fig.add_subplot(projection='3d')
+        self.ax.set_xlabel('x')
+        self.ax.set_ylabel('z')
+        self.ax.set_zlabel('y')
+        self.ax.grid(False)
+
+
+    def update(self, t):
+        if self.ax is None:
+            self.setup_plot()
+            
+        frame_index = int(t * self.fps)
+        if frame_index >= len(self.frames):
+            frame_index = len(self.frames) - 1
+            
+        frame = self.frames[frame_index]
         cmap = plt.get_cmap('jet')
         self.ax.clear()
         
+        # Reset labels and grid after clear
+        self.ax.set_xlabel('x')
+        self.ax.set_ylabel('z')
+        self.ax.set_zlabel('y')
+        self.ax.grid(False)
+
         for k in self.longs:
             tr = self.trajectories[k]
-            whr = arange(len(tr))[tr[:,-1]==frame]
+            # Fast lookup for current frame in this trajectory
+            whr = tr[:,-1]==frame
             if any(whr):
-                ind = whr[0]
-                x = tr[ind-self.tl:ind+1,1]
-                y = tr[ind-self.tl:ind+1,2]
-                z = tr[ind-self.tl:ind+1,3]
+                ind = arange(len(tr))[whr][0]
+                # Extract tail
+                tail_start = max(0, ind - self.tl)
+                x = tr[tail_start:ind+1, 1]
+                y = tr[tail_start:ind+1, 2]
+                z = tr[tail_start:ind+1, 3]
+                
                 if len(x)==0: continue
                 dx = ((x[-1]-x[0])**2 + (y[-1]-y[0])**2 + (z[-1]-z[0])**2)**0.5
-                c = min([(dx/self.tl) / self.vscale,1])
-                self.ax.plot(x, z, y, '-', color = cmap(c*0.9)) #color=(0.1+c*0.9,0,0.8*(1-c)))
+                c = min([(dx/self.tl) / self.vscale, 1.0])
+                self.ax.plot(x, z, y, '-', color = cmap(c*0.9))
         
         self.ax.set_xlim(self.xmin, self.xmax)
         self.ax.set_zlim(self.ymin, self.ymax)
         self.ax.set_ylim(self.zmin, self.zmax)
         
-        self.ax.set_xlabel('x')
-        self.ax.set_ylabel('z')
-        self.ax.set_zlabel('y')
-
-        
-        #self.ax.w_xaxis.set_pane_color((0.6,0.6,1,0.03))
-        #self.ax.w_yaxis.set_pane_color((0.6,0.6,1,0.06))
-        #self.ax.w_zaxis.set_pane_color((0.7,0.6,1,0.12))
-        
-        self.ax.grid(False)
-        
         self.ax.view_init(elev=self.angles[0], 
-                          azim=self.angles[1] + self.rotation*self.counter)
-        
+                          azim=self.angles[1] + self.rotation*frame_index)
         
         self.ax.set_box_aspect((self.xmax-self.xmin, 
                                 self.zmax-self.zmin, 
@@ -243,9 +266,10 @@ class animate_trajectories(object):
         
         plt.tight_layout()
         
-        self.counter += 1
-        
-        return mplfig_to_npimage(self.fig) # RGB image of the figure
+        # Custom fig to numpy conversion
+        self.fig.canvas.draw()
+        import numpy as np
+        return np.array(self.fig.canvas.buffer_rgba())[:,:,:3] # RGB only
 
         
 
@@ -253,24 +277,9 @@ class animate_trajectories(object):
         '''
         will animate the particle's location, and save the animation
         '''
-        #self.prepare_for_animation()
-        
-        v_lst = []
-        for i in self.longs:
-            tr = self.trajectories[i]
-            dt = int(self.min_length/2)
-            dx = sum([(tr[dt,j] - tr[0,j])**2 for j in [1,2,3]])**0.5
-            #if self.vscale<dx/dt:
-            #    self.vscale = dx/dt
-            v_lst.append(dx/dt)
-            
-        self.vscale = percentile(v_lst, 95)
-        
-        self.fig = plt.figure(figsize=(9,9))
-        self.ax = self.fig.add_subplot(projection='3d')
-        
+        self.setup_plot()
         animation = mpy.VideoClip(self.update, duration=self.duration)
-        animation.write_videofile('animation.mp4',fps = self.fps)
+        animation.write_videofile('animation.mp4', fps=self.fps)
         return animation
     
 
