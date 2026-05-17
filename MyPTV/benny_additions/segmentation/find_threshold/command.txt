@@ -1,0 +1,1 @@
+python batch_segmentation.py master_config.yml

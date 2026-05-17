@@ -1,0 +1,98 @@
+# Path to the base parameters file used by workflow.py
+params_file: Data_Analysis/MyPTV_analysis/20260506_analysis/params_file_fibers_batch.yml
+
+# Path to the parent directory that contains the recordings folders (e.g., rec1, rec2, ...)
+recordings_dir: '/Volumes/Extra/20260506/'
+
+blobs_save_path: 'ptv_results/Rec28_data/fibers/'
+
+# Path and filename where the CSV with the results will be saved
+results_csv: 'C:\Users\bennyv\OneDrive - post.bgu.ac.il\University\Master\Research\REASEARCH\PTV_analysis\20251202_analysis\segmentation\seg_results_summary4.csv'
+
+
+cams:
+  - Cam4
+
+
+
+
+# Threshold values for each camera; each camera name maps to a list of threshold values to iterate over.
+thresholds:
+  Cam1: # Name here hat to match the name of the camera in the recordings folder
+    - 1
+    - 3
+    - 7
+    - 10
+    - 15
+    - 20
+    - 25
+    - 30
+    - 35
+    - 40
+    - 45
+    - 50
+    - 55
+    - 60
+  
+  Cam2:
+    - 1
+    - 3
+    - 7
+    - 10
+    - 15
+    - 20
+    - 25
+    - 30
+    - 35
+    - 40
+    - 45
+    - 50
+    - 55
+    - 60
+
+  Cam3:
+    - 1
+    - 3
+    - 7
+    - 10
+    - 15
+    - 20
+    - 25
+    - 30
+    - 35
+    - 40
+    - 45
+    - 50
+    - 55
+    - 60
+
+  Cam4:
+    - 1
+    - 3
+    - 7
+    - 10
+    - 15
+    - 20
+    - 25
+    - 30
+    - 35
+    - 40
+    - 45
+    - 50
+    - 55
+    - 60
+
+# paths to BG and EQ_maps
+images:
+  Cam1:
+    BG: 'C:\Users\bennyv\OneDrive - post.bgu.ac.il\University\Master\Research\REASEARCH\PTV analysis\20250813_analysis\BG_EQ_im\EQ_cam2.tif'
+    EQ: 'C:\Users\bennyv\OneDrive - post.bgu.ac.il\University\Master\Research\REASEARCH\PTV analysis\20250813_analysis\BG_EQ_im\EQmap_cam1.tif'
+  Cam2:
+    BG: 'C:\Users\bennyv\OneDrive - post.bgu.ac.il\University\Master\Research\REASEARCH\PTV analysis\20250813_analysis\BG_EQ_im\BG_cam2.tif'
+    EQ: 'C:\Users\bennyv\OneDrive - post.bgu.ac.il\University\Master\Research\REASEARCH\PTV analysis\20250813_analysis\BG_EQ_im\EQ_cam2.tif'
+  Cam3:
+    BG: 'C:\Users\bennyv\OneDrive - post.bgu.ac.il\University\Master\Research\REASEARCH\PTV analysis\20250813_analysis\BG_EQ_im\BG_cam3.tif'
+    EQ: 'C:\Users\bennyv\OneDrive - post.bgu.ac.il\University\Master\Research\REASEARCH\PTV analysis\20250813_analysis\BG_EQ_im\EQmap_cam3.tif'
+  Cam4:
+    BG: 'C:\Users\bennyv\OneDrive - post.bgu.ac.il\University\Master\Research\REASEARCH\PTV analysis\20250813_analysis\BG_EQ_im\BG_cam4.tif'
+    EQ: 'C:\Users\bennyv\OneDrive - post.bgu.ac.il\University\Master\Research\REASEARCH\PTV analysis\20250813_analysis\BG_EQ_im\EQ_cam4.tif'

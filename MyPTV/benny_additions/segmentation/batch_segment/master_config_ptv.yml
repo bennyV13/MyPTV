@@ -1,0 +1,30 @@
+params_file: "/Users/user/Desktop/Research/Data_Analysis/MyPTV_analysis/20260506_analysis/params_file_fibers_batch.yml"
+recordings_dir: "/Volumes/Extra/20260506"
+ptv_results_dir: "/Users/user/Desktop/Research/Data_Analysis/MyPTV_analysis/20260506_analysis/ptv_results"
+sub_dir: "fibers_v2"    # e.g., "particles" or "fibers"
+masks_dir: "/Users/user/Desktop/Research/Data_Analysis/MyPTV_analysis/20260506_analysis/masks"
+results_csv: "/Users/user/Desktop/Research/Data_Analysis/MyPTV_analysis/20260506_analysis/fibersV2_segmentation_results.csv"
+
+run_if_exists: true    # If false, skip segmentation if the blob file already exists.
+save_blobs: true       # If false, only the CSV is updated and blob files are not saved to ptv_results.
+
+
+# Optional camera filter
+cams:
+  - "Cam1"
+  - "Cam2"
+  - "Cam3"
+  - "Cam4"
+
+# Optional camera-specific thresholds
+camera_thresholds:
+  Cam1: 70
+  Cam2: 70
+  Cam3: 70
+  Cam4: 70
+
+camera_thresholds_particles:
+  Cam1: 5
+  Cam2: 2
+  Cam3: 3
+  Cam4: 5

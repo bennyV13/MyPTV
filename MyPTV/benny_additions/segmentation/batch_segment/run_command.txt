@@ -1,0 +1,1 @@
+python /Users/user/Desktop/Research/Data_Analysis/analyzing_softwares/segmentation_scripts/batch_segment/batch_segmentation_ptv_results.py /Users/user/Desktop/Research/Data_Analysis/analyzing_softwares/segmentation_scripts/batch_segment/master_config_ptv.yml

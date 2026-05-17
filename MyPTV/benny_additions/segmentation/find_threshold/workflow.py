@@ -1,0 +1,2109 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sun 20 March 2022
+
+
+This script contains a class designed to make using MyPTV a bit easier
+for users. 
+
+1) We use a single text file to hold all the parameters used in MyPTV.
+
+2) We have a class that reads the text file and performs the given task:
+    segmentation, matching, tracking, smoothing and stitching.
+
+"""
+
+
+from pandas import DataFrame as df
+from yaml import safe_load
+
+
+
+
+
+
+class workflow(object):
+    '''
+    A class used to run specific MyPTV operations with parameters given 
+    in a dedicated text file.
+    '''
+    
+    def __init__(self, param_file, action):
+        '''
+        input -
+        
+        param_file - string; the path to a text file with the specified 
+                     parameters to be used.
+        
+        action - string; the name of the PTV action to be performed. Accepted
+                 values are: 'segmentation', 'matching', 'tracking',
+                 'smoothing', and 'stitching'.
+        '''
+        
+        # read the parameter file:
+        self.param_file_path = param_file
+        self.params = self.read_params_file()
+        
+        
+        self.allowed_actions = ['help', 'initial_calibration', 
+                                'final_calibration',
+                                'analyze_calibration_error',
+                                'calibration_with_particles', 
+                                'matching', 'analyze_disparity',
+                                'segmentation',
+                                'calculate_BG_image',
+                                'calculate_equilization_map',                                
+                                'smoothing', 'stitching', 'tracking', 
+                                'calibration', 'calibration_point_gui', 
+                                'match_target_file', '2D_tracking', 
+                                'manual_matching',
+                                'fiber_orientations',
+                                'plot_trajectories',
+                                'animate_trajectories',
+                                'run_extention',
+                                'calculate_BG_and_EQ','segmentation_fibers', 'apply_BG_and_EQ'          # <-- add this
+                                ]
+        
+        
+        # perform the wanted action:
+        if action is None:
+            print('Started workflow with no particular action.')
+            
+        elif action != None:
+            
+            msg1 = 'The given action is unknown.'
+            msg2 = 'allowed actions are:'+str(self.allowed_actions)
+            if action not in self.allowed_actions:
+                raise ValueError(msg1+'\n'+msg2)
+
+        
+            elif action == 'initial_calibration':
+                self.initial_calibration()
+                
+            elif action == 'final_calibration':
+                self.final_calibration()
+                
+            elif action == 'analyze_calibration_error':
+                self.calibration_error_estimation()
+                
+            elif action == 'calibration_with_particles':
+                self.calibration_with_particles()
+                
+            elif action == 'segmentation':
+                self.do_segmentation()
+                
+            elif action == 'matching':
+                self.do_matching()
+                
+            elif action == 'analyze_disparity':
+                self.do_analyze_disparity()
+                
+            elif action == 'tracking':
+                self.do_tracking()
+                
+            elif action == '2D_tracking':
+                self.do_2d_tracking()
+                
+            elif action == 'smoothing':
+                self.do_smoothing()
+            
+            elif action == 'stitching':
+                self.do_stitching()
+            
+            elif action == 'manual_matching':
+                self.do_manual_matching()
+                
+            elif action == 'fiber_orientations':
+                self.do_orientations()
+                
+            elif action == 'plot_trajectories':
+                self.do_plot_trajectories()
+                
+            elif action == 'animate_trajectories':
+                self.do_animate_trajectories()
+            
+            elif action == 'run_extention':
+                self.do_run_extention()    
+            
+            elif action == 'calculate_BG_image':
+                self.do_calculate_BG_image()
+                
+            elif action == 'calculate_equilization_map':
+                self.do_calculate_equilization_map()
+            
+            elif action == 'help':
+                self.help_me()
+                
+            elif action == 'calculate_BG_and_EQ':
+                self.do_calculate_BG_and_EQ()
+
+            elif action == 'apply_BG_and_EQ':
+                self.do_apply_BG_and_EQ()
+
+                
+            # legacy functions:
+            elif action == 'calibration':
+                print('Note: you are running an outdated action!')
+                print('consider using the initial_calibration and')
+                print('final_calibration actions instead.')
+                self.calibration_sequence()
+            
+            elif action == 'calibration_point_gui':
+                print('Note: you are running an outdated action!')
+                print('consider using the initial_calibration and')
+                print('final_calibration actions instead.')
+                self.calibration_point_gui()
+            
+            elif action == 'match_target_file':
+                print('Note: you are running an outdated action!')
+                print('consider using the initial_calibration and')
+                print('final_calibration actions instead.')
+                self.match_target_file()
+            
+
+    def do_calculate_BG_and_EQ(self):
+        """
+        One-shot (stage-gated by params):
+        1) Calculate BG image (if calculate_BG_image.enabled is True).
+        2) Calculate EQ map (if calculate_equilization_map.enabled is True).
+        3) Apply BG subtraction + EQ normalization and (optionally) save
+           (if calculate_BG_and_EQ.enabled is True; saving controlled by
+            calculate_BG_and_EQ.save).
+        """
+    
+        from myptv.segmentation_mod import (
+            calculate_BG_image as _calc_bg,
+            calculate_equilization_map as _calc_eq,
+        )
+        import os
+        from skimage import io
+        import numpy as np
+    
+        def _safe_get(op, key, default=None):
+            try:
+                return self.get_param(op, key)
+            except Exception:
+                return default
+    
+        def _require_file(path, label):
+            if not os.path.isfile(path):
+                raise FileNotFoundError(f"Required {label} not found: {path}")
+    
+        # ---------------- Flags ----------------
+        bg_enabled  = bool(_safe_get("calculate_BG_image", "enabled", True))
+        eq_enabled  = bool(_safe_get("calculate_equilization_map", "enabled", True))
+        proc_enabled = bool(_safe_get("calculate_BG_and_EQ", "enabled", True))
+        proc_save    = bool(_safe_get("calculate_BG_and_EQ", "save", True))
+    
+        # ------------ BG params ------------
+        bg_dir  = self.get_param("calculate_BG_image", "images_folder")
+        bg_ext  = self.get_param("calculate_BG_image", "image_extension")
+        bg_raw  = self.get_param("calculate_BG_image", "raw_format")
+        bg_n    = self.get_param("calculate_BG_image", "N_img")
+        bg_out  = _safe_get("calculate_BG_image", "save_name", "BG_image.tif")
+    
+        if bg_enabled:
+            print("\n[1/3] Calculating background image...")
+            _calc_bg(bg_dir, bg_ext, bg_out, N_img=bg_n, raw_format=bg_raw)
+            print(f"Done. BG saved to: {bg_out}\n")
+        else:
+            print("\n[1/3] Skipping BG calculation (calculate_BG_image.enabled=False)")
+            # If later stages need BG, make sure a file is present (either default or provided)
+            _require_file(bg_out, "BG image")
+    
+        # ------------ EQ params ------------
+        eq_dir   = _safe_get("calculate_equilization_map", "images_folder", bg_dir)
+        eq_ext   = _safe_get("calculate_equilization_map", "image_extension", bg_ext)
+        eq_raw   = _safe_get("calculate_equilization_map", "raw_format", bg_raw)
+        eq_n     = _safe_get("calculate_equilization_map", "N_img", bg_n)
+        eq_sigma = _safe_get("calculate_equilization_map", "sigma", 20)
+        eq_out   = _safe_get("calculate_equilization_map", "save_name", "EQ_map.tif")
+        eq_bg_in = _safe_get("calculate_equilization_map", "BG_image", "auto")
+        if eq_bg_in in (None, "auto", "use_previous", True):
+            eq_bg_in = bg_out
+    
+        if eq_enabled:
+            print("[2/3] Calculating equalization map...")
+            _calc_eq(eq_dir, eq_ext, eq_sigma, eq_out, N_img=eq_n, BG_image=eq_bg_in, raw_format=eq_raw)
+            print(f"Done. EQ map saved to: {eq_out}\n")
+        else:
+            print("[2/3] Skipping EQ calculation (calculate_equilization_map.enabled=False)")
+            _require_file(eq_out, "EQ map")
+    
+        # ------------ Apply & Save ------------
+        if not proc_enabled:
+            print("[3/3] Skipping processing (calculate_BG_and_EQ.enabled=False)")
+            return
+    
+        out_dir = _safe_get("calculate_BG_and_EQ", "save_processed_folder",
+                            os.path.join(eq_dir, "BG_EQ"))
+        if proc_save:
+            os.makedirs(out_dir, exist_ok=True)
+    
+        # Reader aligned with your raw_format handling
+        if eq_raw is False:
+            imread_func = lambda p: io.imread(p)
+        else:
+            import rawpy
+            imread_func = lambda p: rawpy.imread(p).raw_image
+    
+        # Load BG and EQ arrays (needed for processing even if not saving)
+        _require_file(bg_out, "BG image")
+        _require_file(eq_out, "EQ map")
+        BG = io.imread(bg_out)
+        EQ = io.imread(eq_out)
+    
+        # Collect input images (top level only)
+        allfiles = sorted([f for f in os.listdir(eq_dir) if f.endswith(eq_ext)])
+        if not allfiles:
+            raise ValueError("No input images found for processing.")
+    
+        # Shape sanity using the first image
+        ref_im = imread_func(os.path.join(eq_dir, allfiles[0]))
+        if BG.shape != ref_im.shape:
+            raise ValueError(f"BG image shape {BG.shape} != image shape {ref_im.shape}")
+        if EQ.shape != ref_im.shape:
+            raise ValueError(f"EQ map shape {EQ.shape} != image shape {ref_im.shape}")
+    
+        if not proc_save:
+            print("[3/3] Processing without saving (calculate_BG_and_EQ.save=False)")
+    
+        for i, fname in enumerate(allfiles, 1):
+            src = os.path.join(eq_dir, fname)
+    
+            # Skip the saved BG or EQ files themselves if they sit in the same folder
+            if os.path.abspath(src) in (os.path.abspath(bg_out), os.path.abspath(eq_out)):
+                continue
+    
+            frame = imread_func(src)
+    
+            # BG subtraction: absdiff
+            diff = np.abs(frame.astype(np.int32) - BG.astype(np.int32))
+            diff = np.clip(diff, 0, 65535)
+    
+            # EQ normalize with safety
+            eq = diff.astype(np.float32) / np.maximum(EQ.astype(np.float32), 1e-6)
+    
+            if proc_save:
+                # Save as uint16 TIFF
+                eq_u16 = np.clip(eq, 0, 65535).astype(np.uint16)
+                base = os.path.splitext(fname)[0]
+                dst = os.path.join(out_dir, base + ".tif")
+                io.imsave(dst, eq_u16, check_contrast=False)
+    
+            if i % 100 == 0:
+                print(f"  Processed {i} / {len(allfiles)}")
+    
+        print("All set")
+        if proc_save:
+            print(f"Processed images saved to: {out_dir}")
+        else:
+            print("Processed images were not saved (save=False).")
+    
+    
+    def do_apply_BG_and_EQ(self):
+        """
+        Apply BG subtraction and optional EQ normalization to images.
+        """
+        import os
+        import numpy as np
+        from skimage import io
+    
+        def _safe_get(section, key, default=None):
+            try:
+                return self.get_param(section, key)
+            except Exception:
+                return default
+    
+        # Read params safely
+        img_dir = _safe_get("apply_BG_and_EQ", "images_folder", None)
+        img_ext = _safe_get("apply_BG_and_EQ", "image_extension", ".tif")
+        raw_fmt = bool(_safe_get("apply_BG_and_EQ", "raw_format", False))
+        bg_path = _safe_get("apply_BG_and_EQ", "remove_background", None)
+        eq_path = _safe_get("apply_BG_and_EQ", "equilization_map", None)
+        out_dir = _safe_get("apply_BG_and_EQ", "save_processed_folder",
+                            os.path.join(img_dir if img_dir else ".", "BG_EQ_applied"))
+    
+        # Required inputs present? BG is mandatory, EQ is optional.
+        if not img_dir or bg_path in (None, "None"):
+            print("Missing images_folder or remove_background path. Skipping.")
+            return
+    
+        # Files exist?
+        if not os.path.isfile(bg_path):
+            print(f"BG file does not exist: {bg_path}. Skipping.")
+            return
+        if eq_path not in (None, "None") and not os.path.isfile(eq_path):
+            print(f"EQ map file was specified but does not exist: {eq_path}. Skipping.")
+            return
+    
+        os.makedirs(out_dir, exist_ok=True)
+    
+        # Decide reader for frames
+        use_raw = raw_fmt or str(img_ext).lower() == ".dng"
+        if use_raw:
+            import rawpy
+            def _imread_frame(p):
+                with rawpy.imread(p) as r:
+                    return r.raw_image.copy()
+        else:
+            def _imread_frame(p):
+                return io.imread(p)
+    
+        # Load BG and EQ (EQ is optional)
+        BG = io.imread(bg_path)
+        EQ = None
+        if eq_path not in (None, "None"):
+            EQ = io.imread(eq_path)
+            print("Applying BG and EQ...")
+        else:
+            print("Applying BG only (no EQ map provided)...")
+
+    
+        # Collect input images
+        img_ext_lc = str(img_ext).lower()
+        allfiles = sorted([f for f in os.listdir(img_dir) if f.lower().endswith(img_ext_lc)])
+        if not allfiles:
+            print("No input images found. Skipping.")
+            return
+    
+        # Sanity: shapes
+        ref_im = _imread_frame(os.path.join(img_dir, allfiles[0]))
+        if BG.shape != ref_im.shape:
+            raise ValueError(f"BG image shape {BG.shape} != image shape {ref_im.shape}")
+        if EQ is not None and EQ.shape != ref_im.shape:
+            raise ValueError(f"EQ map shape {EQ.shape} != image shape {ref_im.shape}")
+    
+        print(f"[apply_BG_and_EQ] Processing {len(allfiles)} images from: {img_dir}")
+        for i, fname in enumerate(allfiles, 1):
+            src = os.path.join(img_dir, fname)
+            frame = _imread_frame(src)
+    
+            # BG subtraction (abs difference)
+            diff = np.abs(frame.astype(np.int32) - BG.astype(np.int32))
+            diff = np.clip(diff, 0, 65535)
+    
+            # EQ normalization (optional)
+            if EQ is not None:
+                processed_img = diff.astype(np.float32) / np.maximum(EQ.astype(np.float32), 1e-6)
+            else:
+                processed_img = diff
+            
+            processed_img = np.clip(processed_img, 0, 65535).astype(np.uint16)
+    
+            dst = os.path.join(out_dir, os.path.splitext(fname)[0] + ".tif")
+            io.imsave(dst, processed_img, check_contrast=False)
+    
+            if i % 100 == 0:
+                print(f"  Processed {i}/{len(allfiles)}")
+    
+        print(f"All processed images saved to: {out_dir}")
+    
+    
+ 
+    
+    def help_me(self):
+        '''
+        Prints a message that might help users with the allowable commands.
+        '''
+        print('\nThe workflow script is intended to help users utilize MyPTVs')
+        print('capabilities in their 3D particle tracking experiments. \n')
+        
+        print('To use the workflow script, run it with Python, usin one of')
+        print('the following actions that you would like to perform:\n')
+        
+        for e, act in enumerate(self.allowed_actions):
+            print('%d) "%s"'%(e, act))
+            
+        print('\nThe script will now close, so the wanted action could be run.')
+        
+        print('\nGood luck!')
+        
+        print('\nP.S. - try using the user manual that is found on the main')
+        print('Github repository.')
+            
+        
+            
+    
+    
+    def read_params_file(self):
+        '''
+        Reads the yaml file and formats it as a DataFrame.
+        '''
+        
+        with open(self.param_file_path, 'r') as f:
+            params = {}
+            
+            try:
+                sl = safe_load(f)
+            except:
+                raise ValueError('Error in loading the parameters file.')
+                
+            for i in range(len(sl)):
+                params.update(sl[i])
+                    
+        as_dict = {'operation':[], 'param': [], 'value': [] }
+        for k in params.keys():
+            for kk in params[k].keys():
+                as_dict['operation'].append(k)
+                as_dict['param'].append(kk)
+                as_dict['value'].append(params[k][kk])
+        
+        for i in range(len(as_dict['value'])):
+            if as_dict['value'][i] == 'None': 
+                as_dict['value'][i] = None
+        
+        return df(as_dict)
+    
+    
+    
+    
+    def get_param(self, act, param):
+        '''
+        Fetches a parameter value from the self.params DataFrame.
+        '''
+        if act not in set(self.params['operation']):
+            raise ValueError('Cant find action %s in the parameter file.'%act)
+        
+        par_seg = self.params[self.params['operation']==act]
+        
+        if param not in set(par_seg['param']):
+            msg = 'Cant find the %s -> %s in the parameters file.'%(act,param)
+            raise ValueError(msg)
+        
+        return par_seg[par_seg['param']==param]['value'].iloc[0]
+    
+    
+    
+    
+    def initial_calibration(self):
+        '''
+        Starts the initial calibration GUI
+        '''
+        from matplotlib.pyplot import imread
+        
+        # fetch parameters from the file
+        model_name = self.get_param('calibration', '3D_model')
+        cam_name = self.get_param('calibration', 'camera_name')
+        cal_image = self.get_param('calibration', 'calibration_image')
+        target_file = self.get_param('calibration', 'target_file')
+        res = self.get_param('calibration', 'resolution').split(',')
+        res = (float(res[0]), float(res[1]))
+        
+        
+        if model_name == 'Tsai':
+            from myptv.TsaiModel.gui_intial_cal import initial_cal_gui
+            image = imread(cal_image)
+            if image.shape[1] != res[0] or image.shape[0] != res[1]:
+                msg = 'The given resolution doesnt match the image size'
+                raise ValueError(msg)
+        
+            gui = initial_cal_gui(cam_name, cal_image, target_file)
+        
+        
+        elif model_name == 'extendedZolof':
+            from myptv.extendedZolof.gui_intial_cal import initial_cal_gui
+            image = imread(cal_image)
+            gui = initial_cal_gui(cam_name, cal_image, target_file)
+            
+        
+        else:
+            models = str(['Tsai', 'extendedZolof'])[1:-1]
+            msg = 'Unknown 3D model; permisible model names are: '
+            raise ValueError(msg + models)
+        
+        
+        
+    def final_calibration(self):
+        '''
+        Starts the initial calibration GUI
+        '''
+        import os
+        
+        # fetch parameters from the file
+        model_name = self.get_param('calibration', '3D_model')
+        cam_name = self.get_param('calibration', 'camera_name')
+        cal_image = self.get_param('calibration', 'calibration_image')
+        res = self.get_param('calibration', 'resolution').split(',')
+        res = (float(res[0]), float(res[1]))
+        
+        
+        # checking that a camera file in the working directory
+        ls = os.listdir('.')                
+        
+        # make sure camera file exists
+        if cam_name not in ls:
+            msg = 'No camera file was found. Start with initial calibration.'
+            raise ValueError(msg)
+            
+        # detect the calibration folder
+        cal_folder = '.'
+        for fname in ls:
+            if fname in ['calibration', 'Calibration', 'cal', 'Cal']:
+                if os.path.isdir(os.path.join('.', fname)):
+                    cal_folder = os.path.join('.', fname)
+                    break
+        
+        # get the blob file and setup the camera instance
+        blob_file = os.path.join(cal_folder, cam_name+'_cal_points')
+        
+        if model_name == 'Tsai':
+            from myptv.TsaiModel.gui_final_cal import cal_gui
+            from myptv.TsaiModel.camera import camera_Tsai
+            from myptv.TsaiModel.calibrate import calibrate_Tsai
+            
+            try:
+                cam = camera_Tsai(cam_name, cal_points_fname = blob_file)
+            except:
+                msg = 'Calibration point file (%s) is not right!'%blob_file
+                msg2 = 'check that the file exists and that it has no errors.'
+                raise ValueError(msg+msg2)
+                
+            
+            # load the camera
+            cam.load('.')
+            print('camera data loaded successfully.')
+            cal = calibrate_Tsai(cam, cam.lab_points, cam.image_points)
+            print('initial error: %.3f pixels\n'%(cal.mean_squared_err()))
+            
+            # run the final calibration gui
+            print('starting calibration GIU\n')
+            gui = cal_gui(cal, cal_image)   
+
+        
+        elif model_name == 'extendedZolof':
+            from myptv.extendedZolof.camera import camera_extendedZolof
+            from myptv.extendedZolof.calibrate import calibrate_extendedZolof
+            from myptv.extendedZolof.gui_final_cal import cal_gui
+            
+            try:
+                cam = camera_extendedZolof(cam_name, cal_points_fname = blob_file)
+            except:
+                msg = 'Calibration point file (%s) is not right!'%blob_file
+                msg2 = 'check that the file exists and that it has no errors.'
+                raise ValueError(msg+msg2)
+            
+            cam.load('.')
+            print('camera data loaded successfully.')
+            cal = calibrate_extendedZolof(cam, 
+                                          cam.image_points, 
+                                          cam.lab_points)
+            print('Starting calibration gui')
+            gui = cal_gui(calibrate_obj=cal)
+            #cal.calibrate()
+            err = cal.mean_squared_err()
+            print('Calibration finished. The calibration error is: %.3e'%err)
+            #cam.save('.')
+            
+        
+        else:
+            models = str(['Tsai', 'extendedZolof'])[1:-1]
+            msg = 'Unknown 3D model; permisible model names are: '
+            raise ValueError(msg + models)                                
+            
+    
+
+    
+    
+    def calibration_error_estimation(self):
+        '''
+        Performs stereo matching of the calibration points and compares
+        then with the ground truth. 
+        '''
+        from numpy import loadtxt, array, mean, median, savez
+        from myptv.imaging_mod import camera_wrapper, img_system
+        from pandas import DataFrame
+        
+        cam_names = self.get_param('analyze_calibration_error', 'camera_names')
+        cam_names = [val.strip() for val in cam_names.split(',')]
+        plot = self.get_param('analyze_calibration_error', 'plot_histogram')
+        
+        
+        # setting up the img_system 
+        cams = [camera_wrapper(cn,'./') for cn in cam_names]
+        for cam in cams:
+            try:
+                cam.load()
+            except:
+                raise ValueError('camera file %s not found'%cam.name)
+        imsys = img_system(cams)
+        
+        
+        # read calibration point files and organize in a dictionary
+        point_dic = {}
+        for e, cn in enumerate(cam_names):
+            filename = './Calibration/%s_cal_points'%cn
+            data = loadtxt(filename)
+            for i in range(len(data)):
+                try:
+                    point_dic[tuple(data[i][2:])][e] = data[i][:2]
+                except:
+                    point_dic[tuple(data[i][2:])] = {e: data[i][:2]}
+        
+        
+        # for each point in the dictionary, get the calibration error
+        errors = []
+        errsX, errsY, errsZ = [], [] ,[]
+        x, y, z = [], [], []
+        for k in point_dic.keys():
+            if len(point_dic[k])!=len(cam_names): continue
+            ground_truth = array(k)
+            triangulation = imsys.stereo_match(point_dic[k], 1e20)[0]
+            diff = triangulation - ground_truth
+            err = sum((diff)**2)**0.5
+            
+            errors.append(err)
+            errsX.append(diff[0])
+            errsY.append(diff[1])
+            errsZ.append(diff[2])
+            x.append(ground_truth[0])
+            y.append(ground_truth[1])
+            z.append(ground_truth[2])
+            
+        
+        print('Calibration error in in lab-space units:')
+        print('RMS of full error: %.3e'%(mean(errors)))
+        print('median of full error: %.3e'%(median(errors)))
+        print('x error: %.3e'%(mean(abs(array(errsX)))))
+        print('y error: %.3e'%(mean(abs(array(errsY)))))
+        print('z error: %.3e'%(mean(abs(array(errsZ)))))
+        print('')
+        
+        if plot == True:
+            import matplotlib.pyplot as plt
+            fig, ax = plt.subplots(1,4)
+            
+            fig.suptitle('Errors in lab-space unites')
+            titles = ['total error', 'x error', 'y error', 'z error']
+            for e, lst in enumerate([errors, errsX, errsY, errsZ]):
+                h = ax[e].hist(lst, bins='auto')
+                ax[e].set_title(titles[e])
+            plt.show()
+        
+        
+        errs_df = DataFrame({'x':x, 'y':y, 'z':z,
+                             'x_err':errsX, 'y_err':errsY, 'z_err':errsZ})
+        
+        errs_df.to_csv('calibration_errors_data', 
+                       sep='\t', 
+                       index=False,
+                       float_format='%.4e')
+        
+        print('Calibration errors data saved as "calibration_errors_data" \n')
+            
+            
+        
+    
+    
+    def calibration_with_particles(self):
+        '''
+        This starts the calibrate with particles sequence
+        '''
+        from  matplotlib.pyplot import subplots, show
+        
+        # fetch parameters from the file
+        camera_name =  self.get_param('calibration_with_particles',
+                                      'camera_name')
+        #resolution = self.get_param('calibration_with_particles',
+        #                     'resolution').split(',')
+        #resolution = (float(resolution[0]), float(resolution[1]))
+        traj_filename = self.get_param('calibration_with_particles',
+                                      'traj_filename')
+        cam_number = self.get_param('calibration_with_particles',
+                                      'cam_number') 
+        blobs_fname = self.get_param('calibration_with_particles',
+                                      'blobs_fname')
+        min_traj_len = self.get_param('calibration_with_particles',
+                                      'min_traj_len')
+        max_point_number = self.get_param('calibration_with_particles',
+                                      'max_point_number')
+
+        print('\n', 'starting calibration with particles')
+        
+        
+        cam_file = open('./'+camera_name, 'r')
+        model = cam_file.readline().split()[0]
+        
+        print('\n Camera model: %s'%model)
+        
+        
+        if model == 'Tsai':
+            from myptv.TsaiModel.gui_final_cal import cal_gui
+            from myptv.TsaiModel.camera import camera_Tsai
+            from myptv.TsaiModel.calibrate import calibrate_with_particles_Tsai
+            
+            # setting up a camera instance            
+            cam = camera_Tsai(camera_name)
+            cam.load('./')
+            
+            
+            # set up the calibration object
+            cal_with_p = calibrate_with_particles_Tsai(traj_filename, cam, 
+                                                       cam_number, 
+                                                       blobs_fname, 
+                                                       min_traj_len=min_traj_len,
+                                                       max_point_number=max_point_number)
+            
+            cal = cal_with_p.get_calibrate_instance()
+            
+            # run the final calibration gui
+            print('starting calibration GIU using calibration with particles\n')
+            gui = cal_gui(cal, cal_image) 
+            
+            
+        
+        if model == 'extendedZolof':
+            from myptv.extendedZolof.gui_final_cal import cal_gui
+            from myptv.extendedZolof.camera import camera_extendedZolof
+            from myptv.extendedZolof.calibrate import calibrate_with_particles_EZ
+            from myptv.imaging_mod import camera_wrapper
+            from numpy import mean
+            
+            # setting up a camera instance            
+            cam = camera_wrapper(camera_name, './')
+            cam.load()
+            
+            
+            # set up the calibration object
+            cwp = calibrate_with_particles_EZ(traj_filename, cam, 
+                                                cam_number, 
+                                                blobs_fname, 
+                                                min_traj_len=min_traj_len,
+                                                max_point_number=max_point_number)
+            
+            cal = cwp.get_calibrate_instance()
+            
+            p = cwp.get_particle_disparity()
+            err = [sum(pi**2)**0.5 for pi in p]
+            print('')
+            print('mean disparity before: %.4f px'%(mean(err)))
+            print('max disparity before: %.4f px\n'%(max(err)))
+            
+            # run the final calibration gui
+            print('calibrating...\n')
+            cal.calibrate()
+            
+            p = cwp.get_particle_disparity()
+            err = [sum(pi**2)**0.5 for pi in p]
+            print('mean disparity before: %.4f px'%(mean(err)))
+            print('max disparity before: %.4f px\n'%(max(err)))
+            
+            
+            usr_input = input('save results? (1=yes, other=no)')
+            if usr_input=='1':
+                cam.camera.save()
+                print('saved')
+            
+            
+        
+    def do_calculate_BG_image(self):
+        '''
+        Calculates and save static BG image, defined as the mean of images
+        '''
+        from myptv.segmentation_mod import calculate_BG_image
+        
+        dirname = self.get_param('calculate_BG_image', 'images_folder')
+        ext = self.get_param('calculate_BG_image', 'image_extension')
+        raw_format = self.get_param('calculate_BG_image', 'raw_format')
+        N_img = self.get_param('calculate_BG_image', 'N_img')
+        savename = self.get_param('calculate_BG_image', 'save_name')
+        
+        
+        calculate_BG_image(dirname, ext, savename, N_img=N_img,
+                       raw_format=raw_format)
+        
+        
+    
+    def do_calculate_equilization_map(self):
+        '''
+        Calculates and saves an image equilization map
+        '''
+        from myptv.segmentation_mod import calculate_equilization_map
+        
+        dirname = self.get_param('calculate_equilization_map', 'images_folder')
+        ext = self.get_param('calculate_equilization_map', 'image_extension')
+        raw_format = self.get_param('calculate_equilization_map', 'raw_format')
+        N_img = self.get_param('calculate_equilization_map', 'N_img')
+        sigma = self.get_param('calculate_equilization_map', 'sigma')
+        BG_image = self.get_param('calculate_equilization_map', 'BG_image')
+        savename = self.get_param('calculate_equilization_map', 'save_name')
+        
+        calculate_equilization_map(dirname, ext, sigma, savename, N_img=N_img,
+                               BG_image=BG_image, raw_format=raw_format)
+    
+    
+    
+    def do_segmentation(self):
+        '''
+        Will perform segmentation on the images given in the parameters file
+        and save the results on the given location.
+        '''
+        
+        from numpy import zeros, amax
+        from skimage.io import imread
+        import os
+        
+        # fetching parameters
+        dirname = self.get_param('segmentation', 'images_folder')
+        ext = self.get_param('segmentation', 'image_extension')
+        N_img = self.get_param('segmentation', 'Number_of_images')
+        image_start = self.get_param('segmentation', 'image_start')
+        sigma = self.get_param('segmentation', 'blur_sigma')
+        threshold = self.get_param('segmentation', 'threshold')
+        median = self.get_param('segmentation', 'median')
+        local_filter = self.get_param('segmentation', 'local_filter')
+        max_xsize = self.get_param('segmentation', 'max_xsize')
+        max_ysize = self.get_param('segmentation', 'max_ysize')
+        max_mass = self.get_param('segmentation', 'max_mass')
+        min_xsize = self.get_param('segmentation', 'min_xsize')
+        min_ysize = self.get_param('segmentation', 'min_ysize')
+        min_mass = self.get_param('segmentation', 'min_mass')
+        mask = self.get_param('segmentation', 'mask')
+        plot_res = self.get_param('segmentation', 'plot_result')
+        save_name = self.get_param('segmentation', 'save_name')
+        ROI = self.get_param('segmentation', 'ROI')
+        single_img_name = self.get_param('segmentation', 'single_image_name')
+        method = self.get_param('segmentation', 'method')
+        p_size = self.get_param('segmentation', 'particle_size')
+        shape = self.get_param('segmentation', 'shape')
+        remove_BG = self.get_param('segmentation', 'remove_background')
+        eq_map = self.get_param('segmentation', 'equilization_map')
+        raw_format = self.get_param('segmentation', 'raw_format')
+        DoG_sigmas = self.get_param('segmentation', 'DoG_sigmas')
+        pca_limit = self.get_param('segmentation', 'pca_limit')
+        arrow_scale = self.get_param('segmentation', 'arrow_scale')
+        if arrow_scale is None: arrow_scale = 100.0
+        
+        # reading preprepared mask
+        if type(mask)==str:
+            mask = imread(mask)
+        
+        if method not in ['dilation', 'labeling']:
+            raise ValueError('Method can be only "dilation" or "labeling"')
+        
+        if method=='dilation' and type(p_size) != int:
+            raise ValueError('In dilation, particle_size can only be integer')
+        
+        if shape not in ['particles', 'fibers']:
+            raise ValueError('Shape can be only "particles" or "fibers"')
+        
+        if raw_format==False:
+            imread_func = lambda x: imread(x)
+        else:
+            import rawpy
+            imread_func = lambda x: rawpy.imread(x).raw_image
+        
+        
+        # get the shape of the images
+        # os.makedirs(dirname, exist_ok=False)
+        allfiles = os.listdir(dirname)
+        n_ext = len(ext)
+        image_files = sorted(list(filter(lambda s: s[-n_ext:]==ext, allfiles)))
+        if single_img_name in image_files:
+            image0 = imread_func(os.path.join(dirname,single_img_name))
+        else:
+            image0 = imread_func(os.path.join(dirname,image_files[0]))
+        
+        # preparing a mask using the given ROI
+        if ROI is not None:
+            ROI = [int(val) for val in ROI.split(',')]
+            mask_ROI = zeros(image0.shape)
+            mask_ROI[ROI[2]:ROI[3]+1, ROI[0]:ROI[1]+1] = 1
+            mask = mask * mask_ROI
+            mask = (mask / amax(mask)).astype('uint')
+            
+            
+        # getting equilization map
+        if eq_map is None:
+            print('\n','Not equilyzing')
+            
+        elif type(eq_map)==str:
+            if shape=='particles':
+                print('\n','using given equilization map')
+                eq_map = imread(eq_map)
+            
+            elif shape=='fibers':
+                raise TypeError('equilization not implemented yet for fibers')
+        
+        else:
+            raise TypeError('equilization map not None nor path to an eqmap')
+        
+        
+        if DoG_sigmas is not None and shape=='fibers':
+                raise TypeError('DoG not implemented yet for fibers; use None')
+            
+            
+        def calculate_BG_image(dirname, extension):
+            '''
+            Calculates the background of images, defined as the median over a
+            subsample of 200 images from the image folder.
+            '''
+            import os
+            from skimage import io
+            from numpy import median
+            
+            print('\ncalculating background...')
+            
+            allfiles = os.listdir(dirname)
+            n_ext = len(extension)
+            fltr = lambda s: s[-n_ext:]==extension
+            image_files = sorted(list(filter(fltr, allfiles)))
+            image_files = [os.path.join(dirname, fn) for fn in image_files]
+            
+            if len(image_files)<=200:
+                ic = io.ImageCollection(image_files)
+                
+            else:
+                ic = io.ImageCollection(
+                            image_files[::int(len(image_files)/400+1)][:200])
+            
+            BG = median(ic, axis=0)
+            
+            return BG
+            
+        
+        if shape=='particles':
+            
+            from myptv.segmentation_mod import loop_segmentation
+            from myptv.segmentation_mod import particle_segmentation
+        
+            # segmenting the image if there are more than 1 frames
+            if N_img is None or N_img>1:
+                
+                if type(remove_BG)==str:
+                    print('\n','using given background image')
+                    BG = imread(remove_BG)*1.0
+                elif remove_BG==True:
+                    print('\n','calculating background image')
+                    BG = calculate_BG_image(dirname, ext)
+                else:
+                    BG=False
+                
+                loopSegment = loop_segmentation(dirname, 
+                                                particle_size=p_size,
+                                                extension=ext,
+                                                image_start=image_start,
+                                                N_img=N_img,
+                                                remove_ststic_BG=BG,
+                                                equalize_image=eq_map,
+                                                DoG_sigma=DoG_sigmas,
+                                                sigma=sigma, 
+                                                median=median,
+                                                threshold=threshold, 
+                                                local_filter=local_filter, 
+                                                max_xsize=max_xsize, 
+                                                max_ysize=max_ysize,
+                                                max_mass=max_mass,
+                                                min_xsize=min_xsize, 
+                                                min_ysize=min_ysize,
+                                                min_mass=min_mass,
+                                                mask=mask,
+                                                method=method,
+                                                raw_format=raw_format)
+            
+                loopSegment.segment_folder_images()
+                
+                print('\n','blobs found:', len(loopSegment.blobs))
+                
+                # saving the semented blobs:
+                if save_name is not None and type(save_name)==str:
+                    cwd_ls = os.listdir(os.getcwd())
+                    if save_name in cwd_ls or os.path.exists(save_name):
+                        print('\n The file name "%s" already exists in'%save_name)
+                        print(' the working directory. Should I save anyways?')
+                        usr = input('(1=yes, else=no)')
+                        if usr == '1':
+                            loopSegment.save_results(save_name)
+                            print('\nfile saved.')
+                        else:
+                            print('\nskipped saving')
+                        
+                    else:
+                        loopSegment.save_results(save_name)
+                        print('\nfile saved.')    
+                print('\nDone.\n')
+                
+            
+            
+            # segmenting the image if there is only 1 frames
+            if N_img == 1:
+                print('\n','starting segmentation on a single image.')
+                if single_img_name not in image_files:
+                    in_ = os.path.join(dirname,single_img_name)
+                    msg = 'Image %s not found in the directory.'%in_
+                    raise ValueError(msg)
+                
+                if type(remove_BG)==str:
+                    print('\n','using given background image')
+                    BG = imread(remove_BG)*1.0
+                elif remove_BG==True:
+                    print('\n','calculating background image')
+                    BG = calculate_BG_image(dirname, ext)
+                else:
+                    BG=None
+                    
+                print('\n','segmenting image: %s'%single_img_name)
+                particleSegment = particle_segmentation(image0, 
+                                                        particle_size=p_size,
+                                                        sigma=sigma, 
+                                                        median=median,
+                                                        BG_image=BG,
+                                                        EQ_map=eq_map,
+                                                        DoG_sigma=DoG_sigmas,
+                                                        threshold=threshold, 
+                                                        local_filter=local_filter, 
+                                                        max_xsize=max_xsize, 
+                                                        max_ysize=max_ysize,
+                                                        max_mass=max_mass,
+                                                        min_xsize=min_xsize, 
+                                                        min_ysize=min_ysize,
+                                                        min_mass=min_mass,
+                                                        mask=mask,
+                                                        method=method)
+                particleSegment.get_blobs()
+                particleSegment.apply_blobs_size_filter()
+                
+                print('blobs found:', len(particleSegment.blobs))
+                
+                if plot_res:
+                    from matplotlib.pyplot import show
+                    particleSegment.plot_blobs()
+                    show()
+                    
+                    
+                # Saving the segmented blobs:
+                if save_name is not None and type(save_name)==str:
+                    cwd_ls = os.listdir(os.getcwd())
+                    if save_name in cwd_ls or os.path.exists(save_name):
+                        print('\n The file name "%s" already exists in'%save_name)
+                        print(' the working directory. Should I save anyways?')
+                        usr = input('(1=yes, else=no)')
+                        if usr == '1':
+                            particleSegment.save_results(save_name)
+                            print('\nfile saved.')
+                        else:
+                            print('\nskipped saving')
+                    else:
+                        particleSegment.save_results(save_name)
+                        print('\nfile saved.')
+                    
+                print('\nDone.\n')
+                
+            
+        elif shape=='fibers':
+            
+            from myptv.fibers.fiber_segmentation_mod import fiber_segmentation
+            from myptv.fibers.fiber_segmentation_mod import loop_fiber_segmentation
+            
+            # segmenting the image if there are more than 1 frames
+            if N_img is None or N_img>1:
+                
+                if type(remove_BG)==str:
+                    print('\n','using given background image')
+                    BG = imread(remove_BG)*1.0
+                elif remove_BG==True:
+                    print('\n','calculating background image')
+                    BG = calculate_BG_image(dirname, ext)
+                else:
+                    BG=False
+                    
+                loopSegment = loop_fiber_segmentation(dirname, 
+                                                particle_size=p_size,
+                                                extension=ext,
+                                                image_start=image_start,
+                                                N_img=N_img, 
+                                                sigma=sigma,
+                                                remove_ststic_BG=BG,
+                                                median=median,
+                                                threshold=threshold, 
+                                                local_filter=local_filter, 
+                                                max_xsize=max_xsize, 
+                                                max_ysize=max_ysize,
+                                                max_mass=max_mass,
+                                                min_xsize=min_xsize, 
+                                                min_ysize=min_ysize,
+                                                min_mass=min_mass,
+                                                mask=mask,
+                                                method=method,
+                                                raw_format=raw_format,
+                                                pca_limit=pca_limit)
+                
+                loopSegment.segment_folder_images()
+                
+                print('\n','blobs found:', len(loopSegment.blobs))
+                
+                # saving the semented blobs:
+                if save_name is not None and type(save_name)==str:
+                    cwd_ls = os.listdir(os.getcwd())
+                    if save_name in cwd_ls or os.path.exists(save_name):
+                        print('\n The file name "%s" already exists in'%save_name)
+                        print(' the working directory. Should I save anyways?')
+                        usr = input('(1=yes, else=no)')
+                        if usr == '1':
+                            loopSegment.save_results(save_name)
+                            loopSegment.save_results_direction(save_name+'_directions')
+                            print('\nfile saved.')
+                        else:
+                            print('\nskipped saving')
+                        
+                    else:
+                        loopSegment.save_results(save_name)
+                        loopSegment.save_results_direction(save_name+'_directions')
+                        print('\nfile saved.')    
+                print('\nDone.\n')
+                
+            
+            
+            # segmenting the image if there is only 1 frames
+            if N_img == 1:
+                print('\n','starting segmentation on a single image.')
+                if single_img_name not in image_files:
+                    in_ = os.path.join(dirname,single_img_name)
+                    msg = 'Image %s not found in the directory.'%in_
+                    raise ValueError(msg)
+                
+                if type(remove_BG)==str:
+                    print('\n','using given background image')
+                    BG = imread(remove_BG)*1.0
+                elif remove_BG==True:
+                    print('\n','calculating background image')
+                    BG = calculate_BG_image(dirname, ext)
+                else:
+                    BG=None
+                
+                print('\n','segmenting image: %s'%single_img_name)
+                particleSegment = fiber_segmentation(image0, 
+                                                        particle_size=p_size,
+                                                        sigma=sigma, 
+                                                        median=median,
+                                                        BG_image=BG,
+                                                        threshold=threshold, 
+                                                        local_filter=local_filter, 
+                                                        max_xsize=max_xsize, 
+                                                        max_ysize=max_ysize,
+                                                        max_mass=max_mass,
+                                                        min_xsize=min_xsize, 
+                                                        min_ysize=min_ysize,
+                                                        min_mass=min_mass,
+                                                        mask=mask,
+                                                        method=method,
+                                                        pca_limit=pca_limit)
+                
+                particleSegment.get_blobs()
+                particleSegment.apply_blobs_size_filter()
+                
+                print('blobs found:', len(particleSegment.blobs))
+                
+                if plot_res:
+                    from matplotlib.pyplot import show
+                    particleSegment.plot_blobs(scale=arrow_scale)
+                    show()
+                    
+                    
+                # Saving the segmented blobs:
+                if save_name is not None and type(save_name)==str:
+                    cwd_ls = os.listdir(os.getcwd())
+                    if save_name in cwd_ls or os.path.exists(save_name):
+                        print('\n The file name "%s" already exists in'%save_name)
+                        print(' the working directory. Should I save anyways?')
+                        usr = input('(1=yes, else=no)')
+                        if usr == '1':
+                            particleSegment.save_results(save_name)
+                            particleSegment.save_results_direction(save_name+'_directions')
+                            print('\nfile saved.')
+                        else:
+                            print('\nskipped saving')
+                    else:
+                        particleSegment.save_results(save_name)
+                        particleSegment.save_results_direction(save_name+'_directions')
+                        print('\nfile saved.')
+                    
+                print('\nDone.\n')
+            
+            
+            
+            
+    def do_matching(self):
+        '''
+        Will perform the stereo matching with the file given parameters
+        '''
+        from myptv.particle_matching_mod import matching_with_marching_particles_algorithm
+        from myptv.imaging_mod import camera_wrapper, img_system
+        from os import getcwd, listdir
+        from os.path import exists as pathExists
+        from time import localtime, strftime
+        
+        
+        # fetching the parameters
+        blob_fn = self.get_param('matching', 'blob_files')
+        blob_fn = [val.strip() for val in blob_fn.split(',')]
+        cam_names = self.get_param('matching', 'camera_names')
+        cam_names = [val.strip() for val in cam_names.split(',')]
+        # res = self.get_param('matching', 'cam_resolution')
+        # res = tuple([float(val) for val in res.split(',')])
+        ROI = self.get_param('matching', 'ROI').split(',')
+        ROI = [float(ROI[i]) for i in range(6)]
+        voxel_size = self.get_param('matching', 'voxel_size')
+        N0 = self.get_param('matching', 'N0')
+        max_err = self.get_param('matching', 'max_err')
+        min_cam_match = self.get_param('matching', 'min_cam_match')
+        frame_start = self.get_param('matching', 'frame_start')
+        N_frames = self.get_param('matching', 'N_frames')
+        march_forwards = self.get_param('matching', 'march_forwards')
+        march_backwards = self.get_param('matching', 'march_backwards')
+        save_name = self.get_param('matching', 'save_name')
+        
+        
+        if N0==0 and voxel_size==None:
+            raise ValueError('No initial guess method given (N0=0, voxel_size=None)')
+        
+        if min_cam_match<2:
+            raise ValueError('min_cam_match needs to be at least 2.')
+        
+        # setting up the img_system 
+        cams = [camera_wrapper(cn,'./') for cn in cam_names]
+        for cam in cams:
+            try:
+                cam.load()
+            except:
+                raise ValueError('camera file %s not found'%cam.name)
+        imsys = img_system(cams)
+        
+        
+        mps = matching_with_marching_particles_algorithm(imsys, 
+                                               blob_fn, 
+                                               max_err, 
+                                               ROI,
+                                               N0,
+                                               voxel_size,
+                                               min_cam_match=min_cam_match,
+                                               reverse_eta_zeta=True)
+
+        
+        
+        # setting the frame range to match
+        ts = int(mps.frames[0])
+        te = int(mps.frames[-1])
+        print('segmented particles time range: %d -> %d'%(ts,te),'\n')
+        
+        if frame_start is not None:
+            if frame_start>=ts and frame_start <=te:
+                ts = frame_start
+            else: 
+                raise ValueError('frame_start outside the available frame range')
+        
+        if N_frames is None:
+            frames = range(ts, te+1)
+        else:
+            try:
+                frames = range(ts, ts+N_frames)
+            except:
+                tp = type(frames)
+                msg = 'N_frames must be an integer or None (given %s).'%tp
+                raise TypeError(msg)
+                
+                
+        # mathing
+        print('Starting stereo-matching at: ', strftime("%H:%M:%S", localtime()))
+        
+        if march_forwards==True:
+            print('Matching forwards. Frames: %d -> %d'%(frames[0], frames[-1]))
+            for f in frames:
+                mps.match_frame(f)
+                
+        if march_backwards==True:
+            print('\n','Matching backwards. Frames: %d -> %d'%(frames[-1], frames[0]))
+            for f in frames[::-1]:
+                mps.match_frame(f)
+        
+        
+        
+        # print matching statistics
+        print('')
+        print('Finished! \n')
+        print('particles matched: %d \n'%(len(mps.matches)))
+        
+        Nframes = len(frames)
+        c4 = sum([1 for p in mps.matches if len(p[1])==4]) / Nframes
+        print('quadruplets: %.1f per frame'%c4)
+        c3 = sum([1 for p in mps.matches if len(p[1])==3]) / Nframes
+        print('triplets: %.1f per frame'%c3)
+        c2 = sum([1 for p in mps.matches if len(p[1])==2]) / Nframes
+        print('pairs: %.1f per frame \n'%c2)
+        
+        
+        # save the results
+        if save_name is not None:
+            cwd_ls = listdir(getcwd())
+            if save_name in cwd_ls or pathExists(save_name):
+                print('\n The file name "%s" already exists in'%save_name)
+                print(' the working directory. Should I save anyways?')
+                usr = input('(1=yes, else=no)')
+                if usr == '1':
+                    print('\n','saving file.')
+                    mps.save_particles(save_name)
+                else:
+                    print('\n','skiped saving.')
+                
+            else:
+                print('\n','saving file.')
+                mps.save_particles(save_name)
+        
+        print('\n', 'Finished Matching.\n')
+            
+        
+        
+    def do_analyze_disparity(self):
+        '''
+        Will run the matching_quality_GUI from 
+        myptv -> makePlots -> quality_estimators.
+        '''
+        from myptv.makePlots.quality_estimators import matching_quality_GUI
+        from myptv.imaging_mod import camera_wrapper, img_system
+        
+        # fetching parameters
+        blob_files = self.get_param('analyze_disparity', 'blob_files')
+        blob_files = [val.strip() for val in blob_files.split(',')]
+        particle_filename = self.get_param('analyze_disparity', 'particle_filename')
+        camera_names = self.get_param('analyze_disparity', 'camera_names')
+        camera_names = [val.strip() for val in camera_names.split(',')]
+        max_err = self.get_param('analyze_disparity', 'max_err')
+        min_cam_match = self.get_param('analyze_disparity', 'min_cam_match')
+        
+        
+        cams = [camera_wrapper(cn, './') for cn in camera_names]
+        for c in cams: c.load()
+        imsys = img_system(cams)
+        dmax = max_err
+        min_cam_match = min_cam_match
+    
+        G = matching_quality_GUI(imsys, blob_files, particle_filename, dmax, 
+                                 min_cam_match=min_cam_match)
+        
+        
+        
+    def do_tracking(self):
+        '''
+        Will perform the tracking using the file given parameters.
+        '''
+        from myptv.tracking_mod import tracker_four_frames, tracker_multiframe
+        from myptv.tracking_mod import traj_NSR, fill_in_trajectory
+        from numpy import array
+        from os import getcwd, listdir
+        from os.path import exists as pathExists
+        
+        # fetching parameters
+        particles_fm = self.get_param('tracking', 'particles_file_name')
+        frame_start = self.get_param('tracking', 'frame_start')
+        N_frames = self.get_param('tracking', 'N_frames')
+        d_max = self.get_param('tracking', 'd_max')
+        dv_max = self.get_param('tracking', 'dv_max')
+        mean_flow = self.get_param('tracking', 'mean_flow')
+        candidate_graph = self.get_param('tracking', 'plot_candidate_graph')
+        save_name = self.get_param('tracking', 'save_name')
+        
+        method = self.get_param('tracking', 'method')
+        max_dt = self.get_param('tracking', 'max_dt')
+        Ns = self.get_param('tracking', 'Ns')
+        NSR_th = self.get_param('tracking', 'NSR_threshold')
+        
+        
+        if method not in ['multiframe', 'fourframe']:
+            raise ValueError("method can only be 'multiframe' or 'four_frame'.")
+        
+        
+        if method=='fourframe':
+            
+            # initiate the tracker
+            t4f = tracker_four_frames(particles_fm, 
+                                      d_max=d_max, 
+                                      dv_max=dv_max,
+                                      mean_flow=array(mean_flow),
+                                      store_candidates = candidate_graph)
+            
+            #setting up the frame range
+            ts = int(t4f.times[0])
+            te = int(t4f.times[-1])
+            
+            print('available particles time range: %d -> %d'%(ts,te),'\n')
+            
+            if candidate_graph and (te-ts)>100:
+                print('Warning: you are about to plot a candidate graph with')
+                print('more than 100 frames.')
+                ans = input('Do you wish to proceed (1 = Yes , else = No)?  ')
+                
+                if ans=='1':
+                    pass
+                
+                else:
+                    print('quitting ')
+                    return None
+                
+            
+            if frame_start is not None:
+                if frame_start>=ts and frame_start <=te:
+                    ts = frame_start
+                else: 
+                    print('Warning: frame_start outside the available frame range')
+                    #raise ValueError('frame_start outside the available frame range')
+            
+            if N_frames is None:
+                frames = range(ts, te)
+            else:
+                try:
+                    frames = range(ts, ts+N_frames)
+                except:
+                    tp = type(frames)
+                    msg = 'N_frames must be an integer or None (given %s).'%tp
+                    raise TypeError(msg)
+            
+            # do the tracking
+            t4f.track_all_frames(frames=frames)
+            
+            # print some statistics
+            tr = array(t4f.return_connected_particles())
+            untracked = len(tr[tr[:,0]==-1])
+            tot = len(tr)
+            print('untracked fraction:', untracked/tot)
+            print('tracked per frame:', (tot-untracked)/len(set(tr[:,-1])))
+            
+            if candidate_graph:
+                t4f.plot_candidate_graph()
+        
+        
+        
+        
+        
+        
+        elif method=='multiframe':
+            
+            tmf = tracker_multiframe(particles_fm, max_dt, Ns, 
+                                     d_max=d_max, dv_max=dv_max, 
+                                     NSR_th=NSR_th, 
+                                     mean_flow=array(mean_flow))
+            
+            #setting up the frame range
+            ts = int(tmf.times[0])
+            te = int(tmf.times[-1])
+            print('available particles time range: %d -> %d'%(ts,te),'\n')
+            
+            if candidate_graph:
+                print('\nNote, candidate graph can only be plotted with')
+                print('fourframe tracker, so it is skipped.')
+            
+            
+            if frame_start is not None:
+                if frame_start>=ts and frame_start <=te:
+                    ts = frame_start
+                else: 
+                    print('Warning: frame_start outside the available frame range')
+                    #raise ValueError('frame_start outside the available frame range')
+            
+            if N_frames is None:
+                frames = range(ts, te)
+            else:
+                try:
+                    frames = range(ts, ts+N_frames)
+                except:
+                    tp = type(frames)
+                    msg = 'N_frames must be an integer or None (given %s).'%tp
+                    raise TypeError(msg)
+            
+            
+            # doing the tracking
+            if type(Ns)==list: 
+                frame_skips = max([int(min(Ns)/3), 1])
+                if any([ns%2==0 for ns in Ns]):
+                    raise ValueError('Ns needs to have only odd integers')
+                
+            else: frame_skips = max([int(Ns/3), 1])
+            tmf.track_frames(f0=ts, fe=te, frame_skips=frame_skips, Ns=Ns)
+            
+            # interpolating missing points
+            tmf.interpolate_trajs()
+            
+
+        
+        # save the results
+        if save_name is not None:
+            cwd_ls = listdir(getcwd())
+            if save_name in cwd_ls or pathExists(save_name):
+                print('\n The file name "%s" already exists in'%save_name)
+                print(' the working directory. Should I save anyways?')
+                usr = input('(1=yes, else=no)')
+                if usr == '1':
+                    print('\n','saving file.')
+                    if method=='fourframe': t4f.save_results(save_name)
+                    elif method=='multiframe': tmf.save_results(save_name)
+                
+                else:
+                    print('\n', 'skipped saving.')
+            
+            else:
+                print('\n','saving file.')
+                if method=='fourframe': t4f.save_results(save_name)
+                elif method=='multiframe': tmf.save_results(save_name)
+        
+        print('\n', 'Finished tracking.')
+        
+        
+        
+        
+        
+        
+    def do_smoothing(self):
+        '''
+        Will smooth the trajectories using the specified file given paramters.
+        '''
+        from numpy import loadtxt
+        from myptv.traj_smoothing_mod import smooth_trajectories
+        from os import getcwd, listdir
+        from os.path import exists as pathExists
+        
+        # fetching the smoothing parameters
+        trajectory_file = self.get_param('smoothing', 'trajectory_file')
+        window = self.get_param('smoothing', 'window_size')
+        polyorder = self.get_param('smoothing', 'polynom_order')
+        min_traj_length = self.get_param('smoothing', 'min_traj_length')
+        repetitions = self.get_param('smoothing', 'repetitions')
+        save_name = self.get_param('smoothing', 'save_name')
+        
+        if min_traj_length <= polyorder:
+            raise ValueError('min_traj_length must be larger than polyorder')
+
+        traj_list = loadtxt(trajectory_file)
+        
+        
+        # smoothing the trajectories     
+        print('Starting to smooth trajectories.')
+        sm = smooth_trajectories(traj_list, 
+                                 window, 
+                                 polyorder,
+                                 repetitions=repetitions,
+                                 min_traj_length=min_traj_length)
+        sm.smooth()
+        
+        # saving the data
+        if save_name is not None:
+            cwd_ls = listdir(getcwd())
+            if save_name in cwd_ls or pathExists(save_name):
+                print('\n The file name "%s" already exists in'%save_name)
+                print(' the working directory. Should I save anyways?')
+                usr = input('(1=yes, else=no)')
+                if usr == '1':
+                    print('\n', 'Saving the smoothed data (%s).'%save_name)
+                    sm.save_results(save_name)
+                else:
+                    print('\n', 'Skipped saving file.')
+            
+            else:
+                print('\n', 'Saving the smoothed data (%s).'%save_name)
+                sm.save_results(save_name)
+        
+        print('\n', 'Done.')
+        
+        
+    
+    
+    def do_stitching(self):
+        '''
+        Will perfrom trajectory stitching using the file given parameters.
+        '''
+        from numpy import loadtxt
+        from myptv.traj_stitching_mod import traj_stitching
+        from os import getcwd, listdir
+        from os.path import exists as pathExists
+        
+        # fetchhing the stitching parameters
+        trajectory_file = self.get_param('stitching', 'trajectory_file')
+        Ts = self.get_param('stitching', 'max_time_separation')
+        dm = self.get_param('stitching', 'max_distance')
+        save_name = self.get_param('stitching', 'save_name')
+        
+        traj_list = loadtxt(trajectory_file)
+        
+        # stitch the trajectories
+        ts = traj_stitching(traj_list, Ts, dm)
+        ts.stitch_trajectories()
+        
+        # saving the data
+        if save_name is not None:
+            cwd_ls = listdir(getcwd())
+            if save_name in cwd_ls or pathExists(save_name):
+                print('\n The file name "%s" already exists in'%save_name)
+                print(' the working directory. Should I save anyways?')
+                usr = input('(1=yes, else=no)')
+                if usr == '1':
+                    print('\n', 'Saveing the data.')    
+                    ts.save_results(save_name)
+                else:
+                    print('\n', 'Skipped saving file.')
+            
+            else:
+                print('\n', 'Saveing the data.')    
+                ts.save_results(save_name)
+        
+        print('\n', 'Done.')
+        
+        
+        
+    def do_2d_tracking(self):
+        '''
+        Will perform 2D tracking of segmented blobs using give data.
+        '''
+            
+        from myptv.imaging_mod import camera
+        from myptv.tracking_2D_mod import track_2D
+        
+        # fetchhing the stitching parameters
+        fname = self.get_param('2D_tracking', 'blob_file')
+        frame_start = self.get_param('2D_tracking', 'frame_start')
+        N_frames = self.get_param('2D_tracking', 'N_frames')
+        cam_name = self.get_param('2D_tracking', 'camera_name')
+        res = self.get_param('2D_tracking', 'camera_resolution')
+        res = tuple([float(val) for val in res.split(',')])
+        z_particles = self.get_param('2D_tracking', 'z_particles')
+        d_max = self.get_param('2D_tracking', 'd_max')
+        dv_max = self.get_param('2D_tracking', 'dv_max')
+        save_name = self.get_param('2D_tracking', 'save_name')
+
+        print('\ninitiating 2D tracking...')
+
+        cam = camera(cam_name, res)
+        cam.load('')
+        
+        print('\nloading blobs and transforming to lab-space coordinates')
+        t2d = track_2D(cam, fname, z_particles, d_max=d_max, dv_max = dv_max, 
+                       reverse_eta_zeta=True)
+        
+        t2d.blobs_to_particles()
+        
+        
+        #setting up the frame range
+        ts = int(t2d.times[0])
+        te = int(t2d.times[-1])
+        
+        print('\navailable particles time range: %d -> %d'%(ts,te),'\n')
+        
+        if frame_start is not None:
+            if frame_start>=ts and frame_start <=te:
+                ts = frame_start
+            else: 
+                print('Warning: frame_start outside the available frame range')
+                #raise ValueError('frame_start outside the available frame range')
+        
+        if N_frames is None:
+            frames = range(ts, te)
+        else:
+            try:
+                frames = range(ts, ts+N_frames)
+            except:
+                tp = type(frames)
+                msg = 'N_frames must be an integer or None (given %s).'%tp
+                raise TypeError(msg)
+        
+        
+        print('\ntrackin particles...')
+        
+        t2d.track_all_frames(frames=frames)
+        
+        print('\nsaving results...')
+        
+        t2d.save_results(save_name)
+        
+        print('\nDone!')
+        
+        
+    
+    def do_manual_matching(self):
+        '''
+        Runs a GUI that helps performing manual stereo-matching of
+        points from images. You simply click on the images from different
+        cameras and the GUI gives back the 3D coordinates of this point. 
+        '''
+        from myptv.gui_manual_matching import man_match_gui
+        
+        # fetchhing the stitching parameters
+        camera_names = self.get_param('manual_matching_GUI', 'cameras')
+        im_fname = self.get_param('manual_matching_GUI', 'images')
+        
+        print(camera_names)
+        print(im_fname)
+        
+        gui = man_match_gui(camera_names, im_fname, cameras_folder='.')
+    
+        
+    
+    
+    
+    
+    def do_orientations(self):
+        '''
+        A part of Eric Aschari's Fiber tracking extension (MyFTV):
+            
+        Will perform a fiber orientation analysis
+        '''
+        from numpy import loadtxt, empty, array, zeros, pi, sign, savetxt
+        from numpy import abs as absnp
+        from numpy.linalg import norm
+        from pandas import read_csv
+        from myptv.fibers.fiber_orientation_mod import FiberOrientation
+        from myptv.imaging_mod import camera, img_system
+        # from myptv.particle_matching_mod import match_blob_files
+    
+        
+        # fetching the parameters
+        blob_fn = self.get_param('fiber_orientations', 'blob_files')
+        blob_fn = [val.strip() for val in blob_fn.split(',')]
+        cam_names = self.get_param('fiber_orientations', 'camera_names')
+        cam_names = [val.strip() for val in cam_names.split(',')]
+        res = self.get_param('fiber_orientations', 'cam_resolution')
+        res = tuple([float(val) for val in res.split(',')])
+        trajectory_file = self.get_param('fiber_orientations','trajectory_file')
+        
+        save_name = self.get_param('fiber_orientations', 'save_name')
+        print(save_name)
+        # setting up the img_system 
+        cams = [camera(cn, res) for cn in cam_names]
+        for cam in cams:
+            try:
+                cam.load('')
+            except:
+                raise ValueError('camera file %s not found'%cam.name)
+        imsys = img_system(cams)
+        # fibers = loadtxt(fibers_file)
+        trajectories = loadtxt(trajectory_file)
+        
+        oris = empty((len(trajectories[:,0]),8))
+        shape = (3,1)
+        blobs = []
+        for fn in blob_fn:
+            blobs.append(array(read_csv(fn, sep='\t', header=None)))
+
+        count = 0
+        for frame in range(int(trajectories[-1,-1])+1):
+            
+            frame_trajectories = [line for line in trajectories if line[7] == frame]
+
+            for line in range(len(frame_trajectories)):    
+                X = array([zeros(shape),zeros(shape)])
+                B = array([zeros(shape),zeros(shape)])
+                
+                n_x_prev = 0
+                n_y_prev = 0
+                n_z_prev = 0
+                
+                for cam in range(2):
+                    
+                    frame_blobs = [line for line in blobs[cam] if line[5] == frame]
+                    reso = cams[cam].resolution[0]
+                    index = int(frame_trajectories[line][4+cam])
+                    
+                    x_corr = cams[cam].xh
+                    y_corr = cams[cam].yh
+                    
+                    temp1_x = (frame_blobs[index][0]) - (reso/2. + x_corr)
+                    temp1_b = temp1_x + frame_blobs[index][6]*100
+                    
+                    temp2_x = (frame_blobs[index][1]) - (reso/2. + y_corr)
+                    temp2_b = temp2_x + frame_blobs[index][7]*100
+                    
+                    # coordinate transformation
+                    X[cam][0,0] = temp2_x
+                    B[cam][0,0] = temp2_b
+                    
+                    X[cam][1,0] = temp1_x
+                    B[cam][1,0] = temp1_b
+                    
+                # get orientations
+                o = FiberOrientation(X, B)
+                c,u,ori = o.image2fiber(imsys.cameras)
+                ori = ori/pi*180
+                u /= norm(u)
+                
+                if line == 0:
+                    n_x_prev = u[0]
+                    n_y_prev = u[1]
+                    n_z_prev = u[2]
+                
+                # correct sign
+                value = 0.2
+                if absnp(absnp(u[0]) - absnp(n_x_prev)) < value and sign(u[0]) != sign(n_x_prev):
+                    u[0] *= -1
+                if absnp(absnp(u[1]) - absnp(n_y_prev)) < value and sign(u[1]) != sign(n_y_prev):
+                    u[1] *= -1
+                if absnp(absnp(u[2]) - absnp(n_z_prev)) < value and sign(u[2]) != sign(n_z_prev):
+                    u[2] *= -1
+                
+                n_x_prev = u[0]
+                n_y_prev = u[1]
+                n_z_prev = u[2]
+            
+                temp = frame_trajectories[line]
+
+                temp[1] = u[0]
+                temp[2] = u[1]
+                temp[3] = u[2]
+
+                oris[count] = temp
+                count += 1
+
+                
+                
+        # saving the data
+        if save_name is not None:
+            print('\n', 'Saving the data.')    
+            # o.save_results(save_name, oris)
+            savetxt(save_name, oris, fmt = 
+                       ['%d', '%.3f', '%.3f', '%.3f', '%d', '%d', '%.2f', '%.2f'], delimiter='\t')
+        print('\n', 'Done.')
+    
+    
+    
+    
+    
+    def do_plot_trajectories(self):
+        '''
+        This function is used to generate a 3D plot of the trajectories in 
+        a given file.
+        '''
+        from myptv.makePlots.plot_trajectories import plot_trajectories
+        
+        # fetching the parameters
+        file_name = self.get_param('plot_trajectories', 'file_name')
+        min_length = self.get_param('plot_trajectories', 'min_length')
+        write_trajID = self.get_param('plot_trajectories', 'write_trajID')
+        t0 = self.get_param('plot_trajectories', 't0')
+        te = self.get_param('plot_trajectories', 'te')
+        
+        plot_trajectories(file_name, 
+                          min_length, 
+                          write_trajID=write_trajID, 
+                          t0=t0, 
+                          te=te)
+    
+    
+    
+    def do_animate_trajectories(self):
+        '''
+        This function is used to generate a 3D animation of the trajectories
+        in a given file.
+        '''
+        from myptv.makePlots.plot_trajectories import animate_trajectories
+        
+        # fetching the parameters
+        fname = self.get_param('animate_trajectories', 'file_name')
+        min_length = self.get_param('animate_trajectories', 'min_length')
+        f0 = self.get_param('animate_trajectories', 'f_start')
+        fe = self.get_param('animate_trajectories', 'f_end')
+        fps = self.get_param('animate_trajectories', 'fps')
+        tail_length = self.get_param('animate_trajectories', 'tail_length')
+        elevation = self.get_param('animate_trajectories', 'elevation')
+        azimoth = self.get_param('animate_trajectories', 'azimoth')
+        rotation_rate= self.get_param('animate_trajectories', 'rotation_rate')
+                 
+        
+        at = animate_trajectories(fname, min_length, fps=fps, 
+                                  tail_length=tail_length, 
+                                  f0=f0, fe=fe,
+                                  view_angles = (elevation, azimoth), 
+                                  rotation_rate = rotation_rate)
+        at.animate()
+        
+        print('')
+        print('animation saved. Done!')
+    
+    
+    
+    
+        
+    def do_run_extention(self):
+        '''
+        This is an option to load extrenal extentions to MyPTV. Get it done
+        by setting the propper parameters in the params_file.
+        '''
+        
+        # fetchhing the stitching parameters
+        path_to_extention = self.get_param('run_extention', 'path_to_extention')
+        action_name = self.get_param('run_extention', 'action_name')
+        extention_params_file = self.get_param('run_extention', 'extention_params_file')
+        
+        # 1) import the script  "path_to_extention"
+        
+        # 2) load the extensions' parameter from extention_params_file
+        
+        # 3) run the class given as action_name, with the parameter given
+        
+        
+        return None
+        
+    
+    
+    
+    # ========================================================================
+    # /\/\//\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/
+    #  Legacy functions that are no longer needed due to the cal_gui
+    # /\/\//\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/
+    # ========================================================================
+    
+    def match_target_file(self):
+        '''
+        This function is used to match calibration points to a target file.
+        '''
+        from myptv.imaging_mod import camera
+        from myptv.utils import match_calibration_blobs_and_points
+        from matplotlib.pyplot import show
+        
+        # fetch parameters from the file
+        cam_name = self.get_param('calibration', 'camera_name')
+        points_file = self.get_param('calibration', 'calibration_points_file')
+        target_file = self.get_param('calibration', 'target_file')
+        segmented_file = self.get_param('calibration', 'segmented_points_file')
+        res = self.get_param('calibration', 'resolution').split(',')
+        res = (float(res[0]), float(res[1]))
+        
+        print('Matching target file and segmental calibration points')
+        print('for camera: %s'%cam_name)
+        # initiate the camera
+        cam = camera(cam_name, res)
+        cam.load('.')
+        
+        # match the points
+        mtf = match_calibration_blobs_and_points(cam,
+                                                 segmented_file,
+                                                 target_file)
+        mtf.pair_points()
+    
+        # plot the pairs
+        mtf.plot_projections()
+        show()
+        
+        print('Please confirm that the points were pairs correctly')
+        print("in the figure, by making sure that the blue points")
+        print("and the red x's are close to each other." ,'\n')
+        
+        print("To confirm and save the calibration point file, enter '1'")
+        print("If there are errors, enter '2' and improve the initial calibration.")
+        user = input()
+        
+        if user == '1':
+            mtf.save_results(points_file)
+            print('\n', 'file saved', '\n')
+        
+        elif user == '2':
+            print('\n', 'file not saved', '\n')
+        
+        else:
+            print('\n','unrecognized command. Leaving the workflow.', '\n')
+            
+        print('Done.')
+        
+        
+    
+    
+    
+    def calibration_sequence(self):
+        '''
+        Starts a sequence to guide users through the calibration process.
+        '''
+        from myptv.imaging_mod import camera
+        from myptv.calibrate_mod import calibrate
+        from os import listdir
+        from os.path import isfile
+        #from matplotlib.pyplot import subplots, show, imread
+        
+        # fetch parameters from the file
+        cam_name = self.get_param('calibration', 'camera_name')
+        blob_file = self.get_param('calibration', 'calibration_points_file')
+        cal_image = self.get_param('calibration', 'calibration_image')
+        res = self.get_param('calibration', 'resolution').split(',')
+        res = (float(res[0]), float(res[1]))
+        
+        
+        # checking that a camera file in the working directory
+        ls = listdir('.')                
+        
+        # if the file is found, start calibration sequence
+        if cam_name in ls:
+            print('Starting calibration sequence.')
+            
+            try:
+                cam = camera(cam_name, res, cal_points_fname = blob_file)
+            except:
+                print('\n','Calibration point file (%s) not found!'%blob_file)
+                print('\n','Would you like to start the calibration point gui?')
+                user = input('1=yes,  else=no : ')
+                if user == '1':
+                    self.calibration_point_gui()  
+                else:
+                    print('quitting...')
+                return 
+            
+            cam.load('.')
+            print('camera data loaded successfully.')
+            cal = calibrate(cam, cam.lab_points, cam.image_points)
+            print('initial error: %.3f pixels\n'%(cal.mean_squared_err()))
+            
+            
+            print('starting calibratino GIU\n')
+            from myptv.gui_final_cal import cal_gui
+            gui = cal_gui(cal, cal_image)
+                    
+            
+        # if not, generate an empty file camera file
+        else:
+            print('')
+            print('camera files not detected in the working directory.')
+            print('Generating a new empty file and leaving calib. sequence.')
+            print('To continue calibration, fill in an initial guess in the')
+            print('empty file, and then run again the calibration sequence.')
+            cam = camera(cam_name, res)
+            cam.save('.')
+            print('\n', 'Done.')
+    
+    
+    
+    
+    def calibration_point_gui(self):
+        '''
+        This will start the calibration segmentation point gui.
+        '''
+        from myptv.cal_point_gui import cal_point_gui
+        
+        # fetch parameters from the file
+        blob_file = self.get_param('calibration', 'calibration_points_file')
+        cal_image = self.get_param('calibration', 'calibration_image')
+        res = self.get_param('calibration', 'resolution').split(',')
+        res = (float(res[0]), float(res[1]))
+        
+        print('\n', 'Starting calibration point segmentation GUI', '\n')
+        gui = cal_point_gui(cal_image, blob_file)
+        
+        
+    # ========================================================================
+    # /\/\//\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/
+    #                         End of legacy functions
+    # /\/\//\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/
+    # ========================================================================
+    
+    
+#%%
+        
+        
+        
+
+
+if __name__ == '__main__':
+    
+    import sys
+    fname, action = sys.argv[1], sys.argv[2]
+    print('\n','given inputs -')
+    print('params file name:', fname)
+    print('action:', action, '\n')
+    wf = workflow(fname, action)
+    
+    
+    
+    
+    
+
