@@ -636,6 +636,13 @@ class workflow(object):
         N_img = self.get_param('calculate_BG_image', 'N_img')
         savename = self.get_param('calculate_BG_image', 'save_name')
         
+        # New parameter
+        try:
+            iterations = self.get_param('calculate_BG_image', 'iterations')
+            if iterations is None: iterations = 1
+        except:
+            iterations = 1
+        
         if savename is not None:
             cwd_ls = os.listdir(os.getcwd())
             if savename in cwd_ls or os.path.exists(savename):
@@ -647,7 +654,7 @@ class workflow(object):
                     return
         
         calculate_BG_image(dirname, ext, savename, N_img=N_img,
-                       raw_format=raw_format)
+                       raw_format=raw_format, iterations=iterations)
         
         
     
@@ -728,6 +735,12 @@ class workflow(object):
             pca_limit = self.get_param('segmentation', 'pca_limit')
         except:
             pca_limit = 1.0
+
+        try:
+            bg_iterations = self.get_param('segmentation', 'bg_iterations')
+            if bg_iterations is None: bg_iterations = 1
+        except:
+            bg_iterations = 1
         
         # Pre-check the save directory
         if save_name is not None:
@@ -799,14 +812,14 @@ class workflow(object):
                 raise TypeError('DoG not implemented yet for fibers; use None')
             
             
-        def calculate_BG_image(dirname, extension):
+        def calculate_BG_image(dirname, extension, iterations=1):
             '''
-            Calculates the background of images, defined as the median over a
-            subsample of 200 images from the image folder.
+            Calculates the background of images, defined as the iterative median
+            over a subsample of 200 images from the image folder.
             '''
             import os
+            import numpy as np
             from skimage import io
-            from numpy import median
             
             print('\ncalculating background...')
             
@@ -817,15 +830,26 @@ class workflow(object):
             image_files = [os.path.join(dirname, fn) for fn in image_files]
             
             if len(image_files)<=200:
-                ic = io.ImageCollection(image_files)
-                
+                im_paths = image_files
             else:
-                ic = io.ImageCollection(
-                            image_files[::int(len(image_files)/400+1)][:200])
+                im_paths = image_files[::int(len(image_files)/400+1)][:200]
             
-            BG = median(ic, axis=0)
+            # Load images into memory as float32
+            images = []
+            for path in im_paths:
+                images.append(io.imread(path).astype('float32'))
+            images = np.array(images)
             
-            return BG
+            # Initial background calculation (Iteration 1)
+            BG_total = np.median(images, axis=0)
+            
+            # Iterative refinement (Iteration 2+)
+            for i in range(iterations - 1):
+                residuals = images - BG_total
+                BG_i = np.median(residuals, axis=0)
+                BG_total += BG_i
+            
+            return BG_total
             
         
         if shape=='particles':
@@ -841,7 +865,7 @@ class workflow(object):
                     BG = imread(remove_BG)*1.0
                 elif remove_BG==True:
                     print('\n','calculating background image')
-                    BG = calculate_BG_image(dirname, ext)
+                    BG = calculate_BG_image(dirname, ext, iterations=bg_iterations)
                 else:
                     BG=False
                 
@@ -913,7 +937,7 @@ class workflow(object):
                     BG = imread(remove_BG)*1.0
                 elif remove_BG==True:
                     print('\n','calculating background image')
-                    BG = calculate_BG_image(dirname, ext)
+                    BG = calculate_BG_image(dirname, ext, iterations=bg_iterations)
                 else:
                     BG=None
                     
@@ -979,7 +1003,7 @@ class workflow(object):
                     BG = imread(remove_BG)*1.0
                 elif remove_BG==True:
                     print('\n','calculating background image')
-                    BG = calculate_BG_image(dirname, ext)
+                    BG = calculate_BG_image(dirname, ext, iterations=bg_iterations)
                 else:
                     BG=False
                     
@@ -1050,7 +1074,7 @@ class workflow(object):
                     BG = imread(remove_BG)*1.0
                 elif remove_BG==True:
                     print('\n','calculating background image')
-                    BG = calculate_BG_image(dirname, ext)
+                    BG = calculate_BG_image(dirname, ext, iterations=bg_iterations)
                 else:
                     BG=None
                 
