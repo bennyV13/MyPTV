@@ -763,7 +763,7 @@ def calculate_BG_image(dir_name, extension, savename, N_img=200,
             #im0 += io.imread(BG_images[i])
             im0 += imread_func(BG_images[i])
     
-    BG = (im0 / len(BG_images)).astype('int16')
+    BG = (im0 / len(BG_images)).astype(typ)
     
     # saving
     io.imsave(savename, BG, check_contrast=False)

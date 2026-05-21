@@ -100,7 +100,7 @@ class sheet_segmentation(object):
         local_mean = convolve2d(image, window, mode='same')
         new_im = image - local_mean
         new_im[new_im<0] = 0
-        new_im = new_im.astype('uint8')
+        new_im = new_im.astype(self.im.dtype)
         return new_im
         
     
