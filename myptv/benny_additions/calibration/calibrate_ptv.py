@@ -1,27 +1,25 @@
 import os
+import argparse
 from myptv.extendedZolof.camera import camera_extendedZolof
 from myptv.extendedZolof.calibrate import calibrate_extendedZolof
 
-# Configuration
-# =============
-# File mapping: {output_cam_name: input_points_filename}
-camera_mapping = {
-    'Cam1': 'cam1_cal_points',
-    'Cam2': 'cam2_cal_points',
-    'Cam3': 'cam3_cal_points',
-    'Cam4': 'cam4_cal_points'
-}
+# Default Configuration
+# =====================
+DEFAULT_CAMERAS = ['Cam1', 'Cam2', 'Cam3', 'Cam4']
 
-# Paths
-project_root = '/Users/user/Desktop/Research'
-cal_dir = os.path.join(project_root, 'Data_Analysis/MyPTV_analysis/20260506_analysis/cal')
-
-def run_calibration():
-    print(f"--- MyPTV Calibration Tool (20260506) ---")
+def run_calibration(cal_dir, suffix='_cal_points'):
+    print(f"--- MyPTV Calibration Tool ---")
     print(f"Working Directory: {cal_dir}")
+    print(f"Point file suffix: {suffix}")
     print("-" * 50)
     
-    for cam_name, points_filename in camera_mapping.items():
+    if not os.path.exists(cal_dir):
+        print(f"Error: Directory {cal_dir} does not exist.")
+        return
+
+    for cam_name in DEFAULT_CAMERAS:
+        # Construct the points filename (lowercase cam name + suffix)
+        points_filename = f"{cam_name.lower()}{suffix}"
         print(f"\nProcessing {cam_name}...")
         points_file = os.path.join(cal_dir, points_filename)
         
@@ -31,14 +29,12 @@ def run_calibration():
 
         # 1. Initialize camera and load the points file
         try:
-            # We use the cam_name for the internal name and the points_file for data
             cam = camera_extendedZolof(cam_name, cal_points_fname=points_file)
         except Exception as e:
             print(f"  Error initializing camera: {e}")
             continue
         
         # 2. Setup the calibrator (quadratic=False for full 3rd order polynomial)
-        # extendedZolof usually needs 3rd order for water tank refraction
         cal = calibrate_extendedZolof(cam, cam.image_points, cam.lab_points, quadratic=False)
         
         # 3. Perform the calibration
@@ -61,4 +57,19 @@ def run_calibration():
     print("Calibration process complete.")
 
 if __name__ == "__main__":
-    run_calibration()
+    parser = argparse.ArgumentParser(description="Calibrate MyPTV cameras.")
+    parser.add_argument("--dir", default='Data_Analysis/MyPTV_analysis/20260506_analysis/cal',
+                        help="Directory containing the calibration point files")
+    parser.add_argument("--suffix", default='_cal_points',
+                        help="Suffix for the point files (e.g., _indexed or _cal_points)")
+    
+    args = parser.parse_args()
+    
+    # Resolve absolute path if needed
+    work_dir = args.dir
+    if not os.path.isabs(work_dir):
+        # We assume relative to project root if not absolute
+        project_root = '/Users/user/Desktop/Research'
+        work_dir = os.path.join(project_root, work_dir)
+        
+    run_calibration(work_dir, suffix=args.suffix)

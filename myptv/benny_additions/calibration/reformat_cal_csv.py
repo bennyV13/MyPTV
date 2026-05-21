@@ -1,5 +1,6 @@
 import os
 import pandas as pd
+import argparse
 
 def reformat_csv(file_path):
     print(f"Reformatting {file_path}...")
@@ -33,7 +34,16 @@ def reformat_csv(file_path):
     print(f"Saved to {new_file_path} and removed original.")
 
 def main():
-    target_dir = 'Data_Analysis/MyPTV_analysis/20260506_analysis/cal'
+    parser = argparse.ArgumentParser(description="Reformat indexed CSV files to MyPTV format.")
+    parser.add_argument("--dir", default='Data_Analysis/MyPTV_analysis/20260506_analysis/cal',
+                        help="Target directory containing _indexed.csv files")
+    args = parser.parse_args()
+    
+    target_dir = args.dir
+    if not os.path.exists(target_dir):
+        print(f"Error: Directory {target_dir} does not exist.")
+        return
+
     for filename in os.listdir(target_dir):
         if filename.endswith('_indexed.csv'):
             file_path = os.path.join(target_dir, filename)

@@ -1,16 +1,13 @@
 import os
 import sys
 import numpy as np
+import argparse
 from myptv.extendedZolof.camera import camera_extendedZolof
 from myptv.extendedZolof.calibrate import calibrate_extendedZolof
 
-# Configuration
-# =============
-camera_names = ['Cam1', 'Cam2', 'Cam3', 'Cam4']
-
-# Paths
-project_root = '/Users/user/Desktop/Research'
-cal_dir = os.path.join(project_root, 'Data_Analysis/MyPTV_analysis/20260506_analysis/cal')
+# Default Configuration
+# =====================
+DEFAULT_CAMERAS = ['Cam1', 'Cam2', 'Cam3', 'Cam4']
 
 def discover_initial_points(data):
     '''
@@ -66,13 +63,31 @@ def discover_initial_points(data):
         idx3 = (shift + 2 * gap) % num_rows
         
         # Log the progress for verification
-        print(f"  Col {i} (X={col[0]:.1f}): Inc {increment:2d} | Total Shift {shift:2d} | Indices {[idx1, idx2, idx3]}")
+        # print(f"  Col {i} (X={col[0]:.1f}): Inc {increment:2d} | Total Shift {shift:2d} | Indices {[idx1, idx2, idx3]}")
         
         selected_indices.append(sorted_col_indices[idx1])
         selected_indices.append(sorted_col_indices[idx2])
         selected_indices.append(sorted_col_indices[idx3])
         
     unique_selection = np.unique(selected_indices)
+    
+    # Ensure we only send exactly 25 points if possible
+    target_count = 25
+    if len(unique_selection) > target_count:
+        # Keep the 4 mandatory corners
+        corner_indices = np.array(corners)
+        other_indices = np.array([idx for idx in unique_selection if idx not in corner_indices])
+        
+        # Subsample the remaining points to reach target_count
+        num_needed = target_count - len(corner_indices)
+        if num_needed > 0:
+            # Simple uniform subsampling of the other points
+            step = len(other_indices) / float(num_needed)
+            subsampled_others = [other_indices[int(i * step)] for i in range(num_needed)]
+            unique_selection = np.sort(np.concatenate([corner_indices, subsampled_others]))
+        else:
+            unique_selection = np.sort(corner_indices)
+            
     return unique_selection
 
 
@@ -119,92 +134,25 @@ def plot_selection_cli(data, selected_indices):
     print("-" * 50)
 
 
-def visualize_discovery(file_path, show_plt=True):
-    '''
-    Runs the discovery logic on a file and plots the results.
-    '''
-    print(f"--- Dry Run Visualization ---")
-    print(f"File: {file_path}")
-    
-    data = np.loadtxt(file_path)
-    indices = discover_initial_points(data)
-    selected = data[indices]
-    
-    # Show CLI plot
-    plot_selection_cli(data, indices)
-    
-    if not show_plt:
-        print(f"Total points in file: {len(data)}")
-        print(f"Points selected for Step 1: {len(selected)}")
-        print(f"Discovery complete (CLI plot only).")
-        return
-
-    # Import matplotlib only when needed
-    import matplotlib.pyplot as plt
-    
-    # Identify Lab columns
-    ix, iy, iz = (2, 3, 4) if data.shape[1] == 5 else (0, 1, 2)
-    
-    fig = plt.figure(figsize=(15, 5))
-    
-    # 1. 3D Plot
-    ax1 = fig.add_subplot(131, projection='3d')
-    ax1.scatter(data[:, ix], data[:, iy], data[:, iz], c='lightgrey', alpha=0.3, label='Unselected')
-    ax1.scatter(selected[:, ix], selected[:, iy], selected[:, iz], c='red', s=50, label='Selected')
-    ax1.set_xlabel('X Lab')
-    ax1.set_ylabel('Y Lab')
-    ax1.set_zlabel('Z Lab')
-    ax1.set_title('3D Distribution')
-    
-    # 2. XY Projection (Top Down) - Checking for lines
-    ax2 = fig.add_subplot(132)
-    ax2.scatter(data[:, ix], data[:, iy], c='lightgrey', alpha=0.5)
-    ax2.scatter(selected[:, ix], selected[:, iy], c='red', s=40)
-    ax2.set_xlabel('X Lab')
-    ax2.set_ylabel('Y Lab')
-    ax2.set_title('XY Projection (Non-Collinearity Check)')
-    ax2.grid(True, linestyle='--', alpha=0.7)
-    
-    # 3. XZ Projection (Side View) - Checking Volume Spanning
-    ax3 = fig.add_subplot(133)
-    ax3.scatter(data[:, ix], data[:, iz], c='lightgrey', alpha=0.5)
-    ax3.scatter(selected[:, ix], selected[:, iz], c='red', s=40)
-    ax3.set_xlabel('X Lab')
-    ax3.set_ylabel('Z Lab')
-    ax3.set_title('XZ Projection (Depth Span)')
-    ax3.grid(True, linestyle='--', alpha=0.7)
-    
-    plt.tight_layout()
-    
-    # Save the plot in the same location as the target file
-    output_dir = os.path.dirname(file_path)
-    base_name = os.path.basename(file_path)
-    save_path = os.path.join(output_dir, f"{base_name}_discovery_dryrun.png")
-    plt.savefig(save_path, dpi=150)
-    print(f"Plot saved to: {save_path}")
-    
-    plt.show()
-    
-    print(f"Total points in file: {len(data)}")
-    print(f"Points selected for Step 1: {len(selected)}")
-    print(f"Discovery complete.")
-
-
-def run_two_step_calibration():
-    print(f"--- MyPTV Automated Two-Step Calibration (20260506) ---")
+def run_two_step_calibration(cal_dir, suffix='_cal_points', target_cam=None):
+    print(f"--- MyPTV Automated Two-Step Calibration ---")
     print(f"Working Directory: {cal_dir}")
+    print(f"Point file suffix: {suffix}")
     print("=" * 60)
     
-    for cam_name in camera_names:
+    cams_to_process = [target_cam] if target_cam else DEFAULT_CAMERAS
+    
+    for cam_name in cams_to_process:
         print(f"\n>>> PROCESSING {cam_name} <<<")
         
-        full_points_file = os.path.join(cal_dir, f"{cam_name.lower()}_cal_points")
+        points_filename = f"{cam_name.lower()}{suffix}"
+        full_points_file = os.path.join(cal_dir, points_filename)
+        
         if not os.path.exists(full_points_file):
-            print(f"  [Error] Full calibration points file not found: {full_points_file}")
+            print(f"  [Error] Points file not found: {full_points_file}")
             continue
             
-        # Output directory is where the blobs are
-        output_dir = os.path.dirname(full_points_file)
+        output_dir = cal_dir
         full_data = np.loadtxt(full_points_file)
         
         # ---------------------------------------------------------------------
@@ -219,12 +167,12 @@ def run_two_step_calibration():
         plot_selection_cli(full_data, indices)
         
         temp_manual_file = os.path.join(output_dir, f"{cam_name.lower()}_temp_manual")
-        np.savetxt(temp_manual_file, initial_subset, fmt='%.1f', delimiter='\t')
+        np.savetxt(temp_manual_file, initial_subset, fmt='%.3f', delimiter='\t')
         
         try:
             cam = camera_extendedZolof(cam_name, cal_points_fname=temp_manual_file)
             cal_init = calibrate_extendedZolof(cam, cam.image_points, cam.lab_points, quadratic=True)
-            print(f"  Solving with {len(initial_subset)} discovered points...")
+            print(f"  Solving with {len(initial_subset)} discovered points (Quadratic)...")
             cal_init.calibrate()
             print(f"  Initial RMS Error: {cal_init.mean_squared_err():.6f} pixels")
             cam.save(output_dir)
@@ -241,8 +189,9 @@ def run_two_step_calibration():
         try:
             cam_final = camera_extendedZolof(cam_name, cal_points_fname=full_points_file)
             cam_final.load(output_dir)
+            # quadratic=False uses 3rd order polynomial
             cal_final = calibrate_extendedZolof(cam_final, cam_final.image_points, cam_final.lab_points, quadratic=False)
-            print(f"  Refining with {len(full_data)} points...")
+            print(f"  Refining with {len(full_data)} points (3rd Order)...")
             cal_final.calibrate()
             print(f"  Final RMS Error: {cal_final.mean_squared_err():.6f} pixels")
             cam_final.save(output_dir)
@@ -255,14 +204,17 @@ def run_two_step_calibration():
 
 
 if __name__ == "__main__":
-    if "--plotcli" in sys.argv:
-        # Dry run visualization on the small target file
-        target_path = '/Users/user/Desktop/Research/Data_Analysis/MyPTV_analysis/20260506_analysis/cal/target_file_small'
-        if os.path.exists(target_path):
-            visualize_discovery(target_path, show_plt=False)
-        else:
-            print(f"Error: Target file not found at {target_path}")
-    else:
-        # Full calibration sequence
-        run_two_step_calibration()
+    parser = argparse.ArgumentParser(description="Run 2-step MyPTV calibration.")
+    parser.add_argument("--dir", required=True, help="Directory containing point files")
+    parser.add_argument("--suffix", default='_cal_points', help="Point file suffix")
+    parser.add_argument("--cam", help="Specific camera to process (e.g., Cam2)")
+    
+    args = parser.parse_args()
+    
+    work_dir = args.dir
+    if not os.path.isabs(work_dir):
+        project_root = '/Users/user/Desktop/Research'
+        work_dir = os.path.join(project_root, work_dir)
+        
+    run_two_step_calibration(work_dir, suffix=args.suffix, target_cam=args.cam)
 
