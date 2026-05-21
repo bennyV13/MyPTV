@@ -721,6 +721,10 @@ class workflow(object):
         DoG_sigmas = self.get_param('segmentation', 'DoG_sigmas')
         multiprocessing = self.get_param('segmentation', 'multiprocessing')
         try:
+            sub_type = self.get_param('segmentation', 'subtract_type')
+        except:
+            sub_type = 'absolute'
+        try:
             pca_limit = self.get_param('segmentation', 'pca_limit')
         except:
             pca_limit = 1.0
@@ -861,6 +865,7 @@ class workflow(object):
                                                 min_mass=min_mass,
                                                 mask=mask,
                                                 method=method,
+                                                subtract_type=sub_type,
                                                 raw_format=raw_format,
                                                 multiprocessing=multiprocessing)
             
@@ -929,7 +934,8 @@ class workflow(object):
                                                         min_ysize=min_ysize,
                                                         min_mass=min_mass,
                                                         mask=mask,
-                                                        method=method)
+                                                        method=method,
+                                                        subtract_type=sub_type)
                 particleSegment.get_blobs()
                 particleSegment.apply_blobs_size_filter()
                 

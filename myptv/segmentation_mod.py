@@ -46,7 +46,8 @@ class particle_segmentation(object):
                  min_xsize=None, max_xsize=None,
                  min_ysize=None, max_ysize=None,
                  min_mass=None, max_mass=None,
-                 method='labeling'):
+                 method='labeling',
+                 subtract_type='absolute'):
         '''
         inputs - 
         
@@ -71,8 +72,13 @@ class particle_segmentation(object):
                        filter. In this is None then the filter is not applied.
         
         BG_image - Either a given static image, in which case this image is
-                   subtracted from the given image by taking the difference,
+                   subtracted from the given image,
                    or this is None, in which case this operation is skipped.
+
+        subtract_type - string, either 'absolute' or 'simple'. If 'absolute',
+                        the absolute difference from the background is taken.
+                        If 'simple', the background is subtracted and the 
+                        result is clipped at 0.
         
         EQ_map - Either a given array, in which case this array is
                  used to equalize the image intensity, or this is None, in 
@@ -107,6 +113,7 @@ class particle_segmentation(object):
         self.loc_filter = local_filter
         self.BG_image = BG_image
         self.EQ_map = EQ_map
+        self.subtract_type = subtract_type
         
         if method not in ['dilation', 'labeling']:
             raise ValueError('method "%s" unknown.'%method)
@@ -157,7 +164,14 @@ class particle_segmentation(object):
         
         # subtract background:
         if self.BG_image is not None:
-            imNoBG = npabs(self.im - self.BG_image).astype(self.im.dtype)
+            if self.subtract_type == 'absolute':
+                imNoBG = npabs(self.im - self.BG_image).astype(self.im.dtype)
+            elif self.subtract_type == 'simple':
+                imNoBG = self.im - self.BG_image
+                imNoBG[imNoBG < 0] = 0
+                imNoBG = imNoBG.astype(self.im.dtype)
+            else:
+                raise ValueError("subtract_type must be 'absolute' or 'simple'")
         else:
             imNoBG = self.im
             
@@ -483,6 +497,7 @@ class loop_segmentation(object):
                  min_ysize=None, max_ysize=None,
                  min_mass=None, max_mass=None,
                  method='labeling',
+                 subtract_type='absolute',
                  raw_format=False,
                  multiprocessing=True):
         '''
@@ -531,6 +546,7 @@ class loop_segmentation(object):
         self.mass_limits = (min_mass, max_mass)
         self.loc_filter = local_filter
         self.method = method
+        self.subtract_type = subtract_type
         self.raw_format = raw_format
         self.DoG_sigma = DoG_sigma
         self.multiprocess = multiprocessing
@@ -642,7 +658,7 @@ class loop_segmentation(object):
                   self.median, self.loc_filter, self.BG, self.EQ_map, 
                   self.mask, self.DoG_sigma,
                   self.bbox_limits, self.mass_limits, self.method, 
-                  self.p_size, i0]
+                  self.p_size, i0, self.subtract_type]
         
         if self.multiprocess:
             try:
@@ -717,6 +733,7 @@ def iter_frame(i, im, params):
                                min_mass=params[11][0],
                                max_mass=params[11][1],
                                method = params[12],
+                               subtract_type = params[15],
                                particle_size=params[13])
     ps.get_blobs()
     ps.apply_blobs_size_filter()
