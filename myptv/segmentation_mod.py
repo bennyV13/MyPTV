@@ -757,34 +757,47 @@ def iter_frame(i, im, params):
 
 
 def calculate_BG_image(dir_name, extension, savename, N_img=200,
-                       raw_format=False):
+                       raw_format=False, iterations=1):
     '''
-    Calculates a mean image and saves it on the disk for image processing.
+    Calculates a background image using an iterative median approach and 
+    saves it on the disk.
     '''
+    import numpy as np
+    from skimage import io
+    import tqdm
+    import os
+
     if raw_format == False:
         imread_func = lambda x: io.imread(x)
-        
     else:
         import rawpy
         imread_func = lambda x: rawpy.imread(x).raw_image
-        
-    BG_images = get_img_list(dir_name, extension, N_img=N_img)
-    
-    # calculating the BG image
-    for i in tqdm.tqdm(range(len(BG_images)), desc='calculating the BG image'):
-        if i==0:
-            #im0 = io.imread(BG_images[i])*1.0
-            im0 = imread_func(BG_images[i])*1.0
-            typ = im0.dtype
-        else:
-            #im0 += io.imread(BG_images[i])
-            im0 += imread_func(BG_images[i])
-    
-    BG = (im0 / len(BG_images)).astype(typ)
-    
-    # saving
-    io.imsave(savename, BG, check_contrast=False)
 
+    BG_image_paths = get_img_list(dir_name, extension, N_img=N_img)
+
+    # Load images into memory as float32 to allow signed residuals
+    images = []
+    for path in tqdm.tqdm(BG_image_paths, desc='Loading images for BG'):
+        img = imread_func(path).astype('float32')
+        images.append(img)
+    images = np.array(images)
+
+    # Initial background calculation (Iteration 1)
+    BG_total = np.median(images, axis=0)
+
+    # Iterative refinement (Iteration 2+)
+    for i in range(iterations - 1):
+        desc = f'Refining BG (iteration {i+2}/{iterations})'
+        residuals = images - BG_total
+        BG_i = np.median(residuals, axis=0)
+        BG_total += BG_i
+
+    # Convert back to original dtype (assuming uint8 or uint16 based on input)
+    final_BG = BG_total.astype(imread_func(BG_image_paths[0]).dtype)
+
+    # saving
+    io.imsave(savename, final_BG, check_contrast=False)
+    return final_BG
 
 
 
