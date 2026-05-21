@@ -309,6 +309,11 @@ class initial_cal_gui(object):
                                 height=1)
         save_segment_button.grid(row=12, column=1, padx=2, pady=7, sticky='ew')
         
+        load_segment_button = Button(segmentation_frame, text='Load blobs', 
+                                command = self.load_blobs, padx=2, pady=7, 
+                                height=1)
+        load_segment_button.grid(row=13, column=0, columnspan=2, padx=2, pady=7, sticky='ew')
+        
         
         
         
@@ -736,8 +741,45 @@ class initial_cal_gui(object):
         saveName = os.path.join(self.folder, self.cam_name + '_CalBlobs')
         self.particleSegment.save_results(saveName)
         print('\nFile saved. Done.\n')
-    
-    
+        
+    def load_blobs(self):
+        '''
+        Loads previously saved blobs to skip segmentation.
+        '''
+        from numpy import loadtxt
+        import glob
+        
+        filename = os.path.join(self.folder, self.cam_name + '_CalBlobs')
+        if not os.path.exists(filename):
+            # Try to find a cam*.txt file as a fallback
+            txt_files = glob.glob(os.path.join(self.folder, self.cam_name + '*.txt'))
+            if txt_files:
+                filename = txt_files[0]
+            else:
+                messagebox.showerror("Error", f"Blobs file not found:\n{filename}")
+                return
+            
+        try:
+            blobs_data = loadtxt(filename)
+            if blobs_data.ndim == 1:
+                blobs_data = blobs_data.reshape(1, -1)
+                
+            self.segmented = []
+            for row in blobs_data:
+                x = row[0]
+                y = row[1]
+                wx = row[2] if len(row) > 2 else 4
+                wy = row[3] if len(row) > 3 else 4
+                self.segmented.append((x, y, wx, wy))
+                
+            print(f'\nLoaded {len(self.segmented)} blobs from file.')
+            
+            # Refresh the image display to draw the blobs
+            self.update_image_display()
+            
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to load blobs: {e}")
+            
     def plotSegmented(self):
         for x_, y_, wx, wy in self.segmented:
             x_ = int(x_*self.z) - int(self.hbar.get()[1])

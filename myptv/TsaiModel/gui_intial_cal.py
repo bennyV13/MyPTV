@@ -342,10 +342,15 @@ class initial_cal_gui(object):
         segment_button = Button(segmentation_frame, text='Segment image', 
                                 command = self.sementImage, padx=2, pady=7)
         segment_button.grid(row=12, column=0, padx=2, pady=7, sticky='ew')
-        
         save_segment_button = Button(segmentation_frame, text='Save blobs', 
-                                command = self.save_blobs, padx=2, pady=7)
+                                command = self.save_blobs, padx=2, pady=7, 
+                                height=1)
         save_segment_button.grid(row=12, column=1, padx=2, pady=7, sticky='ew')
+
+        load_segment_button = Button(segmentation_frame, text='Load blobs', 
+                                command = self.load_blobs, padx=2, pady=7, 
+                                height=1)
+        load_segment_button.grid(row=13, column=0, columnspan=2, padx=2, pady=7, sticky='ew')
         
         
         
@@ -733,8 +738,62 @@ class initial_cal_gui(object):
         saveName = os.path.join(self.folder, self.cam_name + '_CalBlobs')
         self.particleSegment.save_results(saveName)
         print('\nFile saved. Done.\n')
-    
-    
+        
+    def load_blobs(self):
+        '''
+        Loads previously saved blobs to skip segmentation.
+        '''
+        from numpy import loadtxt
+        import glob
+        
+        filename = os.path.join(self.folder, self.cam_name + '_CalBlobs')
+        if not os.path.exists(filename):
+            # Try to find a cam*.txt file as a fallback
+            txt_files = glob.glob(os.path.join(self.folder, self.cam_name + '*.txt'))
+            if txt_files:
+                filename = txt_files[0]
+            else:
+                print(f"Blobs file not found: {filename}")
+                return
+            
+        try:
+            blobs_data = loadtxt(filename)
+            if blobs_data.ndim == 1:
+                blobs_data = blobs_data.reshape(1, -1)
+                
+            self.segmented = []
+            for row in blobs_data:
+                x = row[0]
+                y = row[1]
+                wx = row[2] if len(row) > 2 else 4
+                wy = row[3] if len(row) > 3 else 4
+                self.segmented.append((x, y, wx, wy))
+                
+            print(f'\nLoaded {len(self.segmented)} blobs from file.')
+            
+            # Refresh the image display to draw the blobs
+            image = Image.open(self.image_name)
+            s = image.size
+            image = image.resize((int(s[0]*self.z),int(s[1]*self.z)),
+                                 Image.LANCZOS)
+            
+            new_bird = ImageTk.PhotoImage(image)
+            self.board.configure(image = new_bird)
+            self.board.image = new_bird
+            self.canvas.delete('all')
+            self.canvas.create_image(0, 0, image=new_bird, anchor='nw')
+            self.canvas.configure(scrollregion = self.canvas.bbox("all"))
+            
+            self.mark_points()
+            
+            if hasattr(self, 'mtf'):
+                self.plot_matched_point_pair()
+            else:
+                self.plotSegmented()
+            
+        except Exception as e:
+            print(f"Failed to load blobs: {e}")
+            
     def plotSegmented(self):
         for x_, y_, wx, wy in self.segmented:
             x_ = int(x_*self.z) - int(self.hbar.get()[1])

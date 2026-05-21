@@ -385,10 +385,15 @@ class initial_cal_gui(object):
         segment_button = Button(segmentation_frame, text='Segment image', 
                                 command = self.sementImage, padx=2, pady=7)
         segment_button.grid(row=12, column=0, padx=2, pady=7, sticky='ew')
-        
         save_segment_button = Button(segmentation_frame, text='Save blobs', 
-                                command = self.save_blobs, padx=2, pady=7)
+                                command = self.save_blobs, padx=2, pady=7, 
+                                height=1)
         save_segment_button.grid(row=12, column=1, padx=2, pady=7, sticky='ew')
+
+        load_segment_button = Button(segmentation_frame, text='Load blobs', 
+                                command = self.load_blobs, padx=2, pady=7, 
+                                height=1)
+        load_segment_button.grid(row=13, column=0, columnspan=2, padx=2, pady=7, sticky='ew')
         
         
         
