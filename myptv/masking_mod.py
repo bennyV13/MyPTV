@@ -179,7 +179,7 @@ def generate_blob_polygon_mask(blob_file, reference_image, padding, output_bit_d
     
     ax.set_xlim(0, resolution[0])
     ax.set_ylim(resolution[1], 0) # Flip Y for image coords
-    ax.legend()
+    ax.legend(loc='center')
     ax.set_title(f"Sides: {len(padded_hull)} | Padding: {padding}px\nClose to save, Ctrl+C to abort.")
     plt.show()
 
@@ -198,3 +198,8 @@ def generate_blob_polygon_mask(blob_file, reference_image, padding, output_bit_d
     
     io.imsave(save_name, mask, check_contrast=False)
     print(f"Mask saved to {save_name} with {len(padded_hull)} sides.")
+    
+    # Save vertices to a text file
+    vertices_save_name = os.path.splitext(save_name)[0] + "_vertices.txt"
+    np.savetxt(vertices_save_name, padded_hull, fmt='%.3f', header='x\ty')
+    print(f"Vertices saved to {vertices_save_name}")
