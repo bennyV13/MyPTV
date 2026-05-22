@@ -239,6 +239,7 @@ if __name__ == "__main__":
     parser.add_argument("--camera_id", type=int, default=0, help="Camera ID (default 0)")
     parser.add_argument("--plot", help="Path to save validation plot")
     parser.add_argument("--create_png", action="store_true", help="Enable generating the validation plot (PNG)")
+    parser.add_argument("--cal_image", help="Path to the background calibration image (e.g. image.png)")
 
     # Mapping arguments
     parser.add_argument("--origin", choices=['tl', 'tr', 'bl', 'br'], default='bl',
@@ -274,6 +275,12 @@ if __name__ == "__main__":
     y_dir = None
     if args.plus_y: y_dir = 'plus'
     elif args.minus_y: y_dir = 'minus'
+
+    # Validate arguments
+    if args.cal_image:
+        if not (args.image_points and args.target_points):
+            parser.error("Error: --cal_image can only be used in single-camera mode. "
+                         "Please provide both --image_points and --target_points.")
 
     if args.image_points and args.target_points:
         # Process single camera
