@@ -30,3 +30,31 @@ def test_missing_image_file_raises_error():
     if os.path.exists("temp_cal.txt"): os.remove("temp_cal.txt")
     
     assert "Error: Calibration image not found at 'non_existent_image_12345.png'" in result.stderr or "FileNotFoundError" in result.stderr or result.returncode != 0
+
+def test_successful_execution_with_image():
+    """Verify that specifying a valid image file runs successfully and overlays the image."""
+    from PIL import Image
+    
+    # Save a temporary valid image
+    img = Image.new("RGB", (100, 100), color="white")
+    img.save("temp_im.png")
+    
+    # Write temp empty blobs and cal_points files to trigger execution
+    with open("temp_blobs.txt", "w") as f: f.write("10.0 20.0\n30.0 40.0\n")
+    with open("temp_cal.txt", "w") as f: f.write("0.0 0.0 0.0\n10.0 20.0 0.0\n")
+    
+    script_path = os.path.join("myptv", "benny_additions", "calibration", "point_indexer.py")
+    cmd = [sys.executable, script_path, 
+           "--image_points", "temp_blobs.txt", 
+           "--target_points", "temp_cal.txt", 
+           "--cal_image", "temp_im.png",
+           "--plot", "temp_out_plot.png",
+           "--output", "temp_out_points.csv"]
+    
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    
+    # Clean up
+    for file in ["temp_blobs.txt", "temp_cal.txt", "temp_im.png", "temp_out_plot.png", "temp_out_points.csv"]:
+        if os.path.exists(file): os.remove(file)
+        
+    assert result.returncode == 0

@@ -186,7 +186,7 @@ def index_calibration_points(image_points_path, target_points_path, camera_id=0,
 
     return indexed_rows
 
-def save_and_plot(indexed_rows, output_csv, output_plot, camera_name, create_plot=True):
+def save_and_plot(indexed_rows, output_csv, output_plot, camera_name, create_plot=True, cal_image_path=None):
     """
     Saves the indexed points to a CSV and optionally generates a validation plot.
     """
@@ -202,6 +202,16 @@ def save_and_plot(indexed_rows, output_csv, output_plot, camera_name, create_plo
     
     # Plotting for Human Approval
     plt.figure(figsize=(10, 8))
+    
+    if cal_image_path:
+        if not os.path.exists(cal_image_path):
+            raise FileNotFoundError(f"Error: Calibration image not found at '{cal_image_path}'")
+        try:
+            img = plt.imread(cal_image_path)
+            cmap = 'gray' if len(img.shape) == 2 else None
+            plt.imshow(img, cmap=cmap, alpha=0.6)
+        except Exception as e:
+            raise RuntimeError(f"Error: Failed to load calibration image '{cal_image_path}': {e}")
     unique_x = df['WorldX'].unique()
     colors = plt.cm.tab10(np.linspace(0, 1, len(unique_x)))
     
@@ -300,7 +310,8 @@ if __name__ == "__main__":
         rows = index_calibration_points(args.image_points, args.target_points, camera_id=args.camera_id,
                                         origin=origin, swap_xy=args.swap_xy, x_dir=x_dir, y_dir=y_dir)
         if rows:
-            save_and_plot(rows, output_csv, output_plot, f"Cam {args.camera_id}", create_plot=create_plot)
+            save_and_plot(rows, output_csv, output_plot, f"Cam {args.camera_id}", 
+                          create_plot=create_plot, cal_image_path=args.cal_image)
     else:
         # Default execution for the 4 cameras in synthetic_data
         print("No input files specified. Running default batch for synthetic_data...")
