@@ -788,8 +788,12 @@ def calculate_BG_image(dir_name, extension, savename, N_img=200,
     # Iterative refinement (Iteration 2+)
     for i in range(iterations - 1):
         desc = f'Refining BG (iteration {i+2}/{iterations})'
+        print(desc)
         residuals = images - BG_total
         BG_i = np.median(residuals, axis=0)
+        name=f'res_iteration_{i+2}.tif'
+        BG_ii = BG_i.astype(imread_func(BG_image_paths[0]).dtype)
+        io.imsave(name, BG_ii, check_contrast=False)
         BG_total += BG_i
 
     # Convert back to original dtype (assuming uint8 or uint16 based on input)
@@ -798,6 +802,46 @@ def calculate_BG_image(dir_name, extension, savename, N_img=200,
     # saving
     io.imsave(savename, final_BG, check_contrast=False)
     return final_BG
+
+
+
+def calculate_BG_image_batch(recordings_dir, output_dir, extension, 
+                             N_img=200, raw_format=False, iterations=1):
+    '''
+    Calculates background images for all recordings and cameras in a given
+    directory structure and saves them in the output directory.
+    
+    The expected structure is:
+    recordings_dir / rec* / cam* / images
+    
+    The output structure will be:
+    output_dir / rec* / BG_<CamName>.tif
+    '''
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    recs = [d for d in os.listdir(recordings_dir) if 
+            os.path.isdir(os.path.join(recordings_dir, d)) and 
+            d.lower().startswith('rec')]
+
+    for rec in sorted(recs):
+        rec_path = os.path.join(recordings_dir, rec)
+        out_rec_path = os.path.join(output_dir, rec)
+        
+        if not os.path.exists(out_rec_path):
+            os.makedirs(out_rec_path)
+            
+        cams = [d for d in os.listdir(rec_path) if 
+                os.path.isdir(os.path.join(rec_path, d)) and 
+                d.lower().startswith('cam')]
+        
+        for cam in sorted(cams):
+            cam_path = os.path.join(rec_path, cam)
+            save_name = os.path.join(out_rec_path, f'BG_{cam}.tif')
+            
+            print(f'\nProcessing {rec} - {cam}...')
+            calculate_BG_image(cam_path, extension, save_name, N_img=N_img,
+                               raw_format=raw_format, iterations=iterations)
 
 
 
