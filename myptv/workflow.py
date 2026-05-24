@@ -56,6 +56,7 @@ class workflow(object):
                                 'matching', 'analyze_disparity',
                                 'segmentation',
                                 'calculate_BG_image',
+                                'calculate_BG_image_batch',
                                 'calculate_equilization_map',
                                 'smoothing', 'stitching', 'tracking', 
                                 'calibration', 'calibration_point_gui', 
@@ -137,6 +138,9 @@ class workflow(object):
                 
                 elif action == 'calculate_BG_image':
                     self.do_calculate_BG_image()
+                
+                elif action == 'calculate_BG_image_batch':
+                    self.do_calculate_BG_image_batch()
                     
                 elif action == 'calculate_equilization_map':
                     self.do_calculate_equilization_map()
@@ -397,6 +401,9 @@ class workflow(object):
         cam_names = [val.strip() for val in cam_names.split(',')]
         plot = self.get_param('analyze_calibration_error', 'plot_histogram')
         
+        # Get point file suffix option if specified, default to '_cal_points'
+        action_params = self.get_action_params('analyze_calibration_error')
+        point_file_suffix = action_params.get('point_file_suffix', '_cal_points')
         
         # setting up the img_system 
         cams = [camera_wrapper(cn,'./') for cn in cam_names]
@@ -411,7 +418,7 @@ class workflow(object):
         # read calibration point files and organize in a dictionary
         point_dic = {}
         for e, cn in enumerate(cam_names):
-            filename = './Calibration/%s_cal_points'%cn
+            filename = './Calibration/%s%s'%(cn, point_file_suffix)
             data = loadtxt(filename)
             for i in range(len(data)):
                 try:
@@ -655,6 +662,28 @@ class workflow(object):
         
         calculate_BG_image(dirname, ext, savename, N_img=N_img,
                        raw_format=raw_format, iterations=iterations)
+
+
+    def do_calculate_BG_image_batch(self):
+        '''
+        Calculates and save static BG images for multiple folders
+        '''
+        from myptv.segmentation_mod import calculate_BG_image_batch
+        
+        recordings_dir = self.get_param('calculate_BG_image_batch', 'recordings_dir')
+        output_dir = self.get_param('calculate_BG_image_batch', 'output_dir')
+        ext = self.get_param('calculate_BG_image_batch', 'image_extension')
+        raw_format = self.get_param('calculate_BG_image_batch', 'raw_format')
+        N_img = self.get_param('calculate_BG_image_batch', 'N_img')
+        
+        try:
+            iterations = self.get_param('calculate_BG_image_batch', 'iterations')
+            if iterations is None: iterations = 1
+        except:
+            iterations = 1
+
+        calculate_BG_image_batch(recordings_dir, output_dir, ext, N_img=N_img,
+                                 raw_format=raw_format, iterations=iterations)
         
         
     
@@ -741,6 +770,18 @@ class workflow(object):
             if bg_iterations is None: bg_iterations = 1
         except:
             bg_iterations = 1
+            
+        try:
+            draw_fiber_features = self.get_param('segmentation', 'draw_fiber_features')
+            if draw_fiber_features is None: draw_fiber_features = True
+        except:
+            draw_fiber_features = True
+            
+        try:
+            arrow_scale = self.get_param('segmentation', 'arrow_scale')
+            if arrow_scale is None: arrow_scale = 100.0
+        except:
+            arrow_scale = 100.0
         
         # Pre-check the save directory
         if save_name is not None:
@@ -845,6 +886,8 @@ class workflow(object):
             
             # Iterative refinement (Iteration 2+)
             for i in range(iterations - 1):
+                desc = f'Refining BG (iteration {i+2}/{iterations})'
+                print(desc)
                 residuals = images - BG_total
                 BG_i = np.median(residuals, axis=0)
                 BG_total += BG_i
@@ -1103,7 +1146,7 @@ class workflow(object):
                 
                 if plot_res:
                     from matplotlib.pyplot import show
-                    particleSegment.plot_blobs()
+                    particleSegment.plot_blobs(draw_fiber_features=draw_fiber_features, scale=arrow_scale)
                     show()
                     
                     
