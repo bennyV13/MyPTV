@@ -2381,7 +2381,379 @@ class workflow(object):
         print(f"Batch segmentation completed. Results -> {results_csv_path}")
 
 
-#%%
+    def do_batch_pipeline(self):
+        '''
+        Runs MyPTV matching, tracking, smoothing, and orientations for targeted
+        recordings sequentially, with robust isolation, error skipping, and dry-run support.
+        '''
+        import sys
+        import os
+        import copy
+        import subprocess
+        import re
+        import csv
+        import time
+        from random import randint
+        from datetime import datetime
+        from yaml import safe_dump, safe_load
+
+        # 1. Fetch batch_pipeline parameters from parameters file
+        try: recordings_dir = self.get_param('batch_pipeline', 'recordings_dir')
+        except:
+            print("ERROR: batch_pipeline requires 'recordings_dir'")
+            return
+        
+        try: ptv_results_dir = self.get_param('batch_pipeline', 'ptv_results_dir')
+        except: ptv_results_dir = 'ptv_results'
+
+        try: sub_dir = self.get_param('batch_pipeline', 'sub_dir')
+        except: sub_dir = 'particles'
+
+        try: results_csv_path = self.get_param('batch_pipeline', 'results_csv')
+        except: results_csv_path = os.path.join(ptv_results_dir, 'batch_pipeline_results.csv')
+
+        try: run_if_exists = self.get_param('batch_pipeline', 'run_if_exists')
+        except: run_if_exists = False
+
+        # Step controls
+        try: run_matching = self.get_param('batch_pipeline', 'run_matching')
+        except: run_matching = True
+        try: run_tracking = self.get_param('batch_pipeline', 'run_tracking')
+        except: run_tracking = True
+        try: run_smoothing = self.get_param('batch_pipeline', 'run_smoothing')
+        except: run_smoothing = True
+        try: run_orientations = self.get_param('batch_pipeline', 'run_orientations')
+        except: run_orientations = False
+
+        # Optional filters
+        try: recordings_filter = self.get_param('batch_pipeline', 'recordings')
+        except: recordings_filter = None
+        
+        try: cams_override = self.get_param('batch_pipeline', 'cams')
+        except: cams_override = None
+
+        # Dry run determination
+        cli_dry_run = '--dry-run' in sys.argv or '-d' in sys.argv
+        try: file_dry_run = self.get_param('batch_pipeline', 'dry_run')
+        except: file_dry_run = False
+        dry_run = cli_dry_run or file_dry_run
+
+        if not os.path.exists(recordings_dir):
+            print(f"ERROR: recordings_dir does not exist: {recordings_dir}")
+            return
+
+        # Resolve recordings
+        planned_recs = []
+        if recordings_filter:
+            filter_list = [r.strip().lower() for r in recordings_filter.split(',')]
+            for item in sorted(os.listdir(recordings_dir)):
+                if os.path.isdir(os.path.join(recordings_dir, item)) and item.lower() in filter_list:
+                    planned_recs.append(item)
+        else:
+            for item in sorted(os.listdir(recordings_dir)):
+                if os.path.isdir(os.path.join(recordings_dir, item)) and item.lower().startswith("rec"):
+                    planned_recs.append(item)
+
+        if not planned_recs:
+            print("No matching recordings found under recordings_dir.")
+            return
+
+        # Resolve cams
+        cams = []
+        if cams_override:
+            cams = [c.strip() for c in cams_override.split(',')]
+        else:
+            # Fallback to matching block camera_names
+            try:
+                match_cams = self.get_param('matching', 'camera_names')
+                cams = [c.strip() for c in match_cams.split(',')]
+            except:
+                # Fallback to orientations block camera_names
+                try:
+                    ori_cams = self.get_param('fiber_orientations', 'camera_names')
+                    cams = [c.strip() for c in ori_cams.split(',')]
+                except:
+                    pass
+        if not cams:
+            print("ERROR: Camera list could not be resolved from batch_pipeline, matching, or fiber_orientations.")
+            return
+
+        # Evaluate planned steps for each recording
+        workflow_path = os.path.abspath(__file__)
+        params_dir = os.path.dirname(os.path.abspath(self.param_file_path))
+
+        evaluation = []
+        for rec in planned_recs:
+            out_dir = os.path.join(ptv_results_dir, f"{rec}_data", sub_dir)
+            
+            matching_out = os.path.join(out_dir, "particles")
+            tracking_out = os.path.join(out_dir, "trajectories")
+            smoothing_out = os.path.join(out_dir, "trajectories_smoothed")
+            orientations_out = os.path.join(out_dir, "fiber_orientations")
+
+            run_m_action = "SKIP"
+            run_t_action = "SKIP"
+            run_s_action = "SKIP"
+            run_o_action = "SKIP"
+
+            dep_re_run = False
+
+            # Evaluate Matching
+            if run_matching:
+                if os.path.exists(matching_out) and not run_if_exists:
+                    run_m_action = "SKIP (exists)"
+                else:
+                    run_m_action = "RUN"
+                    dep_re_run = True
+            
+            # Evaluate Tracking
+            if run_tracking:
+                if os.path.exists(tracking_out) and not run_if_exists and not dep_re_run:
+                    run_t_action = "SKIP (exists)"
+                else:
+                    run_t_action = "RUN"
+                    dep_re_run = True
+
+            # Evaluate Smoothing
+            if run_smoothing:
+                if os.path.exists(smoothing_out) and not run_if_exists and not dep_re_run:
+                    run_s_action = "SKIP (exists)"
+                else:
+                    run_s_action = "RUN"
+                    dep_re_run = True
+
+            # Evaluate Orientations
+            if run_orientations:
+                if os.path.exists(orientations_out) and not run_if_exists and not dep_re_run:
+                    run_o_action = "SKIP (exists)"
+                else:
+                    run_o_action = "RUN"
+
+            evaluation.append({
+                "rec": rec,
+                "out_dir": out_dir,
+                "matching": run_m_action,
+                "tracking": run_t_action,
+                "smoothing": run_s_action,
+                "orientations": run_o_action
+            })
+
+        if dry_run:
+            print(f"--- DRY RUN: Planned batch pipeline execution ---")
+            print(f"Recordings Dir: {recordings_dir}")
+            print(f"Results CSV Destination: {results_csv_path}")
+            print(f"Run If Exists: {run_if_exists}")
+            print(f"Cameras to use: {', '.join(cams)}")
+            for item in evaluation:
+                print(f"\nRecording: {item['rec']}")
+                print(f"  - Matching: {item['matching']}")
+                print(f"  - Tracking: {item['tracking']}")
+                print(f"  - Smoothing: {item['smoothing']}")
+                print(f"  - Orientations: {item['orientations']}")
+            print(f"\n--- Dry run complete. No files run. ---")
+            return
+
+        # Actual Execution
+        os.makedirs(os.path.dirname(os.path.abspath(results_csv_path)) or ".", exist_ok=True)
+
+        with open(results_csv_path, "w", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow([
+                "Recording", "Matching_Status", "Matching_Count", 
+                "Tracking_Status", "Tracking_Fraction", 
+                "Smoothing_Status", "Orientations_Status", 
+                "Total_Duration_Sec", "Error_Message"
+            ])
+            csvfile.flush()
+
+            for item in evaluation:
+                rec = item["rec"]
+                out_dir = item["out_dir"]
+                os.makedirs(out_dir, exist_ok=True)
+
+                start_time = time.time()
+                error_occurred = False
+                error_msg = ""
+                
+                m_status, m_count = "Skipped", ""
+                t_status, t_fraction = "Skipped", ""
+                s_status = "Skipped"
+                o_status = "Skipped"
+
+                # Step 1: Matching
+                if item["matching"] == "RUN" and not error_occurred:
+                    print(f"\n--- Running Matching for {rec} ---")
+                    with open(self.param_file_path, "r", encoding="utf-8") as f:
+                        params_dict = safe_load(f)
+                    
+                    m_block = None
+                    for block in params_dict:
+                        if "matching" in block:
+                            m_block = block["matching"]
+                              
+                    if m_block is None:
+                        m_block = {}
+                        params_dict.append({"matching": m_block})
+                    
+                    blobs_paths = [os.path.join(out_dir, f"blobs_{c}").replace("\\", "/") for c in cams]
+                    m_block["blob_files"] = ", ".join(blobs_paths)
+                    m_block["camera_names"] = ", ".join(cams)
+                    m_block["save_name"] = os.path.join(out_dir, "particles").replace("\\", "/")
+
+                    temp_file = os.path.join(params_dir, f"temp_params_pipeline_{rec}_matching_{randint(100, 999)}.yml")
+                    with open(temp_file, "w", encoding="utf-8") as tf:
+                        safe_dump(params_dict, tf, sort_keys=False)
+
+                    cmd = [sys.executable, workflow_path, os.path.abspath(temp_file), "matching"]
+                    res = subprocess.run(cmd, input="1\n", capture_output=True, text=True, cwd=params_dir)
+
+                    if os.path.exists(temp_file):
+                        os.remove(temp_file)
+
+                    if res.returncode != 0:
+                        m_status = "Failed"
+                        error_occurred = True
+                        error_msg = f"Matching failed: {res.stderr.strip()}"
+                        print(f"ERROR: {error_msg}")
+                    else:
+                        m_status = "Success"
+                        match = re.search(r"particles matched:\s*(\d+)", res.stdout)
+                        m_count = int(match.group(1)) if match else 0
+                        print(f"Success: Matched {m_count} particles.")
+
+                # Step 2: Tracking
+                if item["tracking"] == "RUN" and not error_occurred:
+                    print(f"--- Running Tracking for {rec} ---")
+                    with open(self.param_file_path, "r", encoding="utf-8") as f:
+                        params_dict = safe_load(f)
+                    
+                    t_block = None
+                    for block in params_dict:
+                        if "tracking" in block:
+                            t_block = block["tracking"]
+                              
+                    if t_block is None:
+                        t_block = {}
+                        params_dict.append({"tracking": t_block})
+
+                    t_block["particles_file_name"] = os.path.join(out_dir, "particles").replace("\\", "/")
+                    t_block["save_name"] = os.path.join(out_dir, "trajectories").replace("\\", "/")
+
+                    temp_file = os.path.join(params_dir, f"temp_params_pipeline_{rec}_tracking_{randint(100, 999)}.yml")
+                    with open(temp_file, "w", encoding="utf-8") as tf:
+                        safe_dump(params_dict, tf, sort_keys=False)
+
+                    cmd = [sys.executable, workflow_path, os.path.abspath(temp_file), "tracking"]
+                    res = subprocess.run(cmd, input="1\n", capture_output=True, text=True, cwd=params_dir)
+
+                    if os.path.exists(temp_file):
+                        os.remove(temp_file)
+
+                    if res.returncode != 0:
+                        t_status = "Failed"
+                        error_occurred = True
+                        error_msg = f"Tracking failed: {res.stderr.strip()}"
+                        print(f"ERROR: {error_msg}")
+                    else:
+                        t_status = "Success"
+                        match = re.search(r"untracked fraction:\s*([\d.]+)", res.stdout)
+                        t_fraction = float(match.group(1)) if match else 0.0
+                        print(f"Success: Untracked fraction: {t_fraction}")
+
+                # Step 3: Smoothing
+                if item["smoothing"] == "RUN" and not error_occurred:
+                    print(f"--- Running Smoothing for {rec} ---")
+                    with open(self.param_file_path, "r", encoding="utf-8") as f:
+                        params_dict = safe_load(f)
+                    
+                    s_block = None
+                    for block in params_dict:
+                        if "smoothing" in block:
+                            s_block = block["smoothing"]
+                              
+                    if s_block is None:
+                        s_block = {}
+                        params_dict.append({"smoothing": s_block})
+
+                    s_block["trajectory_file"] = os.path.join(out_dir, "trajectories").replace("\\", "/")
+                    s_block["save_name"] = os.path.join(out_dir, "trajectories_smoothed").replace("\\", "/")
+
+                    temp_file = os.path.join(params_dir, f"temp_params_pipeline_{rec}_smoothing_{randint(100, 999)}.yml")
+                    with open(temp_file, "w", encoding="utf-8") as tf:
+                        safe_dump(params_dict, tf, sort_keys=False)
+
+                    cmd = [sys.executable, workflow_path, os.path.abspath(temp_file), "smoothing"]
+                    res = subprocess.run(cmd, input="1\n", capture_output=True, text=True, cwd=params_dir)
+
+                    if os.path.exists(temp_file):
+                        os.remove(temp_file)
+
+                    if res.returncode != 0:
+                        s_status = "Failed"
+                        error_occurred = True
+                        error_msg = f"Smoothing failed: {res.stderr.strip()}"
+                        print(f"ERROR: {error_msg}")
+                    else:
+                        s_status = "Success"
+                        print("Success: Smoothed trajectories.")
+
+                # Step 4: Orientations
+                if item["orientations"] == "RUN" and not error_occurred:
+                    print(f"--- Running Orientations for {rec} ---")
+                    with open(self.param_file_path, "r", encoding="utf-8") as f:
+                        params_dict = safe_load(f)
+                    
+                    o_block = None
+                    for block in params_dict:
+                        if "fiber_orientations" in block:
+                            o_block = block["fiber_orientations"]
+                              
+                    if o_block is None:
+                        o_block = {}
+                        params_dict.append({"fiber_orientations": o_block})
+
+                    blobs_paths = [os.path.join(out_dir, f"blobs_{c}").replace("\\", "/") for c in cams]
+                    o_block["blob_files"] = ", ".join(blobs_paths)
+                    o_block["camera_names"] = ", ".join(cams)
+                    o_block["save_name"] = os.path.join(out_dir, "fiber_orientations").replace("\\", "/")
+                    
+                    traj_file = os.path.join(out_dir, "trajectories_smoothed").replace("\\", "/")
+                    if not os.path.exists(traj_file) and not run_smoothing:
+                        traj_file = os.path.join(out_dir, "trajectories").replace("\\", "/")
+                    o_block["trajectory_file"] = traj_file
+
+                    temp_file = os.path.join(params_dir, f"temp_params_pipeline_{rec}_orientations_{randint(100, 999)}.yml")
+                    with open(temp_file, "w", encoding="utf-8") as tf:
+                        safe_dump(params_dict, tf, sort_keys=False)
+
+                    cmd = [sys.executable, workflow_path, os.path.abspath(temp_file), "orientations"]
+                    res = subprocess.run(cmd, input="1\n", capture_output=True, text=True, cwd=params_dir)
+
+                    if os.path.exists(temp_file):
+                        os.remove(temp_file)
+
+                    if res.returncode != 0:
+                        o_status = "Failed"
+                        error_msg = f"Orientations failed: {res.stderr.strip()}"
+                        print(f"ERROR: {error_msg}")
+                    else:
+                        o_status = "Success"
+                        print("Success: Calculated orientations.")
+
+                # Save status row
+                duration = time.time() - start_time
+                writer.writerow([
+                    rec, m_status, m_count, 
+                    t_status, t_fraction, 
+                    s_status, o_status, 
+                    round(duration, 2), error_msg
+                ])
+                csvfile.flush()
+
+        print(f"\nBatch pipeline execution completed. Results -> {results_csv_path}")
+
+
+#%
         
         
         
