@@ -68,7 +68,8 @@ class workflow(object):
                                 'run_extention',
                                 'web_gui',
                                 'create_blob_mask',
-                                'batch_segmentation']
+                                'batch_segmentation',
+                                'batch_pipeline']
         
         
         # perform the wanted action:
@@ -151,6 +152,9 @@ class workflow(object):
                 
                 elif action == 'batch_segmentation':
                     self.do_batch_segmentation()
+                
+                elif action == 'batch_pipeline':
+                    self.do_batch_pipeline()
                 
                 elif action == 'help':
                     self.help_me()
