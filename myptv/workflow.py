@@ -2712,7 +2712,7 @@ class workflow(object):
                         o_block = {}
                         params_dict.append({"fiber_orientations": o_block})
 
-                    blobs_paths = [os.path.join(out_dir, f"blobs_{c}").replace("\\", "/") for c in cams]
+                    blobs_paths = [os.path.join(out_dir, f"blobs_{c.lower()}_directions").replace("\\", "/") for c in cams]
                     o_block["blob_files"] = ", ".join(blobs_paths)
                     o_block["camera_names"] = ", ".join(cams)
                     o_block["save_name"] = os.path.join(out_dir, "fiber_orientations").replace("\\", "/")
