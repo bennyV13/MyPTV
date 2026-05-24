@@ -67,7 +67,8 @@ class workflow(object):
                                 'animate_trajectories',
                                 'run_extention',
                                 'web_gui',
-                                'create_blob_mask']
+                                'create_blob_mask',
+                                'batch_segmentation']
         
         
         # perform the wanted action:
@@ -147,6 +148,9 @@ class workflow(object):
 
                 elif action == 'create_blob_mask':
                     self.do_create_blob_mask()
+                
+                elif action == 'batch_segmentation':
+                    self.do_batch_segmentation()
                 
                 elif action == 'help':
                     self.help_me()
@@ -2068,8 +2072,311 @@ class workflow(object):
     #                         End of legacy functions
     # /\/\//\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/\/
     # ========================================================================
-    
-    
+    def do_batch_segmentation(self):
+        '''
+        Runs MyPTV segmentation for every (Recording, Camera) pair under recordings_dir
+        and logs the final summary and statistics to a CSV file.
+        '''
+        import sys
+        import os
+        import copy
+        import subprocess
+        import re
+        import csv
+        from datetime import datetime
+        from yaml import safe_dump, safe_load
+
+        # 1. Fetch batch_segmentation parameters from the params file
+        recordings_dir = self.get_param('batch_segmentation', 'recordings_dir')
+        ptv_results_dir = self.get_param('batch_segmentation', 'ptv_results_dir')
+        results_csv_path = self.get_param('batch_segmentation', 'results_csv')
+        sub_dir = self.get_param('batch_segmentation', 'sub_dir')
+        
+        # Check dry run
+        cli_dry_run = '--dry-run' in sys.argv or '-d' in sys.argv
+        try: file_dry_run = self.get_param('batch_segmentation', 'dry_run')
+        except: file_dry_run = False
+        dry_run = cli_dry_run or file_dry_run
+
+        try: run_if_exists = self.get_param('batch_segmentation', 'run_if_exists')
+        except: run_if_exists = True
+            
+        try: save_blobs = self.get_param('batch_segmentation', 'save_blobs')
+        except: save_blobs = True
+
+        try: cams = self.get_param('batch_segmentation', 'cams')
+        except: cams = None
+        if isinstance(cams, str):
+            cams = [c.strip() for c in cams.split(',')]
+
+        try: masks_dir = self.get_param('batch_segmentation', 'masks_dir')
+        except: masks_dir = None
+
+        try: bg_dir = self.get_param('batch_segmentation', 'bg_dir')
+        except: bg_dir = None
+
+        try: global_blur_sigma = self.get_param('batch_segmentation', 'blur_sigma')
+        except: global_blur_sigma = None
+
+        try: global_min_mass = self.get_param('batch_segmentation', 'min_mass')
+        except: global_min_mass = None
+
+        try: camera_thresholds = self.get_param('batch_segmentation', 'camera_thresholds')
+        except: camera_thresholds = None
+
+        try: camera_blur_sigmas = self.get_param('batch_segmentation', 'camera_blur_sigmas')
+        except: camera_blur_sigmas = None
+
+        try: camera_min_masses = self.get_param('batch_segmentation', 'camera_min_masses')
+        except: camera_min_masses = None
+
+        if not os.path.exists(recordings_dir):
+            print(f"ERROR: recordings_dir does not exist: {recordings_dir}")
+            return
+
+        planned = []
+        for rec in sorted(os.listdir(recordings_dir)):
+            rec_path = os.path.join(recordings_dir, rec)
+            if not (os.path.isdir(rec_path) and rec.lower().startswith("rec")):
+                continue
+            for cam in sorted(os.listdir(rec_path)):
+                cam_img_dir = os.path.join(rec_path, cam)
+                if not (os.path.isdir(cam_img_dir) and cam.lower().startswith("cam")):
+                    continue
+                if cams and cam not in cams:
+                    continue
+                planned.append((rec, cam, cam_img_dir))
+
+        if not planned:
+            print("No (Rec, Cam) pairs found.")
+            return
+
+        workflow_path = os.path.abspath(__file__)
+
+        if dry_run:
+            print(f"--- DRY RUN: Planned (Rec, Cam) pairs to process ---")
+            print(f"Recordings Dir: {recordings_dir}")
+            print(f"Results CSV Destination: {results_csv_path}")
+            print(f"Save Blobs: {save_blobs} | Run If Exists: {run_if_exists}")
+            if masks_dir: print(f"Masks Dir: {masks_dir}")
+            if bg_dir: print(f"BG Dir: {bg_dir}")
+            
+            for rec, cam, cam_img_dir in planned:
+                out_dir = os.path.join(ptv_results_dir, f"{rec}_data", sub_dir)
+                target_name = f"blobs_{cam}"
+                existing_path = None
+                if os.path.exists(out_dir):
+                    for f in os.listdir(out_dir):
+                        if f.lower() == target_name.lower():
+                            existing_path = os.path.join(out_dir, f)
+                            break
+                
+                status_str = "Will process"
+                if existing_path:
+                    status_str = "Will SKIP (exists)" if not run_if_exists else "Will SAVE TO TMP (exists)"
+                elif not save_blobs:
+                    status_str = "Will run but NOT SAVE blobs"
+
+                bg_info = "None"
+                if bg_dir:
+                    rec_bg_subfolder = None
+                    if os.path.exists(bg_dir):
+                        for d in os.listdir(bg_dir):
+                            if d.lower() == rec.lower() and os.path.isdir(os.path.join(bg_dir, d)):
+                                rec_bg_subfolder = os.path.join(bg_dir, d)
+                                break
+                    bg_file = None
+                    if rec_bg_subfolder:
+                        for f in os.listdir(rec_bg_subfolder):
+                            if f.lower().startswith("bg") and cam.lower() in f.lower() and f.lower().endswith(".tif"):
+                                bg_file = os.path.join(rec_bg_subfolder, f)
+                                break
+                    if bg_file:
+                        bg_info = f"Recording-specific: {bg_file}"
+                    else:
+                        if os.path.exists(bg_dir):
+                            for f in os.listdir(bg_dir):
+                                if f.lower().startswith("bg") and cam.lower() in f.lower() and f.lower().endswith(".tif") and os.path.isfile(os.path.join(bg_dir, f)):
+                                    bg_file = os.path.join(bg_dir, f)
+                                    break
+                        if bg_file:
+                            bg_info = f"Global fallback: {bg_file}"
+                        else:
+                            bg_info = "None found (Warning)"
+
+                mask_info = "None"
+                if masks_dir:
+                    mask_filename = f"mask_{cam}.tif"
+                    mask_path = None
+                    if os.path.exists(masks_dir):
+                        for f in os.listdir(masks_dir):
+                            if f.lower() == mask_filename.lower():
+                                mask_path = os.path.join(masks_dir, f)
+                                break
+                    mask_info = mask_path if mask_path else f"MISSING ({mask_filename})"
+
+                thr = camera_thresholds.get(cam, "Default") if camera_thresholds else "Default"
+                bs = camera_blur_sigmas.get(cam, global_blur_sigma if global_blur_sigma is not None else "Default") if camera_blur_sigmas else (global_blur_sigma if global_blur_sigma is not None else "Default")
+                mm = camera_min_masses.get(cam, global_min_mass if global_min_mass is not None else "Default") if camera_min_masses else (global_min_mass if global_min_mass is not None else "Default")
+
+                print(f" - Rec={rec} | Cam={cam} | threshold={thr} | blur_sigma={bs} | min_mass={mm} | Mask={mask_info} | BG={bg_info} | Status={status_str}")
+            print(f"--- Dry run complete. No files written. ---")
+            return
+
+        # Actual run
+        os.makedirs(os.path.dirname(os.path.abspath(results_csv_path)) or ".", exist_ok=True)
+
+        with open(results_csv_path, "w", newline="") as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(["Recording", "Camera", "Threshold", "BlurSigma", "MinMass", "BlobCount"])
+            csvfile.flush()
+
+            for rec, cam, cam_img_dir in planned:
+                out_dir = os.path.join(ptv_results_dir, f"{rec}_data", sub_dir)
+                os.makedirs(out_dir, exist_ok=True)
+                target_name = f"blobs_{cam}"
+                save_name = os.path.join(out_dir, target_name)
+
+                existing_path = None
+                if os.path.exists(out_dir):
+                    for f in os.listdir(out_dir):
+                        if f.lower() == target_name.lower():
+                            existing_path = os.path.join(out_dir, f)
+                            break
+
+                is_backup = False
+                if existing_path:
+                    if not run_if_exists:
+                        print(f"SKIP: {existing_path} already exists and run_if_exists=False.")
+                        continue
+                    
+                    tmp_dir = os.path.join(out_dir, "tmp")
+                    os.makedirs(tmp_dir, exist_ok=True)
+                    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                    save_name = os.path.join(tmp_dir, f"blobs_{cam}_{timestamp}")
+                    print(f"INFO: {existing_path} already exists. Saving to tmp: {save_name}")
+                    is_backup = True
+
+                actual_save_name = save_name
+                delete_after = False
+                if not save_blobs:
+                    delete_after = True
+                    if not is_backup:
+                        actual_save_name = os.path.join(out_dir, f"temp_blobs_{cam}_{datetime.now().strftime('%H%M%S')}")
+                    print(f"INFO: save_blobs=False. {actual_save_name} will be deleted after counting.")
+
+                with open(self.param_file_path, "r", encoding="utf-8") as f:
+                    base_params = safe_load(f)
+
+                seg_block = None
+                for d in base_params:
+                    if "segmentation" in d:
+                        seg_block = d["segmentation"]
+                        break
+                if seg_block is None:
+                    seg_block = {}
+                    base_params.append({"segmentation": seg_block})
+
+                seg_block["images_folder"] = cam_img_dir.replace("\\", "/")
+                seg_block["save_name"] = actual_save_name.replace("\\", "/")
+
+                if masks_dir:
+                    mask_filename = f"mask_{cam}.tif"
+                    mask_path = None
+                    if os.path.exists(masks_dir):
+                        for f in os.listdir(masks_dir):
+                            if f.lower() == mask_filename.lower():
+                                mask_path = os.path.join(masks_dir, f)
+                                break
+                    if mask_path:
+                        seg_block["mask"] = os.path.abspath(mask_path).replace("\\", "/")
+                    else:
+                        print(f"ERROR: Mask file not found for {cam} in {masks_dir} (expected {mask_filename})")
+                        sys.exit(1)
+
+                if camera_thresholds and cam in camera_thresholds:
+                    seg_block["threshold"] = camera_thresholds[cam]
+
+                if camera_blur_sigmas and cam in camera_blur_sigmas:
+                    seg_block["blur_sigma"] = camera_blur_sigmas[cam]
+                elif global_blur_sigma is not None:
+                    seg_block["blur_sigma"] = global_blur_sigma
+
+                if camera_min_masses and cam in camera_min_masses:
+                    seg_block["min_mass"] = camera_min_masses[cam]
+                elif global_min_mass is not None:
+                    seg_block["min_mass"] = global_min_mass
+
+                if bg_dir:
+                    bg_file_rec = None
+                    rec_bg_subfolder = None
+                    if os.path.exists(bg_dir):
+                        for d in os.listdir(bg_dir):
+                            if d.lower() == rec.lower() and os.path.isdir(os.path.join(bg_dir, d)):
+                                rec_bg_subfolder = os.path.join(bg_dir, d)
+                                break
+                    if rec_bg_subfolder:
+                        for f in os.listdir(rec_bg_subfolder):
+                            f_lower = f.lower()
+                            if f_lower.startswith("bg") and cam.lower() in f_lower and f_lower.endswith(".tif"):
+                                bg_file_rec = os.path.join(rec_bg_subfolder, f)
+                                break
+                    if bg_file_rec:
+                        seg_block["remove_background"] = os.path.abspath(bg_file_rec).replace("\\", "/")
+                        print(f"Applying recording-specific background: {seg_block['remove_background']}")
+                    else:
+                        bg_file_global = None
+                        if os.path.exists(bg_dir):
+                            for f in os.listdir(bg_dir):
+                                f_lower = f.lower()
+                                if f_lower.startswith("bg") and cam.lower() in f_lower and f_lower.endswith(".tif") and os.path.isfile(os.path.join(bg_dir, f)):
+                                    bg_file_global = os.path.join(bg_dir, f)
+                                    break
+                        if bg_file_global:
+                            seg_block["remove_background"] = os.path.abspath(bg_file_global).replace("\\", "/")
+                            print(f"Applying global fallback background: {seg_block['remove_background']}")
+                        else:
+                            print(f"Warning: No background found for {cam} in {bg_dir}")
+                            if "remove_background" in seg_block:
+                                del seg_block["remove_background"]
+                else:
+                    if "remove_background" in seg_block:
+                        del seg_block["remove_background"]
+
+                threshold_used = seg_block.get("threshold", "N/A")
+                blur_sigma_used = seg_block.get("blur_sigma", "N/A")
+                min_mass_used = seg_block.get("min_mass", "N/A")
+
+                params_dir = os.path.dirname(os.path.abspath(self.param_file_path))
+                temp_params_file = os.path.join(params_dir, f"temp_params_batch_{cam}.yml")
+                with open(temp_params_file, "w", encoding="utf-8") as tf:
+                    safe_dump(base_params, tf, sort_keys=False)
+
+                print(f"Running segmentation | Rec={rec} | Cam={cam} | threshold={threshold_used} | blur_sigma={blur_sigma_used} | min_mass={min_mass_used}")
+
+                cmd = [sys.executable, workflow_path, os.path.abspath(temp_params_file), "segmentation"]
+                result = subprocess.run(cmd, capture_output=True, text=True, cwd=params_dir)
+
+                if result.returncode != 0:
+                    print(f"ERROR: Workflow failed for {temp_params_file}")
+                    print(result.stderr.strip())
+                    count = 0
+                else:
+                    m = re.search(r"blobs found:\s*(\d+)", result.stdout)
+                    count = int(m.group(1)) if m else 0
+
+                writer.writerow([rec, cam, threshold_used, blur_sigma_used, min_mass_used, count])
+                csvfile.flush()
+                print(f"Done | Rec={rec} | Cam={cam} | blobs: {count}")
+
+                if os.path.exists(temp_params_file):
+                    os.remove(temp_params_file)
+                if delete_after and os.path.exists(actual_save_name):
+                    os.remove(actual_save_name)
+
+        print(f"Batch segmentation completed. Results -> {results_csv_path}")
+
+
 #%%
         
         
@@ -2083,6 +2390,7 @@ if __name__ == '__main__':
     parser.add_argument('fname', help='Parameters file name')
     parser.add_argument('action', help='Action to perform')
     parser.add_argument('--comment', default='', help='Comment for the log entry')
+    parser.add_argument('--dry-run', '-d', action='store_true', help='Run in dry-run mode for batch action')
     args = parser.parse_args()
 
     print('\n','given inputs -')
