@@ -105,7 +105,7 @@ def get_velocity_list(traj_list, kind='x'):
     elif kind=='KE':
         get_component = lambda tr: 0.5*(np.sum(tr[:,4:7]**2, axis=1))
     
-    if kind=='ax':
+    elif kind=='ax':
         get_component = lambda tr: tr[:,7]
     
     elif kind=='ay':
@@ -116,6 +116,9 @@ def get_velocity_list(traj_list, kind='x'):
         
     elif kind=='aKE':
         get_component = lambda tr: 0.5*(np.sum(tr[:,7:10]**2, axis=1))
+        
+    else:
+        raise ValueError('undefined kind "%s"'%kind)
             
     lst = [u for tr in traj_list for u in get_component(tr) ]
     
@@ -141,6 +144,9 @@ def get_trajectory_velocities(traj_list, kind='x'):
         
     elif kind=='KE':
         get_component = lambda tr: 0.5*(np.sum(tr[:,4:7]**2, axis=1))
+        
+    else:
+        raise ValueError('undefined kind "%s"'%kind)
         
     lst = [get_component(tr) for tr in traj_list]
     
@@ -240,6 +246,9 @@ def get_mean_std_time_series(traj_list, kind='x'):
         
     elif kind=='KE':
         get_component = lambda tr: 0.5*(np.sum(tr[:,4:7]**2, axis=1))
+        
+    else:
+        raise ValueError('undefined kind "%s"'%kind)
     
     tm_lst = []
     
@@ -290,6 +299,9 @@ def get_mean_velocity_profiles(traj_list, start, stop, nbins, direction, kind):
         
     elif kind=='KE':
         get_component = lambda tr: 0.5*(np.sum(tr[:,4:7]**2, axis=1))
+        
+    else:
+        raise ValueError('undefined kind "%s"'%kind)
     
     
     if direction=='x':
@@ -300,6 +312,9 @@ def get_mean_velocity_profiles(traj_list, start, stop, nbins, direction, kind):
         
     elif direction=='z':
         get_cordinate = lambda tr: tr[:,3]
+        
+    else:
+        raise ValueError('undefined direction "%s"'%direction)
     
     
     cord_lst = []
@@ -312,7 +327,15 @@ def get_mean_velocity_profiles(traj_list, start, stop, nbins, direction, kind):
     bins = ((np.array(cord_lst) - start)/(stop-start)*nbins).astype('int')
     
     vals = pd.DataFrame({'bins': bins, 'v': v_lst})
-    avg_V = [np.mean(g['v']) for k,g in vals.groupby('bins') if k<nbins and k>=0]
+    
+    avg_V = []
+    grouped = dict(list(vals.groupby('bins')))
+    for i in range(nbins):
+        if i in grouped:
+            avg_V.append(np.mean(grouped[i]['v']))
+        else:
+            avg_V.append(np.nan)
+            
     db = (stop-start)/nbins
     axis = [start+db*(i+0.5) for i in range(nbins)]
     
@@ -352,6 +375,9 @@ def get_std_velocity_profiles(traj_list, start, stop, nbins, direction, kind):
         
     elif kind=='KE':
         get_component = lambda tr: 0.5*(np.sum(tr[:,4:7]**2, axis=1))
+        
+    else:
+        raise ValueError('undefined kind "%s"'%kind)
     
     
     if direction=='x':
@@ -362,6 +388,9 @@ def get_std_velocity_profiles(traj_list, start, stop, nbins, direction, kind):
         
     elif direction=='z':
         get_cordinate = lambda tr: tr[:,3]
+        
+    else:
+        raise ValueError('undefined direction "%s"'%direction)
     
     
     cord_lst = []
@@ -374,7 +403,15 @@ def get_std_velocity_profiles(traj_list, start, stop, nbins, direction, kind):
     bins = ((np.array(cord_lst) - start)/(stop-start)*nbins).astype('int')
     
     vals = pd.DataFrame({'bins': bins, 'v': v_lst})
-    std_V = [np.std(g['v']) for k,g in vals.groupby('bins') if k<nbins and k>=0]
+    
+    std_V = []
+    grouped = dict(list(vals.groupby('bins')))
+    for i in range(nbins):
+        if i in grouped:
+            std_V.append(np.std(grouped[i]['v']))
+        else:
+            std_V.append(np.nan)
+            
     db = (stop-start)/nbins
     axis = [start+db*(i+0.5) for i in range(nbins)]
     
