@@ -2482,14 +2482,30 @@ class workflow(object):
         workflow_path = os.path.abspath(__file__)
         params_dir = os.path.dirname(os.path.abspath(self.param_file_path))
 
+        # Extract custom save_name basenames from parameter file
+        m_save, t_save, s_save, o_save = "particles", "trajectories", "trajectories_smoothed", "fiber_orientations"
+        try:
+            with open(self.param_file_path, "r", encoding="utf-8") as f:
+                for block in safe_load(f):
+                    if "matching" in block and "save_name" in block["matching"] and block["matching"]["save_name"]:
+                        m_save = os.path.basename(block["matching"]["save_name"].strip())
+                    if "tracking" in block and "save_name" in block["tracking"] and block["tracking"]["save_name"]:
+                        t_save = os.path.basename(block["tracking"]["save_name"].strip())
+                    if "smoothing" in block and "save_name" in block["smoothing"] and block["smoothing"]["save_name"]:
+                        s_save = os.path.basename(block["smoothing"]["save_name"].strip())
+                    if "fiber_orientations" in block and "save_name" in block["fiber_orientations"] and block["fiber_orientations"]["save_name"]:
+                        o_save = os.path.basename(block["fiber_orientations"]["save_name"].strip())
+        except Exception:
+            pass
+
         evaluation = []
         for rec in planned_recs:
             out_dir = os.path.join(ptv_results_dir, f"{rec}_data", sub_dir)
             
-            matching_out = os.path.join(out_dir, "particles")
-            tracking_out = os.path.join(out_dir, "trajectories")
-            smoothing_out = os.path.join(out_dir, "trajectories_smoothed")
-            orientations_out = os.path.join(out_dir, "fiber_orientations")
+            matching_out = os.path.join(out_dir, m_save)
+            tracking_out = os.path.join(out_dir, t_save)
+            smoothing_out = os.path.join(out_dir, s_save)
+            orientations_out = os.path.join(out_dir, o_save)
 
             run_m_action = "SKIP"
             run_t_action = "SKIP"
@@ -2595,10 +2611,20 @@ class workflow(object):
                         m_block = {}
                         params_dict.append({"matching": m_block})
                     
-                    blobs_paths = [os.path.join(out_dir, f"blobs_{c}").replace("\\", "/") for c in cams]
+                    if "blob_files" in m_block and m_block["blob_files"]:
+                        user_blobs = m_block["blob_files"].split(",")
+                        blobs_paths = [os.path.join(out_dir, os.path.basename(b.strip())).replace("\\", "/") for b in user_blobs]
+                    else:
+                        blobs_paths = [os.path.join(out_dir, f"blobs_{c}").replace("\\", "/") for c in cams]
                     m_block["blob_files"] = ", ".join(blobs_paths)
-                    m_block["camera_names"] = ", ".join(cams)
-                    m_block["save_name"] = os.path.join(out_dir, "particles").replace("\\", "/")
+                    
+                    if "camera_names" not in m_block or not m_block["camera_names"]:
+                        m_block["camera_names"] = ", ".join(cams)
+                        
+                    if "save_name" in m_block and m_block["save_name"]:
+                        m_block["save_name"] = os.path.join(out_dir, os.path.basename(m_block["save_name"].strip())).replace("\\", "/")
+                    else:
+                        m_block["save_name"] = os.path.join(out_dir, "particles").replace("\\", "/")
 
                     temp_file = os.path.join(params_dir, f"temp_params_pipeline_{rec}_matching_{randint(100, 999)}.yml")
                     with open(temp_file, "w", encoding="utf-8") as tf:
@@ -2620,6 +2646,8 @@ class workflow(object):
                         match = re.search(r"particles matched:\s*(\d+)", res.stdout)
                         m_count = int(match.group(1)) if match else 0
                         print(f"Success: Matched {m_count} particles.")
+                elif "SKIP" in item["matching"] and not error_occurred:
+                    print(f"--- Skipping Matching for {rec}: {item['matching']} ---")
 
                 # Step 2: Tracking
                 if item["tracking"] == "RUN" and not error_occurred:
@@ -2636,8 +2664,15 @@ class workflow(object):
                         t_block = {}
                         params_dict.append({"tracking": t_block})
 
-                    t_block["particles_file_name"] = os.path.join(out_dir, "particles").replace("\\", "/")
-                    t_block["save_name"] = os.path.join(out_dir, "trajectories").replace("\\", "/")
+                    if "particles_file_name" in t_block and t_block["particles_file_name"]:
+                        t_block["particles_file_name"] = os.path.join(out_dir, os.path.basename(t_block["particles_file_name"].strip())).replace("\\", "/")
+                    else:
+                        t_block["particles_file_name"] = os.path.join(out_dir, "particles").replace("\\", "/")
+                        
+                    if "save_name" in t_block and t_block["save_name"]:
+                        t_block["save_name"] = os.path.join(out_dir, os.path.basename(t_block["save_name"].strip())).replace("\\", "/")
+                    else:
+                        t_block["save_name"] = os.path.join(out_dir, "trajectories").replace("\\", "/")
 
                     temp_file = os.path.join(params_dir, f"temp_params_pipeline_{rec}_tracking_{randint(100, 999)}.yml")
                     with open(temp_file, "w", encoding="utf-8") as tf:
@@ -2659,6 +2694,8 @@ class workflow(object):
                         match = re.search(r"untracked fraction:\s*([\d.]+)", res.stdout)
                         t_fraction = float(match.group(1)) if match else 0.0
                         print(f"Success: Untracked fraction: {t_fraction}")
+                elif "SKIP" in item["tracking"] and not error_occurred:
+                    print(f"--- Skipping Tracking for {rec}: {item['tracking']} ---")
 
                 # Step 3: Smoothing
                 if item["smoothing"] == "RUN" and not error_occurred:
@@ -2675,8 +2712,15 @@ class workflow(object):
                         s_block = {}
                         params_dict.append({"smoothing": s_block})
 
-                    s_block["trajectory_file"] = os.path.join(out_dir, "trajectories").replace("\\", "/")
-                    s_block["save_name"] = os.path.join(out_dir, "trajectories_smoothed").replace("\\", "/")
+                    if "trajectory_file" in s_block and s_block["trajectory_file"]:
+                        s_block["trajectory_file"] = os.path.join(out_dir, os.path.basename(s_block["trajectory_file"].strip())).replace("\\", "/")
+                    else:
+                        s_block["trajectory_file"] = os.path.join(out_dir, "trajectories").replace("\\", "/")
+                        
+                    if "save_name" in s_block and s_block["save_name"]:
+                        s_block["save_name"] = os.path.join(out_dir, os.path.basename(s_block["save_name"].strip())).replace("\\", "/")
+                    else:
+                        s_block["save_name"] = os.path.join(out_dir, "trajectories_smoothed").replace("\\", "/")
 
                     temp_file = os.path.join(params_dir, f"temp_params_pipeline_{rec}_smoothing_{randint(100, 999)}.yml")
                     with open(temp_file, "w", encoding="utf-8") as tf:
@@ -2696,6 +2740,8 @@ class workflow(object):
                     else:
                         s_status = "Success"
                         print("Success: Smoothed trajectories.")
+                elif "SKIP" in item["smoothing"] and not error_occurred:
+                    print(f"--- Skipping Smoothing for {rec}: {item['smoothing']} ---")
 
                 # Step 4: Orientations
                 if item["orientations"] == "RUN" and not error_occurred:
@@ -2712,21 +2758,34 @@ class workflow(object):
                         o_block = {}
                         params_dict.append({"fiber_orientations": o_block})
 
-                    blobs_paths = [os.path.join(out_dir, f"blobs_{c.lower()}_directions").replace("\\", "/") for c in cams]
+                    if "blob_files" in o_block and o_block["blob_files"]:
+                        user_blobs = o_block["blob_files"].split(",")
+                        blobs_paths = [os.path.join(out_dir, os.path.basename(b.strip())).replace("\\", "/") for b in user_blobs]
+                    else:
+                        blobs_paths = [os.path.join(out_dir, f"blobs_{c.lower()}_directions").replace("\\", "/") for c in cams]
                     o_block["blob_files"] = ", ".join(blobs_paths)
-                    o_block["camera_names"] = ", ".join(cams)
-                    o_block["save_name"] = os.path.join(out_dir, "fiber_orientations").replace("\\", "/")
                     
-                    traj_file = os.path.join(out_dir, "trajectories_smoothed").replace("\\", "/")
-                    if not os.path.exists(traj_file) and not run_smoothing:
-                        traj_file = os.path.join(out_dir, "trajectories").replace("\\", "/")
-                    o_block["trajectory_file"] = traj_file
+                    if "camera_names" not in o_block or not o_block["camera_names"]:
+                        o_block["camera_names"] = ", ".join(cams)
+                        
+                    if "save_name" in o_block and o_block["save_name"]:
+                        o_block["save_name"] = os.path.join(out_dir, os.path.basename(o_block["save_name"].strip())).replace("\\", "/")
+                    else:
+                        o_block["save_name"] = os.path.join(out_dir, "fiber_orientations").replace("\\", "/")
+                    
+                    if "trajectory_file" in o_block and o_block["trajectory_file"]:
+                        o_block["trajectory_file"] = os.path.join(out_dir, os.path.basename(o_block["trajectory_file"].strip())).replace("\\", "/")
+                    else:
+                        traj_file = os.path.join(out_dir, "trajectories_smoothed").replace("\\", "/")
+                        if not os.path.exists(traj_file) and not run_smoothing:
+                            traj_file = os.path.join(out_dir, "trajectories").replace("\\", "/")
+                        o_block["trajectory_file"] = traj_file
 
                     temp_file = os.path.join(params_dir, f"temp_params_pipeline_{rec}_orientations_{randint(100, 999)}.yml")
                     with open(temp_file, "w", encoding="utf-8") as tf:
                         safe_dump(params_dict, tf, sort_keys=False)
 
-                    cmd = [sys.executable, workflow_path, os.path.abspath(temp_file), "orientations"]
+                    cmd = [sys.executable, workflow_path, os.path.abspath(temp_file), "fiber_orientations"]
                     res = subprocess.run(cmd, input="1\n", capture_output=True, text=True, cwd=params_dir)
 
                     if os.path.exists(temp_file):
@@ -2738,7 +2797,9 @@ class workflow(object):
                         print(f"ERROR: {error_msg}")
                     else:
                         o_status = "Success"
-                        print("Success: Calculated orientations.")
+                        print("Success: Calculated fiber orientations.")
+                elif "SKIP" in item["orientations"] and not error_occurred:
+                    print(f"--- Skipping Orientations for {rec}: {item['orientations']} ---")
 
                 # Save status row
                 duration = time.time() - start_time
