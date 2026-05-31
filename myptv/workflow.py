@@ -132,6 +132,9 @@ class workflow(object):
                 elif action == 'plot_trajectories':
                     self.do_plot_trajectories()
                     
+                elif action == 'plot_fibers':
+                    self.do_plot_fibers()
+                    
                 elif action == 'animate_trajectories':
                     self.do_animate_trajectories()
                 
@@ -1844,6 +1847,32 @@ class workflow(object):
                           write_trajID=write_trajID, 
                           t0=t0, 
                           te=te)
+    
+    
+    def do_plot_fibers(self):
+        '''
+        This function is used to generate a 3D plot of fiber orientations and rotation rates.
+        '''
+        from myptv.makePlots.plot_trajectories import plot_fibers
+        
+        # fetching parameters
+        trajectory_file = self.get_param('plot_fibers', 'trajectory_file')
+        orientations_file = self.get_param('plot_fibers', 'orientations_file')
+        min_length = int(self.get_param('plot_fibers', 'min_length'))
+        write_trajID = self.get_param('plot_fibers', 'write_trajID')
+        t0 = int(self.get_param('plot_fibers', 't0'))
+        te = int(self.get_param('plot_fibers', 'te'))
+        length_scale = float(self.get_param('plot_fibers', 'length_scale'))
+        mode = self.get_param('plot_fibers', 'mode')
+        
+        plot_fibers(trajectory_file, 
+                    orientations_file, 
+                    min_length, 
+                    write_trajID=write_trajID, 
+                    t0=t0, 
+                    te=te, 
+                    length_scale=length_scale, 
+                    mode=mode)
     
     
     
