@@ -465,6 +465,10 @@ def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=Fal
             pdot_z = np.zeros(len(frames))
             omega_dots = np.zeros(len(frames))
 
+        # Note: 'speed_colored_rod' colors segments by local speed (translation + rotation). 
+        # Even with rod_segments=1, it is conceptually different from 'centered_rod':
+        # - 'centered_rod' colors the entire rod based on its rotation rate (omega_dots) in rad/frame.
+        # - 'speed_colored_rod' with 1 segment colors the entire rod based on its center of mass translational speed (v_cm) in pixels/frame.
         if mode == 'speed_colored_rod':
             L = length_scale
             s_mids = np.linspace(-0.5 * L, 0.5 * L, rod_segments + 1)

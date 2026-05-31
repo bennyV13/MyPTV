@@ -134,7 +134,7 @@ def plot_selection_cli(data, selected_indices):
     print("-" * 50)
 
 
-def run_two_step_calibration(cal_dir, suffix='_cal_points', target_cam=None):
+def run_two_step_calibration(cal_dir, suffix='_cal_points', target_cam=None, alpha=0.001, step1_quadratic=False, step2_quadratic=False):
     print(f"--- MyPTV Automated Two-Step Calibration ---")
     print(f"Working Directory: {cal_dir}")
     print(f"Point file suffix: {suffix}")
@@ -171,8 +171,9 @@ def run_two_step_calibration(cal_dir, suffix='_cal_points', target_cam=None):
         
         try:
             cam = camera_extendedZolof(cam_name, cal_points_fname=temp_manual_file)
-            cal_init = calibrate_extendedZolof(cam, cam.image_points, cam.lab_points, quadratic=True)
-            print(f"  Solving with {len(initial_subset)} discovered points (Quadratic)...")
+            cal_init = calibrate_extendedZolof(cam, cam.image_points, cam.lab_points, quadratic=step1_quadratic, alpha=alpha)
+            order_str = "Quadratic" if step1_quadratic else "3rd Order"
+            print(f"  Solving with {len(initial_subset)} discovered points ({order_str}, alpha={alpha})...")
             cal_init.calibrate()
             print(f"  Initial RMS Error: {cal_init.mean_squared_err():.6f} pixels")
             cam.save(output_dir)
@@ -190,8 +191,9 @@ def run_two_step_calibration(cal_dir, suffix='_cal_points', target_cam=None):
             cam_final = camera_extendedZolof(cam_name, cal_points_fname=full_points_file)
             cam_final.load(output_dir)
             # quadratic=False uses 3rd order polynomial
-            cal_final = calibrate_extendedZolof(cam_final, cam_final.image_points, cam_final.lab_points, quadratic=False)
-            print(f"  Refining with {len(full_data)} points (3rd Order)...")
+            cal_final = calibrate_extendedZolof(cam_final, cam_final.image_points, cam_final.lab_points, quadratic=step2_quadratic, alpha=alpha)
+            order_str = "Quadratic" if step2_quadratic else "3rd Order"
+            print(f"  Refining with {len(full_data)} points ({order_str}, alpha={alpha})...")
             cal_final.calibrate()
             print(f"  Final RMS Error: {cal_final.mean_squared_err():.6f} pixels")
             cam_final.save(output_dir)
@@ -208,6 +210,9 @@ if __name__ == "__main__":
     parser.add_argument("--dir", required=True, help="Directory containing point files")
     parser.add_argument("--suffix", default='_cal_points', help="Point file suffix")
     parser.add_argument("--cam", help="Specific camera to process (e.g., Cam2)")
+    parser.add_argument("--alpha", type=float, default=0.001, help="Regularization parameter alpha (default: 0.001)")
+    parser.add_argument("--step1-quadratic", action="store_true", help="Force Step 1 initial solve to use quadratic fit instead of cubic")
+    parser.add_argument("--step2-quadratic", action="store_true", help="Force Step 2 refinement to use quadratic fit instead of cubic")
     
     args = parser.parse_args()
     
@@ -216,5 +221,5 @@ if __name__ == "__main__":
         project_root = '/Users/user/Desktop/Research'
         work_dir = os.path.join(project_root, work_dir)
         
-    run_two_step_calibration(work_dir, suffix=args.suffix, target_cam=args.cam)
+    run_two_step_calibration(work_dir, suffix=args.suffix, target_cam=args.cam, alpha=args.alpha, step1_quadratic=args.step1_quadratic, step2_quadratic=args.step2_quadratic)
 

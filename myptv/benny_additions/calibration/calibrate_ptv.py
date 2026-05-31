@@ -7,7 +7,7 @@ from myptv.extendedZolof.calibrate import calibrate_extendedZolof
 # =====================
 DEFAULT_CAMERAS = ['Cam1', 'Cam2', 'Cam3', 'Cam4']
 
-def run_calibration(cal_dir, suffix='_cal_points'):
+def run_calibration(cal_dir, suffix='_cal_points', alpha=0.001, quadratic=False):
     print(f"--- MyPTV Calibration Tool ---")
     print(f"Working Directory: {cal_dir}")
     print(f"Point file suffix: {suffix}")
@@ -34,8 +34,8 @@ def run_calibration(cal_dir, suffix='_cal_points'):
             print(f"  Error initializing camera: {e}")
             continue
         
-        # 2. Setup the calibrator (quadratic=False for full 3rd order polynomial)
-        cal = calibrate_extendedZolof(cam, cam.image_points, cam.lab_points, quadratic=False)
+        # 2. Setup the calibrator (using quadratic and alpha settings)
+        cal = calibrate_extendedZolof(cam, cam.image_points, cam.lab_points, quadratic=quadratic, alpha=alpha)
         
         # 3. Perform the calibration
         print(f"  Calculating coefficients from {len(cam.image_points)} points...")
@@ -62,6 +62,8 @@ if __name__ == "__main__":
                         help="Directory containing the calibration point files")
     parser.add_argument("--suffix", default='_cal_points',
                         help="Suffix for the point files (e.g., _indexed or _cal_points)")
+    parser.add_argument("--alpha", type=float, default=0.001, help="Regularization parameter alpha (default: 0.001)")
+    parser.add_argument("--quadratic", action="store_true", help="Force calibration to use quadratic fit instead of cubic")
     
     args = parser.parse_args()
     
@@ -72,4 +74,4 @@ if __name__ == "__main__":
         project_root = '/Users/user/Desktop/Research'
         work_dir = os.path.join(project_root, work_dir)
         
-    run_calibration(work_dir, suffix=args.suffix)
+    run_calibration(work_dir, suffix=args.suffix, alpha=args.alpha, quadratic=args.quadratic)

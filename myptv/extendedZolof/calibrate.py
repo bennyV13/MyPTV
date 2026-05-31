@@ -10,6 +10,7 @@ obtain the [A], [B], and O Extended Zolof model parameters.
 
 """
 
+import numpy as np
 from numpy import array, dot
 from numpy import sum as npsum
 from numpy.linalg import lstsq, norm
@@ -29,7 +30,7 @@ class calibrate_extendedZolof(camera_extendedZolof):
     '''
     
     
-    def __init__(self, camera, x_list, X_list, quadratic=False):
+    def __init__(self, camera, x_list, X_list, quadratic=False, alpha=0.0):
         '''
         Given a list of 2D points, x=(x,y), and a list of 3D point X=(X,Y,Z), 
         we assume that given a point X, we can compute x by a polynomial 
@@ -49,6 +50,7 @@ class calibrate_extendedZolof(camera_extendedZolof):
         self.x_list = x_list
         self.X_list = X_list
         self.quadratic = quadratic
+        self.alpha = alpha
         
         
         
@@ -70,7 +72,14 @@ class calibrate_extendedZolof(camera_extendedZolof):
                 for i in range(-9,0): Xcol_i[i] = 0  
                 XColumns.append(Xcol_i)
         
-        res = lstsq(XColumns, self.x_list, rcond=None)
+        if self.alpha > 0.0:
+            XColumns_arr = array(XColumns)
+            n_features = XColumns_arr.shape[1]
+            XColumns_reg = np.vstack([XColumns_arr, np.sqrt(self.alpha) * np.eye(n_features)])
+            x_list_reg = np.vstack([self.x_list, np.zeros((n_features, array(self.x_list).shape[1]))])
+            res = lstsq(XColumns_reg, x_list_reg, rcond=None)
+        else:
+            res = lstsq(XColumns, self.x_list, rcond=None)
         self.A = res[0]
         
         # 2) finding the best camera center -
@@ -88,7 +97,15 @@ class calibrate_extendedZolof(camera_extendedZolof):
         
         # 4) finding the B coefficients -
         xColumns = [self.cam.get_xCol(xi) for xi in self.x_list]
-        res = lstsq(xColumns, r_list, rcond=None)
+        if self.alpha > 0.0:
+            xColumns_arr = array(xColumns)
+            r_list_arr = array(r_list)
+            n_features_B = xColumns_arr.shape[1]
+            xColumns_reg = np.vstack([xColumns_arr, np.sqrt(self.alpha) * np.eye(n_features_B)])
+            r_list_reg = np.vstack([r_list_arr, np.zeros((n_features_B, r_list_arr.shape[1]))])
+            res = lstsq(xColumns_reg, r_list_reg, rcond=None)
+        else:
+            res = lstsq(xColumns, r_list, rcond=None)
         self.B = res[0]
         
         self.cam.O = self.O

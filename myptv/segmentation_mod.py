@@ -815,7 +815,7 @@ def calculate_BG_image_batch(recordings_dir, output_dir, extension,
     recordings_dir / rec* / cam* / images
     
     The output structure will be:
-    output_dir / rec* / BG_<CamName>.tif
+    output_dir / rec* / <CamName>_BG.tif
     '''
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
