@@ -64,6 +64,7 @@ class workflow(object):
                                 'manual_matching',
                                 'fiber_orientations',
                                 'plot_trajectories',
+                                'plot_fibers',
                                 'animate_trajectories',
                                 'run_extention',
                                 'web_gui',
@@ -1834,9 +1835,10 @@ class workflow(object):
         a given file.
         '''
         from myptv.makePlots.plot_trajectories import plot_trajectories
+        from myptv.parse_file_list import parse_file_list
         
         # fetching the parameters
-        file_name = self.get_param('plot_trajectories', 'file_name')
+        file_name = parse_file_list(self.get_param('plot_trajectories', 'file_name'))
         min_length = self.get_param('plot_trajectories', 'min_length')
         write_trajID = self.get_param('plot_trajectories', 'write_trajID')
         t0 = self.get_param('plot_trajectories', 't0')
@@ -1854,10 +1856,11 @@ class workflow(object):
         This function is used to generate a 3D plot of fiber orientations and rotation rates.
         '''
         from myptv.makePlots.plot_trajectories import plot_fibers
+        from myptv.parse_file_list import parse_file_list
         
         # fetching parameters
-        trajectory_file = self.get_param('plot_fibers', 'trajectory_file')
-        orientations_file = self.get_param('plot_fibers', 'orientations_file')
+        trajectory_file = parse_file_list(self.get_param('plot_fibers', 'trajectory_file'))
+        orientations_file = parse_file_list(self.get_param('plot_fibers', 'orientations_file'))
         min_length = int(self.get_param('plot_fibers', 'min_length'))
         write_trajID = self.get_param('plot_fibers', 'write_trajID')
         t0 = int(self.get_param('plot_fibers', 't0'))
@@ -1865,6 +1868,11 @@ class workflow(object):
         length_scale = float(self.get_param('plot_fibers', 'length_scale'))
         mode = self.get_param('plot_fibers', 'mode')
         
+        try:
+            rod_segments = int(self.get_param('plot_fibers', 'rod_segments'))
+        except ValueError:
+            rod_segments = 10
+            
         plot_fibers(trajectory_file, 
                     orientations_file, 
                     min_length, 
@@ -1872,7 +1880,8 @@ class workflow(object):
                     t0=t0, 
                     te=te, 
                     length_scale=length_scale, 
-                    mode=mode)
+                    mode=mode,
+                    rod_segments=rod_segments)
     
     
     

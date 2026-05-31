@@ -38,8 +38,17 @@ def plot_trajectories(fname, min_length, write_trajID=False, t0=0, te=-1):
                 t0 and ending at frame te. Set t0=0 and te=-1 (default) to plot
                 trajectories at all times available.
     '''
-    
-    data = read_csv(fname, header=None, sep='\t')
+    import pandas as pd
+    if isinstance(fname, str):
+        fname = [fname]
+        
+    data_list = []
+    for f_idx, f in enumerate(fname):
+        d = read_csv(f, header=None, sep='\t')
+        d[0] = d[0].apply(lambda x: f"{f_idx}_{x}" if x != -1 else x)
+        data_list.append(d)
+        
+    data = pd.concat(data_list, ignore_index=True)
     trajectories = dict([(g, array(k.values)) 
                          for g,k in data.groupby(0) if g!=-1])
     
@@ -342,7 +351,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 import matplotlib.colors as mcolors
 
-def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=False, t0=0, te=-1, length_scale=10.0, mode='centered_rod'):
+def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=False, t0=0, te=-1, length_scale=10.0, mode='centered_rod', rod_segments=10):
     '''
     Plots fiber trajectories in 3D with orientation rods scaled by rotation rate.
     
@@ -353,16 +362,38 @@ def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=Fal
         write_trajID - whether to write the trajectory ID
         t0, te - time range in frames
         length_scale - scaling multiplier for the rod lengths
-        mode - 'centered_rod' or 'path_and_half_rod'
+        mode - 'centered_rod', 'path_and_half_rod', or 'speed_colored_rod'
+        rod_segments - number of segments to split the rod into (for speed_colored_rod mode)
     '''
-    if not os.path.exists(trajectory_file):
-        raise FileNotFoundError(f"Trajectory file not found: {trajectory_file}")
-    if not os.path.exists(orientations_file):
-        raise FileNotFoundError(f"Orientations file not found: {orientations_file}")
+    valid_modes = ['centered_rod', 'path_and_half_rod', 'speed_colored_rod']
+    if mode not in valid_modes:
+        raise ValueError(f"Unknown mode: {mode}. Must be one of {valid_modes}")
 
-    # Read files
-    traj_data = pd.read_csv(trajectory_file, header=None, sep='\t')
-    ori_data = pd.read_csv(orientations_file, header=None, sep='\t')
+    if isinstance(trajectory_file, str):
+        trajectory_file = [trajectory_file]
+    if isinstance(orientations_file, str):
+        orientations_file = [orientations_file]
+        
+    if len(trajectory_file) != len(orientations_file):
+        raise ValueError("Number of trajectory files and orientations files must match")
+
+    traj_data_list = []
+    for f_idx, f in enumerate(trajectory_file):
+        if not os.path.exists(f):
+            raise FileNotFoundError(f"Trajectory file not found: {f}")
+        d = pd.read_csv(f, header=None, sep='\t')
+        d[0] = d[0].apply(lambda x: f"{f_idx}_{x}" if x != -1 else x)
+        traj_data_list.append(d)
+    traj_data = pd.concat(traj_data_list, ignore_index=True)
+
+    ori_data_list = []
+    for f_idx, f in enumerate(orientations_file):
+        if not os.path.exists(f):
+            raise FileNotFoundError(f"Orientations file not found: {f}")
+        d = pd.read_csv(f, header=None, sep='\t')
+        d[0] = d[0].apply(lambda x: f"{f_idx}_{x}" if x != -1 else x)
+        ori_data_list.append(d)
+    ori_data = pd.concat(ori_data_list, ignore_index=True)
 
     # Convert any values to floats and group by trajectory ID (column 0)
     trajs = dict([(k, np.array(g)) for k, g in traj_data.groupby(0) if k != -1])
@@ -418,6 +449,9 @@ def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=Fal
         pz = merged['pz'].values
 
         frames = merged['frame'].values
+        vx = merged['vx'].values
+        vy = merged['vy'].values
+        vz = merged['vz'].values
 
         # Compute rotation rate (omega_dot) as magnitude of derivative of orientation vector
         if len(frames) >= 2:
@@ -426,10 +460,27 @@ def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=Fal
             pdot_z = np.gradient(pz, frames)
             omega_dots = np.sqrt(pdot_x**2 + pdot_y**2 + pdot_z**2)
         else:
+            pdot_x = np.zeros(len(frames))
+            pdot_y = np.zeros(len(frames))
+            pdot_z = np.zeros(len(frames))
             omega_dots = np.zeros(len(frames))
 
-        all_omega_dots.extend(omega_dots)
-        plot_data.append((tid, xs, ys, zs, px, py, pz, omega_dots))
+        if mode == 'speed_colored_rod':
+            L = length_scale
+            s_mids = np.linspace(-0.5 * L, 0.5 * L, rod_segments + 1)
+            s_mids = 0.5 * (s_mids[:-1] + s_mids[1:])
+            segment_speeds = []
+            for i in range(len(frames)):
+                v_cm = np.array([vx[i], vy[i], vz[i]])
+                pdot = np.array([pdot_x[i], pdot_y[i], pdot_z[i]])
+                speeds = [np.linalg.norm(v_cm + s * pdot) for s in s_mids]
+                segment_speeds.append(speeds)
+            segment_speeds = np.array(segment_speeds)
+            all_omega_dots.extend(segment_speeds.flatten())
+            plot_data.append((tid, xs, ys, zs, px, py, pz, omega_dots, segment_speeds))
+        else:
+            all_omega_dots.extend(omega_dots)
+            plot_data.append((tid, xs, ys, zs, px, py, pz, omega_dots, None))
 
     if not all_omega_dots:
         print("No trajectories met the criteria for plotting.")
@@ -449,7 +500,7 @@ def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=Fal
     z_min, z_max = float('inf'), float('-inf')
 
     # Plot
-    for tid, xs, ys, zs, px, py, pz, omega_dots in plot_data:
+    for tid, xs, ys, zs, px, py, pz, omega_dots, segment_speeds in plot_data:
         x_min, x_max = min(x_min, xs.min()), max(x_max, xs.max())
         y_min, y_max = min(y_min, ys.min()), max(y_max, ys.max())
         z_min, z_max = min(z_min, zs.min()), max(z_max, zs.max())
@@ -470,15 +521,25 @@ def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=Fal
                 x_endpoints = [cx - 0.5 * L * ux, cx + 0.5 * L * ux]
                 y_endpoints = [cy - 0.5 * L * uy, cy + 0.5 * L * uy]
                 z_endpoints = [cz - 0.5 * L * uz, cz + 0.5 * L * uz]
+                ax.plot(x_endpoints, z_endpoints, y_endpoints, '-', color=color, lw=1.5)
             elif mode == 'path_and_half_rod':
                 x_endpoints = [cx, cx + 0.5 * L * ux]
                 y_endpoints = [cy, cy + 0.5 * L * uy]
                 z_endpoints = [cz, cz + 0.5 * L * uz]
+                ax.plot(x_endpoints, z_endpoints, y_endpoints, '-', color=color, lw=1.5)
+            elif mode == 'speed_colored_rod':
+                s_nodes = np.linspace(-0.5 * L, 0.5 * L, rod_segments + 1)
+                speeds = segment_speeds[i]
+                for j in range(rod_segments):
+                    s1 = s_nodes[j]
+                    s2 = s_nodes[j+1]
+                    x_endpts = [cx + s1 * ux, cx + s2 * ux]
+                    y_endpts = [cy + s1 * uy, cy + s2 * uy]
+                    z_endpts = [cz + s1 * uz, cz + s2 * uz]
+                    c = cmap(norm(speeds[j]))
+                    ax.plot(x_endpts, z_endpts, y_endpts, '-', color=c, lw=1.5)
             else:
                 raise ValueError(f"Unknown mode: {mode}")
-
-            # Plot using standard axis conventions (x, z, y)
-            ax.plot(x_endpoints, z_endpoints, y_endpoints, '-', color=color, lw=1.5)
 
         if write_trajID and len(xs) > 0:
             ax.text(xs[0], zs[0], ys[0], str(tid), fontdict={'fontsize': 10, 'color': 'black'})
@@ -496,7 +557,10 @@ def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=Fal
     mappable = cm.ScalarMappable(norm=norm, cmap=cmap)
     mappable.set_array(all_omega_dots)
     cbar = fig.colorbar(mappable, ax=ax, pad=0.1, shrink=0.7)
-    cbar.set_label(r'$\dot{\omega}$ (rotation rate, rad/frame)')
+    if mode == 'speed_colored_rod':
+        cbar.set_label(r'Speed (pixels/frame)')
+    else:
+        cbar.set_label(r'$\dot{\omega}$ (rotation rate, rad/frame)')
 
     plt.title(f"Fiber Trajectories ({mode} mode)")
     print(f"plotted {len(plot_data)} fiber trajectories")
