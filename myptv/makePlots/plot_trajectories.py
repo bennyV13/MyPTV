@@ -336,14 +336,171 @@ def PlotParticlePositionHistogram(fname):
 
 
 import os
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+from matplotlib import cm
+import matplotlib.colors as mcolors
 
 def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=False, t0=0, te=-1, length_scale=10.0, mode='centered_rod'):
     '''
     Plots fiber trajectories in 3D with orientation rods scaled by rotation rate.
+    
+    inputs:
+        trajectory_file - path to the smoothed trajectories file (for center positions)
+        orientations_file - path to the fiber orientations file
+        min_length - only trajectories longer than this will be plotted
+        write_trajID - whether to write the trajectory ID
+        t0, te - time range in frames
+        length_scale - scaling multiplier for the rod lengths
+        mode - 'centered_rod' or 'path_and_half_rod'
     '''
     if not os.path.exists(trajectory_file):
         raise FileNotFoundError(f"Trajectory file not found: {trajectory_file}")
     if not os.path.exists(orientations_file):
         raise FileNotFoundError(f"Orientations file not found: {orientations_file}")
+
+    # Read files
+    traj_data = pd.read_csv(trajectory_file, header=None, sep='\t')
+    ori_data = pd.read_csv(orientations_file, header=None, sep='\t')
+
+    # Convert any values to floats and group by trajectory ID (column 0)
+    trajs = dict([(k, np.array(g)) for k, g in traj_data.groupby(0) if k != -1])
+    oris = dict([(k, np.array(g)) for k, g in ori_data.groupby(0) if k != -1])
+
+    fig = plt.figure(figsize=(10, 8))
+    ax = fig.add_subplot(projection='3d')
+    cmap = plt.get_cmap('viridis')
+
+    all_omega_dots = []
+    plot_data = []
+
+    # Gather data, align frames, and calculate gradients
+    for tid in sorted(trajs.keys()):
+        if tid not in oris:
+            continue
+
+        t_arr = trajs[tid]
+        o_arr = oris[tid]
+
+        t_df = pd.DataFrame(t_arr)
+        o_df = pd.DataFrame(o_arr)
+
+        # Assign explicit string column names for clarity and robustness
+        # t_df has: 0: id, 1: x, 2: y, 3: z, 4: vx, 5: vy, 6: vz, 7: ax, 8: ay, 9: az, 10: frame
+        t_df.columns = ['id', 'x', 'y', 'z', 'vx', 'vy', 'vz', 'ax', 'ay', 'az', 'frame']
+        
+        # o_df has: 0: id, 1: px, 2: py, 3: pz, 4: c1, 5: c2, 6: c3, 7: c4, 8: err, 9: frame
+        o_df.columns = ['id', 'px', 'py', 'pz', 'c1', 'c2', 'c3', 'c4', 'err', 'frame']
+
+        # Merge on frame number
+        merged = pd.merge(t_df, o_df, on='frame', suffixes=('_pos', '_ori'))
+        if merged.empty:
+            continue
+
+        merged = merged.sort_values(by='frame')
+
+        # Limit time
+        te_lim = te if te != -1 else merged['frame'].max()
+        merged = merged[(merged['frame'] >= t0) & (merged['frame'] <= te_lim)]
+
+        if len(merged) < min_length:
+            continue
+
+        # Position (x, y, z)
+        xs = merged['x'].values
+        ys = merged['y'].values
+        zs = merged['z'].values
+
+        # Orientation (px, py, pz)
+        px = merged['px'].values
+        py = merged['py'].values
+        pz = merged['pz'].values
+
+        frames = merged['frame'].values
+
+        # Compute rotation rate (omega_dot) as magnitude of derivative of orientation vector
+        if len(frames) >= 2:
+            pdot_x = np.gradient(px, frames)
+            pdot_y = np.gradient(py, frames)
+            pdot_z = np.gradient(pz, frames)
+            omega_dots = np.sqrt(pdot_x**2 + pdot_y**2 + pdot_z**2)
+        else:
+            omega_dots = np.zeros(len(frames))
+
+        all_omega_dots.extend(omega_dots)
+        plot_data.append((tid, xs, ys, zs, px, py, pz, omega_dots))
+
+    if not all_omega_dots:
+        print("No trajectories met the criteria for plotting.")
+        plt.show()
+        return
+
+    min_omega = min(all_omega_dots)
+    max_omega = max(all_omega_dots)
+    if max_omega == min_omega:
+        max_omega = min_omega + 1e-5
+
+    norm = mcolors.Normalize(vmin=min_omega, vmax=max_omega)
+
+    # Initialize coordinates boundaries
+    x_min, x_max = float('inf'), float('-inf')
+    y_min, y_max = float('inf'), float('-inf')
+    z_min, z_max = float('inf'), float('-inf')
+
+    # Plot
+    for tid, xs, ys, zs, px, py, pz, omega_dots in plot_data:
+        x_min, x_max = min(x_min, xs.min()), max(x_max, xs.max())
+        y_min, y_max = min(y_min, ys.min()), max(y_max, ys.max())
+        z_min, z_max = min(z_min, zs.min()), max(z_max, zs.max())
+
+        # Path connecting the centers is always a thin black line
+        ax.plot(xs, zs, ys, '-', color='black', lw=0.7)
+
+        # Plot sticks for each frame along the trajectory
+        for i in range(len(xs)):
+            cx, cy, cz = xs[i], ys[i], zs[i]
+            ux, uy, uz = px[i], py[i], pz[i]
+            omega = omega_dots[i]
+
+            color = cmap(norm(omega))
+            L = length_scale * omega
+
+            if mode == 'centered_rod':
+                x_endpoints = [cx - 0.5 * L * ux, cx + 0.5 * L * ux]
+                y_endpoints = [cy - 0.5 * L * uy, cy + 0.5 * L * uy]
+                z_endpoints = [cz - 0.5 * L * uz, cz + 0.5 * L * uz]
+            elif mode == 'path_and_half_rod':
+                x_endpoints = [cx, cx + 0.5 * L * ux]
+                y_endpoints = [cy, cy + 0.5 * L * uy]
+                z_endpoints = [cz, cz + 0.5 * L * uz]
+            else:
+                raise ValueError(f"Unknown mode: {mode}")
+
+            # Plot using standard axis conventions (x, z, y)
+            ax.plot(x_endpoints, z_endpoints, y_endpoints, '-', color=color, lw=1.5)
+
+        if write_trajID and len(xs) > 0:
+            ax.text(xs[0], zs[0], ys[0], str(tid), fontdict={'fontsize': 10, 'color': 'black'})
+
+
+    ax.set_xlabel('x')
+    ax.set_zlabel('y')
+    ax.set_ylabel('z')
+
+    # Coordinate boundaries aspect ratio
+    from numpy import ptp
+    ax.set_box_aspect((ptp([x_min, x_max]), ptp([z_min, z_max]), ptp([y_min, y_max])))
+
+    # Colorbar
+    mappable = cm.ScalarMappable(norm=norm, cmap=cmap)
+    mappable.set_array(all_omega_dots)
+    cbar = fig.colorbar(mappable, ax=ax, pad=0.1, shrink=0.7)
+    cbar.set_label(r'$\dot{\omega}$ (rotation rate, rad/frame)')
+
+    plt.title(f"Fiber Trajectories ({mode} mode)")
+    print(f"plotted {len(plot_data)} fiber trajectories")
+    plt.show()
+
 
 
