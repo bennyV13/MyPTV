@@ -464,7 +464,7 @@ def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=Fal
             omega = omega_dots[i]
 
             color = cmap(norm(omega))
-            L = length_scale * omega
+            L = length_scale
 
             if mode == 'centered_rod':
                 x_endpoints = [cx - 0.5 * L * ux, cx + 0.5 * L * ux]
