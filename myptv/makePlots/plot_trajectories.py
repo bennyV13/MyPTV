@@ -332,3 +332,18 @@ def PlotParticlePositionHistogram(fname):
     
     return None
 
+
+
+
+import os
+
+def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=False, t0=0, te=-1, length_scale=10.0, mode='centered_rod'):
+    '''
+    Plots fiber trajectories in 3D with orientation rods scaled by rotation rate.
+    '''
+    if not os.path.exists(trajectory_file):
+        raise FileNotFoundError(f"Trajectory file not found: {trajectory_file}")
+    if not os.path.exists(orientations_file):
+        raise FileNotFoundError(f"Orientations file not found: {orientations_file}")
+
+
