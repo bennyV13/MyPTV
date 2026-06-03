@@ -564,4 +564,4 @@ class smooth_orientations(object):
             fmt.append('%d')
         fmt += ['%.3f', '%.3f']
         
-        np.savetxt(fname, self.smoothed_oris, fmt=fmt, delimiter='\\t')
+        np.savetxt(fname, self.smoothed_oris, fmt=fmt, delimiter='\t')
