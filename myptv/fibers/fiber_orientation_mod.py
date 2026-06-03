@@ -9,6 +9,8 @@ Created on Thu Mar 31 15:59:35 2022
 import numpy as np
 import math
 from scipy import linalg
+from myptv.traj_smoothing_mod import smooth_traj_poly
+from tqdm import tqdm
 
 
 class FiberOrientation(object):
@@ -432,9 +434,134 @@ class fiber_traj_orientation(object):
     
     
     
+
+class smooth_orientations(object):
+    '''
+    A class used to smooth fiber orientations in a list. 
+    During smoothing, we also calculate the angular velocity (px_dot, py_dot, pz_dot)
+    and angular acceleration (px_ddot, py_ddot, pz_ddot) of the orientations.
+    The output has 12 + C columns: id, px, py, pz, px_dot, py_dot, pz_dot, px_ddot, py_ddot, pz_ddot, c1..cC, err, frame
+    '''
     
-    
-    
-    
-    
-    
+    def __init__(self, ori_list, window, polyorder, repetitions=1, min_traj_length=4):
+        self.ori_list = ori_list
+        self.window = window
+        self.polyorder = polyorder
+        self.repetitions = repetitions
+        
+        if min_traj_length <= polyorder:
+            raise ValueError('min_traj_length must be larger than polyorder')
+            
+        self.min_traj_length = min_traj_length
+        self.smoothed_oris = []
+        
+    def smooth(self):
+        '''
+        Performs the smoothing and returns the results. 
+        '''
+        # organizing trajectories in a dictionary:
+        traj_dic = {}
+        zero_length_trajs = []
+        for i in range(len(self.ori_list)):
+            tr = self.ori_list[i]
+            
+            # for unconnected samples, put zero velocity and acceleration:
+            if tr[0] == -1: 
+                new_tr = [tr[0], tr[1], tr[2], tr[3], 
+                          0.0, 0.0, 0.0, 0.0, 0.0, 0.0] + list(tr[4:])
+                zero_length_trajs.append(new_tr)
+            
+            # from the connected samples, make a trajectory dictionary
+            else:
+                if tr[0] in traj_dic.keys():
+                    traj_dic[tr[0]].append(tr)
+                else:
+                    traj_dic[tr[0]] = [tr]
+        
+        short_trajs = []
+        smoothed_traj_list = []
+        count = 0
+        total = 0
+        for tr_num in tqdm(traj_dic.keys()):
+            
+            total += 1
+            
+            tr_len = len(traj_dic[tr_num])
+            
+            if tr_len < self.min_traj_length:
+                for i in range(len(traj_dic[tr_num])):
+                    tr = traj_dic[tr_num][i]
+                    new_tr = [tr[0], tr[1], tr[2], tr[3], 
+                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0] + list(tr[4:])
+                    short_trajs.append(new_tr)
+                continue
+            
+            elif tr_len < self.window:
+                W = tr_len - 1*(tr_len%2==0)
+            
+            else:
+                W = self.window
+            
+            # sort samples according to time:
+            traj = sorted(traj_dic[tr_num], key=lambda s: s[-1])
+            
+            # smoothing orientations
+            p, v, a = smooth_traj_poly(np.array(traj).T[1:4,:], 
+                                       W, 
+                                       self.polyorder,
+                                       repetitions=self.repetitions)
+            
+            # Normalizing the smoothed position vectors to have a magnitude of 1
+            for i in range(len(p[0])):
+                mag = math.sqrt(p[0][i]**2 + p[1][i]**2 + p[2][i]**2)
+                if mag > 0:
+                    p[0][i] /= mag
+                    p[1][i] /= mag
+                    p[2][i] /= mag
+            
+            # setting a new trajectories
+            new_traj = []
+            N = int(self.window/2)+1
+            for i in range(N, len(traj_dic[tr_num]) - N):
+                new_traj.append([])
+                new_traj[-1].append(traj[i][0])
+                new_traj[-1].append(p[0][i])
+                new_traj[-1].append(p[1][i])
+                new_traj[-1].append(p[2][i])
+                new_traj[-1].append(v[0][i])
+                new_traj[-1].append(v[1][i])
+                new_traj[-1].append(v[2][i])
+                new_traj[-1].append(a[0][i])
+                new_traj[-1].append(a[1][i])
+                new_traj[-1].append(a[2][i])
+                # Append camera indices, error, and frame
+                new_traj[-1].extend(traj[i][4:])
+                
+            smoothed_traj_list += new_traj
+            count+=1
+            
+        print('')
+        print('smoothed samples: %d'%(len(smoothed_traj_list)))
+        print('too short to smooth: %d'%(len(short_trajs)))
+        print('single samples: %d'%(len(zero_length_trajs)))
+        
+        smoothed_traj_list += short_trajs    
+        smoothed_traj_list += zero_length_trajs
+        self.smoothed_oris = smoothed_traj_list
+        
+        
+    def save_results(self, fname):
+        '''
+        Will save the smoothed orientations in a text file.
+        '''
+        if len(self.smoothed_oris) == 0:
+            print("No smoothed orientations to save.")
+            return
+
+        fmt = ['%d', '%.4f', '%.4f', '%.4f', '%.6f', '%.6f', '%.6f', '%.9f', '%.9f', '%.9f']
+        # Add a %d for each camera column. The last 2 are error and frame.
+        for i in range(len(self.smoothed_oris[0]) - 12):
+            fmt.append('%d')
+        fmt += ['%.3f', '%.3f']
+        
+        np.savetxt(fname, self.smoothed_oris, fmt=fmt, delimiter='\\t')

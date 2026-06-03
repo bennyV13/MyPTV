@@ -421,8 +421,24 @@ def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=Fal
         # t_df has: 0: id, 1: x, 2: y, 3: z, 4: vx, 5: vy, 6: vz, 7: ax, 8: ay, 9: az, 10: frame
         t_df.columns = ['id', 'x', 'y', 'z', 'vx', 'vy', 'vz', 'ax', 'ay', 'az', 'frame']
         
-        # o_df has: 0: id, 1: px, 2: py, 3: pz, 4: c1, 5: c2, 6: c3, 7: c4, 8: err, 9: frame
-        o_df.columns = ['id', 'px', 'py', 'pz', 'c1', 'c2', 'c3', 'c4', 'err', 'frame']
+        num_cols = len(o_df.columns)
+        has_smoothed = False
+        
+        # Support both raw orientations (cams+6 cols) and smoothed orientations (cams+12 cols)
+        # Determine based on column count (assuming at least 2 cameras).
+        if num_cols >= 14:
+            has_smoothed = True
+            cams_count = num_cols - 12
+            o_cols = ['id', 'px', 'py', 'pz', 'px_dot', 'py_dot', 'pz_dot', 'px_ddot', 'py_ddot', 'pz_ddot']
+        else:
+            cams_count = num_cols - 6
+            o_cols = ['id', 'px', 'py', 'pz']
+            
+        for i in range(cams_count):
+            o_cols.append(f'c{i+1}')
+        o_cols.extend(['err', 'frame'])
+        
+        o_df.columns = o_cols
 
         # Merge on frame number
         merged = pd.merge(t_df, o_df, on='frame', suffixes=('_pos', '_ori'))
@@ -453,17 +469,24 @@ def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=Fal
         vy = merged['vy'].values
         vz = merged['vz'].values
 
-        # Compute rotation rate (omega_dot) as magnitude of derivative of orientation vector
-        if len(frames) >= 2:
-            pdot_x = np.gradient(px, frames)
-            pdot_y = np.gradient(py, frames)
-            pdot_z = np.gradient(pz, frames)
+        # Compute rotation rate (omega_dot)
+        if has_smoothed and 'px_dot' in merged.columns:
+            pdot_x = merged['px_dot'].values
+            pdot_y = merged['py_dot'].values
+            pdot_z = merged['pz_dot'].values
             omega_dots = np.sqrt(pdot_x**2 + pdot_y**2 + pdot_z**2)
         else:
-            pdot_x = np.zeros(len(frames))
-            pdot_y = np.zeros(len(frames))
-            pdot_z = np.zeros(len(frames))
-            omega_dots = np.zeros(len(frames))
+            # Fallback to numerical gradient for raw orientations
+            if len(frames) >= 2:
+                pdot_x = np.gradient(px, frames)
+                pdot_y = np.gradient(py, frames)
+                pdot_z = np.gradient(pz, frames)
+                omega_dots = np.sqrt(pdot_x**2 + pdot_y**2 + pdot_z**2)
+            else:
+                pdot_x = np.zeros(len(frames))
+                pdot_y = np.zeros(len(frames))
+                pdot_z = np.zeros(len(frames))
+                omega_dots = np.zeros(len(frames))
 
         # Note: 'speed_colored_rod' colors segments by local speed (translation + rotation). 
         # Even with rod_segments=1, it is conceptually different from 'centered_rod':

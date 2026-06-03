@@ -63,6 +63,7 @@ class workflow(object):
                                 'match_target_file', '2D_tracking', 
                                 'manual_matching',
                                 'fiber_orientations',
+                                'smoothed_orientations',
                                 'plot_trajectories',
                                 'plot_fibers',
                                 'animate_trajectories',
@@ -129,6 +130,9 @@ class workflow(object):
                     
                 elif action == 'fiber_orientations':
                     self.do_orientations()
+                    
+                elif action == 'smoothed_orientations':
+                    self.do_smoothed_orientations()
                     
                 elif action == 'plot_trajectories':
                     self.do_plot_trajectories()
@@ -1824,6 +1828,67 @@ class workflow(object):
             fto = fiber_traj_orientation(trajectory_file, blob_fn, cams)
             fto.get_ori_lst()
             fto.save_orientations(save_name)
+    def do_smoothed_orientations(self):
+        '''
+        This function is used to smooth the fiber orientations using the same 
+        polynomial approach as trajectories.
+        '''
+        from numpy import loadtxt
+        from os import listdir, getcwd, makedirs
+        from os.path import exists as pathExists, dirname as path_dirname
+        from myptv.fibers.fiber_orientation_mod import smooth_orientations
+        
+        # fetching the smoothing parameters
+        orientations_file = self.get_param('smoothed_orientations', 'orientations_file')
+        window = self.get_param('smoothed_orientations', 'window_size')
+        polyorder = self.get_param('smoothed_orientations', 'polynom_order')
+        min_traj_length = self.get_param('smoothed_orientations', 'min_traj_length')
+        repetitions = self.get_param('smoothed_orientations', 'repetitions')
+        save_name = self.get_param('smoothed_orientations', 'save_name')
+        
+        if min_traj_length <= polyorder:
+            raise ValueError('min_traj_length must be larger than polyorder')
+
+        # Pre-check the save directory
+        if save_name is not None:
+            saveDir = path_dirname(save_name)
+            if saveDir != '' and not pathExists(saveDir):
+                try:
+                    makedirs(saveDir)
+                    print(f"Created directory: {saveDir}")
+                except Exception as e:
+                    print(f"Warning: Could not create directory {saveDir} before starting. Error: {e}")
+
+        ori_list = loadtxt(orientations_file)
+        
+        # smoothing the orientations     
+        print('Starting to smooth fiber orientations.')
+        sm = smooth_orientations(ori_list, 
+                                 window, 
+                                 polyorder,
+                                 repetitions=repetitions,
+                                 min_traj_length=min_traj_length)
+        sm.smooth()
+        
+        # saving the data
+        if save_name is not None:
+            cwd_ls = listdir(getcwd())
+            if save_name in cwd_ls or pathExists(save_name):
+                print('\\n The file name "%s" already exists in'%save_name)
+                print(' the working directory. Should I save anyways?')
+                usr = input('(1=yes, else=no)')
+                if usr == '1':
+                    print('\\n', 'Saving the smoothed orientations data (%s).'%save_name)
+                    sm.save_results(save_name)
+                else:
+                    print('\\n', 'Skipped saving file.')
+            
+            else:
+                print('\\n', 'Saving the smoothed orientations data (%s).'%save_name)
+                sm.save_results(save_name)
+        
+        print('\\n', 'Done.')
+
     
     
     
@@ -2462,6 +2527,8 @@ class workflow(object):
         except: run_smoothing = True
         try: run_orientations = self.get_param('batch_pipeline', 'run_orientations')
         except: run_orientations = False
+        try: run_smoothed_orientations = self.get_param('batch_pipeline', 'run_smoothed_orientations')
+        except: run_smoothed_orientations = False
 
         # Optional filters
         try: recordings_filter = self.get_param('batch_pipeline', 'recordings')
@@ -2582,6 +2649,20 @@ class workflow(object):
                     run_o_action = "SKIP (exists)"
                 else:
                     run_o_action = "RUN"
+                    dep_re_run = True
+
+            # Evaluate Smoothed Orientations
+            if run_smoothed_orientations:
+                smoothed_orientations_out = os.path.join(out_dir, "smoothed_fiber_orientations")
+                try:
+                    so_block = self.get_param('smoothed_orientations', 'save_name')
+                    if so_block: smoothed_orientations_out = os.path.join(out_dir, os.path.basename(so_block.strip())).replace("\\", "/")
+                except: pass
+                
+                if os.path.exists(smoothed_orientations_out) and not run_if_exists and not dep_re_run:
+                    run_so_action = "SKIP (exists)"
+                else:
+                    run_so_action = "RUN"
 
             evaluation.append({
                 "rec": rec,
@@ -2589,7 +2670,8 @@ class workflow(object):
                 "matching": run_m_action,
                 "tracking": run_t_action,
                 "smoothing": run_s_action,
-                "orientations": run_o_action
+                "orientations": run_o_action,
+                "smoothed_orientations": run_so_action if run_smoothed_orientations else "Skipped"
             })
 
         if dry_run:
@@ -2633,6 +2715,7 @@ class workflow(object):
                 t_status, t_fraction = "Skipped", ""
                 s_status = "Skipped"
                 o_status = "Skipped"
+                so_status = "Skipped"
 
                 # Step 1: Matching
                 if item["matching"] == "RUN" and not error_occurred:
@@ -2839,12 +2922,59 @@ class workflow(object):
                 elif "SKIP" in item["orientations"] and not error_occurred:
                     print(f"--- Skipping Orientations for {rec}: {item['orientations']} ---")
 
+                # Step 4.5: Smoothed Orientations
+                if item.get("smoothed_orientations") == "RUN" and not error_occurred:
+                    print(f"--- Running Smoothed Orientations for {rec} ---")
+                    with open(self.param_file_path, "r", encoding="utf-8") as f:
+                        params_dict = safe_load(f)
+                    
+                    so_block = None
+                    for block in params_dict:
+                        if "smoothed_orientations" in block:
+                            so_block = block["smoothed_orientations"]
+                              
+                    if so_block is None:
+                        so_block = {"window_size": 15, "polynom_order": 3, "min_traj_length": 15, "repetitions": 1}
+                        params_dict.append({"smoothed_orientations": so_block})
+                        
+                    if "save_name" in so_block and so_block["save_name"]:
+                        so_block["save_name"] = os.path.join(out_dir, os.path.basename(so_block["save_name"].strip())).replace("\\", "/")
+                    else:
+                        so_block["save_name"] = os.path.join(out_dir, "smoothed_fiber_orientations").replace("\\", "/")
+                    
+                    if "orientations_file" in so_block and so_block["orientations_file"]:
+                        so_block["orientations_file"] = os.path.join(out_dir, os.path.basename(so_block["orientations_file"].strip())).replace("\\", "/")
+                    else:
+                        ori_file = os.path.join(out_dir, "fiber_orientations").replace("\\", "/")
+                        so_block["orientations_file"] = ori_file
+
+                    temp_file = os.path.join(params_dir, f"temp_params_pipeline_{rec}_smoothed_orientations_{randint(100, 999)}.yml")
+                    with open(temp_file, "w", encoding="utf-8") as tf:
+                        safe_dump(params_dict, tf, sort_keys=False)
+
+                    cmd = [sys.executable, workflow_path, os.path.abspath(temp_file), "smoothed_orientations"]
+                    res = subprocess.run(cmd, input="1\\n", capture_output=True, text=True, cwd=params_dir)
+
+                    if os.path.exists(temp_file):
+                        os.remove(temp_file)
+
+                    if res.returncode != 0:
+                        so_status = "Failed"
+                        error_occurred = True
+                        error_msg = f"Smoothed Orientations failed: {res.stderr.strip()}"
+                        print(f"ERROR: {error_msg}")
+                    else:
+                        so_status = "Success"
+                        print("Success: Calculated smoothed fiber orientations.")
+                elif str(item.get("smoothed_orientations", "")).startswith("SKIP") and not error_occurred:
+                    print(f"--- Skipping Smoothed Orientations for {rec}: {item.get('smoothed_orientations')} ---")
+
                 # Save status row
                 duration = time.time() - start_time
                 writer.writerow([
                     rec, m_status, m_count, 
                     t_status, t_fraction, 
-                    s_status, o_status, 
+                    s_status, o_status, so_status,
                     round(duration, 2), error_msg
                 ])
                 csvfile.flush()
