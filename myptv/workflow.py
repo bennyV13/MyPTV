@@ -2502,9 +2502,7 @@ class workflow(object):
 
         # 1. Fetch batch_pipeline parameters from parameters file
         try: recordings_dir = self.get_param('batch_pipeline', 'recordings_dir')
-        except:
-            print("ERROR: batch_pipeline requires 'recordings_dir'")
-            return
+        except: recordings_dir = None
         
         try: ptv_results_dir = self.get_param('batch_pipeline', 'ptv_results_dir')
         except: ptv_results_dir = 'ptv_results'
@@ -2543,24 +2541,47 @@ class workflow(object):
         except: file_dry_run = False
         dry_run = cli_dry_run or file_dry_run
 
-        if not os.path.exists(recordings_dir):
-            print(f"ERROR: recordings_dir does not exist: {recordings_dir}")
-            return
+        if recordings_dir and not os.path.exists(recordings_dir):
+            print(f"Warning: recordings_dir does not exist: {recordings_dir}")
 
         # Resolve recordings
         planned_recs = []
-        if recordings_filter:
-            filter_list = [r.strip().lower() for r in recordings_filter.split(',')]
-            for item in sorted(os.listdir(recordings_dir)):
-                if os.path.isdir(os.path.join(recordings_dir, item)) and item.lower() in filter_list:
-                    planned_recs.append(item)
+        seen_recs = set()
+        
+        # Scan local ptv_results_dir for subdirectories matching "rec*_data" or "rec*"
+        if os.path.isabs(ptv_results_dir):
+            scan_dir = ptv_results_dir
         else:
+            scan_dir = os.path.abspath(os.path.join(params_dir, ptv_results_dir))
+        if os.path.exists(scan_dir):
+            for item in sorted(os.listdir(scan_dir)):
+                if os.path.isdir(os.path.join(scan_dir, item)):
+                    item_lower = item.lower()
+                    if item_lower.startswith("rec") and item_lower.endswith("_data"):
+                        rec_name = item[:-5]  # remove '_data' suffix
+                        if rec_name.lower() not in seen_recs:
+                            seen_recs.add(rec_name.lower())
+                            planned_recs.append(rec_name)
+                    elif item_lower.startswith("rec") and not item_lower.endswith("_data"):
+                        if item_lower not in seen_recs:
+                            seen_recs.add(item_lower)
+                            planned_recs.append(item)
+
+        # Fallback to scanning recordings_dir if no recordings found in ptv_results
+        if not planned_recs and recordings_dir and os.path.exists(recordings_dir):
             for item in sorted(os.listdir(recordings_dir)):
                 if os.path.isdir(os.path.join(recordings_dir, item)) and item.lower().startswith("rec"):
-                    planned_recs.append(item)
+                    if item.lower() not in seen_recs:
+                        seen_recs.add(item.lower())
+                        planned_recs.append(item)
+
+        # Filter by recordings parameter if specified
+        if recordings_filter:
+            filter_list = [r.strip().lower() for r in recordings_filter.split(',')]
+            planned_recs = [r for r in planned_recs if r.lower() in filter_list]
 
         if not planned_recs:
-            print("No matching recordings found under recordings_dir.")
+            print("No matching recordings found (scanned local results and recordings_dir).")
             return
 
         # Resolve cams
