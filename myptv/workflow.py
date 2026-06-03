@@ -2500,6 +2500,8 @@ class workflow(object):
         from datetime import datetime
         from yaml import safe_dump, safe_load
 
+        params_dir = os.path.dirname(os.path.abspath(self.param_file_path))
+
         # 1. Fetch batch_pipeline parameters from parameters file
         try: recordings_dir = self.get_param('batch_pipeline', 'recordings_dir')
         except: recordings_dir = None
