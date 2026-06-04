@@ -1949,6 +1949,32 @@ class workflow(object):
         show_path = parse_bool(p_dict.get('show_path'), True)
         add_center_velocity = parse_bool(p_dict.get('add_center_velocity'), False)
         plot_only_half = parse_bool(p_dict.get('plot_only_half'), False)
+
+        def parse_float(val):
+            if val is None:
+                return None
+            try:
+                return float(val)
+            except ValueError:
+                return None
+
+        def parse_lim(val):
+            if val is None:
+                return None
+            if isinstance(val, (list, tuple)):
+                return [float(x) for x in val]
+            if isinstance(val, str):
+                try:
+                    return [float(x.strip()) for x in val.split(',')]
+                except ValueError:
+                    return None
+            return None
+
+        elevation = parse_float(p_dict.get('elevation'))
+        azimuth = parse_float(p_dict.get('azimuth') or p_dict.get('azimoth'))
+        xlim = parse_lim(p_dict.get('xlim'))
+        ylim = parse_lim(p_dict.get('ylim'))
+        zlim = parse_lim(p_dict.get('zlim'))
         
         try:
             rod_segments = int(p_dict.get('rod_segments', 10))
@@ -1966,7 +1992,12 @@ class workflow(object):
                     show_path=show_path,
                     add_center_velocity=add_center_velocity,
                     plot_only_half=plot_only_half,
-                    rod_segments=rod_segments)
+                    rod_segments=rod_segments,
+                    elevation=elevation,
+                    azimuth=azimuth,
+                    xlim=xlim,
+                    ylim=ylim,
+                    zlim=zlim)
     
     
     

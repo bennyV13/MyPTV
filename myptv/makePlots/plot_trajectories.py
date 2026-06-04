@@ -351,7 +351,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 import matplotlib.colors as mcolors
 
-def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=False, t0=0, te=-1, length_scale=10.0, mode=None, show_path=True, add_center_velocity=False, plot_only_half=False, rod_segments=10):
+def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=False, t0=0, te=-1, length_scale=10.0, mode=None, show_path=True, add_center_velocity=False, plot_only_half=False, rod_segments=10, elevation=None, azimuth=None, xlim=None, ylim=None, zlim=None):
     '''
     Plots fiber trajectories in 3D with orientation rods scaled by rotation rate.
     
@@ -545,6 +545,9 @@ def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=Fal
     y_min, y_max = float('inf'), float('-inf')
     z_min, z_max = float('inf'), float('-inf')
 
+    segments = []
+    colors = []
+
     # Plot
     for tid, xs, ys, zs, px, py, pz, omega_dots, segment_speeds in plot_data:
         x_min, x_max = min(x_min, xs.min()), max(x_max, xs.max())
@@ -567,20 +570,25 @@ def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=Fal
                 for j in range(rod_segments):
                     s1 = s_nodes[j]
                     s2 = s_nodes[j+1]
-                    x_endpts = [cx + s1 * ux, cx + s2 * ux]
-                    y_endpts = [cy + s1 * uy, cy + s2 * uy]
-                    z_endpts = [cz + s1 * uz, cz + s2 * uz]
-                    c = cmap(norm(speeds[j]))
-                    ax.plot(x_endpts, z_endpts, y_endpts, '-', color=c, lw=0.8, alpha=0.6)
+                    pt1 = (cx + s1 * ux, cz + s1 * uz, cy + s1 * uy)
+                    pt2 = (cx + s2 * ux, cz + s2 * uz, cy + s2 * uy)
+                    segments.append([pt1, pt2])
+                    colors.append(cmap(norm(speeds[j])))
             else:
                 color = cmap(norm(omega))
-                x_endpoints = [cx + s_start * ux, cx + s_end * ux]
-                y_endpoints = [cy + s_start * uy, cy + s_end * uy]
-                z_endpoints = [cz + s_start * uz, cz + s_end * uz]
-                ax.plot(x_endpoints, z_endpoints, y_endpoints, '-', color=color, lw=0.8, alpha=0.6)
+                pt1 = (cx + s_start * ux, cz + s_start * uz, cy + s_start * uy)
+                pt2 = (cx + s_end * ux, cz + s_end * uz, cy + s_end * uy)
+                segments.append([pt1, pt2])
+                colors.append(color)
 
         if write_trajID and len(xs) > 0:
             ax.text(xs[0], zs[0], ys[0], str(tid), fontdict={'fontsize': 10, 'color': 'black'})
+
+    # Draw all the rods efficiently in a single collection to keep rendering extremely fast
+    if segments:
+        from mpl_toolkits.mplot3d.art3d import Line3DCollection
+        lc = Line3DCollection(segments, colors=colors, linewidths=0.8, alpha=0.6)
+        ax.add_collection(lc)
 
 
     ax.set_xlabel('x')
@@ -602,6 +610,17 @@ def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=Fal
 
     title_suffix = f"path={show_path}, center_vel={add_center_velocity}, half={plot_only_half}"
     plt.title(f"Fiber Trajectories ({title_suffix})")
+
+    if elevation is not None or azimuth is not None:
+        ax.view_init(elev=elevation, azim=azimuth)
+
+    if xlim is not None:
+        ax.set_xlim(xlim)
+    if ylim is not None:
+        ax.set_zlim(ylim)  # Lab y is mapped to matplotlib z
+    if zlim is not None:
+        ax.set_ylim(zlim)  # Lab z is mapped to matplotlib y
+
     print(f"plotted {len(plot_data)} fiber trajectories")
     plt.show()
 
