@@ -455,25 +455,25 @@ def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=Fal
             continue
 
         # Position (x, y, z)
-        xs = merged['x'].values
-        ys = merged['y'].values
-        zs = merged['z'].values
+        xs = merged['x'].values.astype(float)
+        ys = merged['y'].values.astype(float)
+        zs = merged['z'].values.astype(float)
 
         # Orientation (px, py, pz)
-        px = merged['px'].values
-        py = merged['py'].values
-        pz = merged['pz'].values
+        px = merged['px'].values.astype(float)
+        py = merged['py'].values.astype(float)
+        pz = merged['pz'].values.astype(float)
 
-        frames = merged['frame'].values
-        vx = merged['vx'].values
-        vy = merged['vy'].values
-        vz = merged['vz'].values
+        frames = merged['frame'].values.astype(float)
+        vx = merged['vx'].values.astype(float)
+        vy = merged['vy'].values.astype(float)
+        vz = merged['vz'].values.astype(float)
 
         # Compute rotation rate (omega_dot)
         if has_smoothed and 'px_dot' in merged.columns:
-            pdot_x = merged['px_dot'].values
-            pdot_y = merged['py_dot'].values
-            pdot_z = merged['pz_dot'].values
+            pdot_x = merged['px_dot'].values.astype(float)
+            pdot_y = merged['py_dot'].values.astype(float)
+            pdot_z = merged['pz_dot'].values.astype(float)
             omega_dots = np.sqrt(pdot_x**2 + pdot_y**2 + pdot_z**2)
         else:
             # Fallback to numerical gradient for raw orientations
