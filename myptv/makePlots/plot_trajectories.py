@@ -485,14 +485,36 @@ def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=Fal
         vy = merged['vy'].values.astype(float)
         vz = merged['vz'].values.astype(float)
 
-        # Compute rotation rate (omega_dot)
-        if has_smoothed and 'px_dot' in merged.columns:
+        # Enforce temporal alignment (sign continuity) along the trajectory to avoid 180-degree jumps
+        has_smoothed_cols = has_smoothed and 'px_dot' in merged.columns
+        if has_smoothed_cols:
             pdot_x = merged['px_dot'].values.astype(float)
             pdot_y = merged['py_dot'].values.astype(float)
             pdot_z = merged['pz_dot'].values.astype(float)
+            pdot_xx = merged['px_ddot'].values.astype(float) if 'px_ddot' in merged.columns else None
+            pdot_yy = merged['py_ddot'].values.astype(float) if 'py_ddot' in merged.columns else None
+            pdot_zz = merged['pz_ddot'].values.astype(float) if 'pz_ddot' in merged.columns else None
+
+        for i in range(1, len(px)):
+            dot_prod = px[i]*px[i-1] + py[i]*py[i-1] + pz[i]*pz[i-1]
+            if dot_prod < 0:
+                px[i] = -px[i]
+                py[i] = -py[i]
+                pz[i] = -pz[i]
+                if has_smoothed_cols:
+                    pdot_x[i] = -pdot_x[i]
+                    pdot_y[i] = -pdot_y[i]
+                    pdot_z[i] = -pdot_z[i]
+                    if pdot_xx is not None:
+                        pdot_xx[i] = -pdot_xx[i]
+                        pdot_yy[i] = -pdot_yy[i]
+                        pdot_zz[i] = -pdot_zz[i]
+
+        # Compute rotation rate (omega_dot)
+        if has_smoothed_cols:
             omega_dots = np.sqrt(pdot_x**2 + pdot_y**2 + pdot_z**2)
         else:
-            # Fallback to numerical gradient for raw orientations
+            # Fallback to numerical gradient for raw orientations (computed from aligned px, py, pz)
             if len(frames) >= 2:
                 pdot_x = np.gradient(px, frames)
                 pdot_y = np.gradient(py, frames)
