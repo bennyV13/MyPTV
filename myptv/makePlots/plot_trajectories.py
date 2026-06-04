@@ -351,7 +351,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 import matplotlib.colors as mcolors
 
-def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=False, t0=0, te=-1, length_scale=10.0, mode='centered_rod', rod_segments=10):
+def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=False, t0=0, te=-1, length_scale=10.0, mode=None, show_path=True, add_center_velocity=False, plot_only_half=False, rod_segments=10):
     '''
     Plots fiber trajectories in 3D with orientation rods scaled by rotation rate.
     
@@ -362,12 +362,28 @@ def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=Fal
         write_trajID - whether to write the trajectory ID
         t0, te - time range in frames
         length_scale - scaling multiplier for the rod lengths
-        mode - 'centered_rod', 'path_and_half_rod', or 'speed_colored_rod'
-        rod_segments - number of segments to split the rod into (for speed_colored_rod mode)
+        mode - (Optional) 'centered_rod', 'path_and_half_rod', or 'speed_colored_rod' for legacy support
+        show_path - whether to show the center line path (default True)
+        add_center_velocity - whether to color the rods by total local speed (translation + rotation) instead of rotation rate only (default False)
+        plot_only_half - whether to plot only the positive half-rod from center (default False)
+        rod_segments - number of segments to split the rod into (for speed coloring)
     '''
-    valid_modes = ['centered_rod', 'path_and_half_rod', 'speed_colored_rod']
-    if mode not in valid_modes:
-        raise ValueError(f"Unknown mode: {mode}. Must be one of {valid_modes}")
+    if mode is not None:
+        valid_modes = ['centered_rod', 'path_and_half_rod', 'speed_colored_rod']
+        if mode not in valid_modes:
+            raise ValueError(f"Unknown mode: {mode}. Must be one of {valid_modes}")
+        if mode == 'centered_rod':
+            show_path = True
+            add_center_velocity = False
+            plot_only_half = False
+        elif mode == 'path_and_half_rod':
+            show_path = True
+            add_center_velocity = False
+            plot_only_half = True
+        elif mode == 'speed_colored_rod':
+            show_path = True
+            add_center_velocity = True
+            plot_only_half = False
 
     if isinstance(trajectory_file, str):
         trajectory_file = [trajectory_file]
@@ -488,14 +504,17 @@ def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=Fal
                 pdot_z = np.zeros(len(frames))
                 omega_dots = np.zeros(len(frames))
 
-        # Note: 'speed_colored_rod' colors segments by local speed (translation + rotation). 
-        # Even with rod_segments=1, it is conceptually different from 'centered_rod':
-        # - 'centered_rod' colors the entire rod based on its rotation rate (omega_dots) in rad/frame.
-        # - 'speed_colored_rod' with 1 segment colors the entire rod based on its center of mass translational speed (v_cm) in pixels/frame.
-        if mode == 'speed_colored_rod':
-            L = length_scale
-            s_mids = np.linspace(-0.5 * L, 0.5 * L, rod_segments + 1)
-            s_mids = 0.5 * (s_mids[:-1] + s_mids[1:])
+        # Setup the rod coordinates endpoints
+        if plot_only_half:
+            s_start = 0.0
+            s_end = 0.5 * length_scale
+        else:
+            s_start = -0.5 * length_scale
+            s_end = 0.5 * length_scale
+
+        if add_center_velocity:
+            s_nodes = np.linspace(s_start, s_end, rod_segments + 1)
+            s_mids = 0.5 * (s_nodes[:-1] + s_nodes[1:])
             segment_speeds = []
             for i in range(len(frames)):
                 v_cm = np.array([vx[i], vy[i], vz[i]])
@@ -532,8 +551,9 @@ def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=Fal
         y_min, y_max = min(y_min, ys.min()), max(y_max, ys.max())
         z_min, z_max = min(z_min, zs.min()), max(z_max, zs.max())
 
-        # Path connecting the centers is always a thin black line
-        ax.plot(xs, zs, ys, '-', color='black', lw=0.7)
+        # Path connecting the centers
+        if show_path:
+            ax.plot(xs, zs, ys, '-', color='black', lw=0.7)
 
         # Plot sticks for each frame along the trajectory
         for i in range(len(xs)):
@@ -541,21 +561,8 @@ def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=Fal
             ux, uy, uz = px[i], py[i], pz[i]
             omega = omega_dots[i]
 
-            color = cmap(norm(omega))
-            L = length_scale
-
-            if mode == 'centered_rod':
-                x_endpoints = [cx - 0.5 * L * ux, cx + 0.5 * L * ux]
-                y_endpoints = [cy - 0.5 * L * uy, cy + 0.5 * L * uy]
-                z_endpoints = [cz - 0.5 * L * uz, cz + 0.5 * L * uz]
-                ax.plot(x_endpoints, z_endpoints, y_endpoints, '-', color=color, lw=0.8, alpha=0.6)
-            elif mode == 'path_and_half_rod':
-                x_endpoints = [cx, cx + 0.5 * L * ux]
-                y_endpoints = [cy, cy + 0.5 * L * uy]
-                z_endpoints = [cz, cz + 0.5 * L * uz]
-                ax.plot(x_endpoints, z_endpoints, y_endpoints, '-', color=color, lw=0.8, alpha=0.6)
-            elif mode == 'speed_colored_rod':
-                s_nodes = np.linspace(-0.5 * L, 0.5 * L, rod_segments + 1)
+            if add_center_velocity:
+                s_nodes = np.linspace(s_start, s_end, rod_segments + 1)
                 speeds = segment_speeds[i]
                 for j in range(rod_segments):
                     s1 = s_nodes[j]
@@ -566,7 +573,11 @@ def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=Fal
                     c = cmap(norm(speeds[j]))
                     ax.plot(x_endpts, z_endpts, y_endpts, '-', color=c, lw=0.8, alpha=0.6)
             else:
-                raise ValueError(f"Unknown mode: {mode}")
+                color = cmap(norm(omega))
+                x_endpoints = [cx + s_start * ux, cx + s_end * ux]
+                y_endpoints = [cy + s_start * uy, cy + s_end * uy]
+                z_endpoints = [cz + s_start * uz, cz + s_end * uz]
+                ax.plot(x_endpoints, z_endpoints, y_endpoints, '-', color=color, lw=0.8, alpha=0.6)
 
         if write_trajID and len(xs) > 0:
             ax.text(xs[0], zs[0], ys[0], str(tid), fontdict={'fontsize': 10, 'color': 'black'})
@@ -584,12 +595,13 @@ def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=Fal
     mappable = cm.ScalarMappable(norm=norm, cmap=cmap)
     mappable.set_array(all_omega_dots)
     cbar = fig.colorbar(mappable, ax=ax, pad=0.1, shrink=0.7)
-    if mode == 'speed_colored_rod':
+    if add_center_velocity:
         cbar.set_label(r'Speed (pixels/frame)')
     else:
         cbar.set_label(r'$\dot{\omega}$ (rotation rate, rad/frame)')
 
-    plt.title(f"Fiber Trajectories ({mode} mode)")
+    title_suffix = f"path={show_path}, center_vel={add_center_velocity}, half={plot_only_half}"
+    plt.title(f"Fiber Trajectories ({title_suffix})")
     print(f"plotted {len(plot_data)} fiber trajectories")
     plt.show()
 

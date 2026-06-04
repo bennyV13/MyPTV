@@ -1931,10 +1931,27 @@ class workflow(object):
         t0 = int(self.get_param('plot_fibers', 't0'))
         te = int(self.get_param('plot_fibers', 'te'))
         length_scale = float(self.get_param('plot_fibers', 'length_scale'))
-        mode = self.get_param('plot_fibers', 'mode')
+        
+        p_dict = self.get_action_params('plot_fibers')
+        mode = p_dict.get('mode', None)
+        
+        def parse_bool(val, default):
+            if val is None:
+                return default
+            if isinstance(val, bool):
+                return val
+            if isinstance(val, (int, float)):
+                return bool(val)
+            if isinstance(val, str):
+                return val.lower() in ('true', 'yes', '1')
+            return default
+
+        show_path = parse_bool(p_dict.get('show_path'), True)
+        add_center_velocity = parse_bool(p_dict.get('add_center_velocity'), False)
+        plot_only_half = parse_bool(p_dict.get('plot_only_half'), False)
         
         try:
-            rod_segments = int(self.get_param('plot_fibers', 'rod_segments'))
+            rod_segments = int(p_dict.get('rod_segments', 10))
         except ValueError:
             rod_segments = 10
             
@@ -1946,6 +1963,9 @@ class workflow(object):
                     te=te, 
                     length_scale=length_scale, 
                     mode=mode,
+                    show_path=show_path,
+                    add_center_velocity=add_center_velocity,
+                    plot_only_half=plot_only_half,
                     rod_segments=rod_segments)
     
     
