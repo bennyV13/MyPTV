@@ -415,7 +415,7 @@ def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=Fal
     trajs = dict([(k, np.array(g)) for k, g in traj_data.groupby(0) if k != -1])
     oris = dict([(k, np.array(g)) for k, g in ori_data.groupby(0) if k != -1])
 
-    fig = plt.figure(figsize=(10, 8))
+    fig = plt.figure(figsize=(8, 6))
     ax = fig.add_subplot(projection='3d')
     cmap = plt.get_cmap('viridis')
 
