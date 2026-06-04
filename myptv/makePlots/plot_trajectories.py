@@ -548,12 +548,12 @@ def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=Fal
                 x_endpoints = [cx - 0.5 * L * ux, cx + 0.5 * L * ux]
                 y_endpoints = [cy - 0.5 * L * uy, cy + 0.5 * L * uy]
                 z_endpoints = [cz - 0.5 * L * uz, cz + 0.5 * L * uz]
-                ax.plot(x_endpoints, z_endpoints, y_endpoints, '-', color=color, lw=1.5)
+                ax.plot(x_endpoints, z_endpoints, y_endpoints, '-', color=color, lw=0.8, alpha=0.6)
             elif mode == 'path_and_half_rod':
                 x_endpoints = [cx, cx + 0.5 * L * ux]
                 y_endpoints = [cy, cy + 0.5 * L * uy]
                 z_endpoints = [cz, cz + 0.5 * L * uz]
-                ax.plot(x_endpoints, z_endpoints, y_endpoints, '-', color=color, lw=1.5)
+                ax.plot(x_endpoints, z_endpoints, y_endpoints, '-', color=color, lw=0.8, alpha=0.6)
             elif mode == 'speed_colored_rod':
                 s_nodes = np.linspace(-0.5 * L, 0.5 * L, rod_segments + 1)
                 speeds = segment_speeds[i]
@@ -564,7 +564,7 @@ def plot_fibers(trajectory_file, orientations_file, min_length, write_trajID=Fal
                     y_endpts = [cy + s1 * uy, cy + s2 * uy]
                     z_endpts = [cz + s1 * uz, cz + s2 * uz]
                     c = cmap(norm(speeds[j]))
-                    ax.plot(x_endpts, z_endpts, y_endpts, '-', color=c, lw=1.5)
+                    ax.plot(x_endpts, z_endpts, y_endpts, '-', color=c, lw=0.8, alpha=0.6)
             else:
                 raise ValueError(f"Unknown mode: {mode}")
 
