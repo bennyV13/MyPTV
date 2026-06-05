@@ -669,12 +669,14 @@ class loop_segmentation(object):
                 # Running with paralelization:
                 print('Running with multiplrocessing...')
                 t0 = time()
-                args = [(X, 
-                         self.imread_func(os.path.join(params[0], 
-                                                       params[1][X])),
-                         params) for X in range(N)]
+                # Pass file paths to workers instead of pre-loaded images
+                # to avoid holding all images in memory simultaneously
+                args = [(X,
+                         os.path.join(params[0], params[1][X]),
+                         params, self.raw_format) for X in range(N)]
                 with multiprocessing.Pool() as pool:
-                    results_list = list(pool.starmap(iter_frame, args))
+                    results_list = list(pool.starmap(iter_frame_from_path,
+                                                     args))
                 print('finished segmentation loop (%.1f sec)'%(time() - t0))
         
             except ImportError as e:
@@ -717,7 +719,7 @@ class loop_segmentation(object):
 
 def iter_frame(i, im, params):
     '''
-    Worker function for the multiprocessing
+    Worker function for the multiprocessing (legacy: receives pre-loaded image)
     '''
     
     ps = particle_segmentation(im,
@@ -743,6 +745,23 @@ def iter_frame(i, im, params):
     res_i = [[b[0][0], b[0][1], b[1][0], b[1][1], b[2], i+params[14]] for b in ps.blobs]
     print('Frame: %d  ;  Blobs: %d'%(i, len(res_i)))
     return res_i
+
+
+def iter_frame_from_path(i, img_path, params, raw_format=False):
+    '''
+    Worker function for multiprocessing that loads its own image from disk.
+    This avoids pre-loading all images into memory and serializing them
+    through IPC pipes, which causes BrokenPipeError on large datasets.
+    '''
+    from skimage import io as skio
+    if raw_format:
+        import rawpy
+        with rawpy.imread(img_path) as raw:
+            im = raw.raw_image.copy()
+    else:
+        im = skio.imread(img_path)
+    
+    return iter_frame(i, im, params)
 
 
 
