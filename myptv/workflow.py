@@ -832,8 +832,11 @@ class workflow(object):
         if raw_format==False:
             imread_func = lambda x: imread(x)
         else:
-            import rawpy
-            imread_func = lambda x: rawpy.imread(x).raw_image
+            def read_raw(x):
+                import rawpy
+                with rawpy.imread(x) as raw:
+                    return raw.raw_image
+            imread_func = read_raw
         
         
         # get the shape of the images

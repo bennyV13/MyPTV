@@ -556,8 +556,11 @@ class loop_segmentation(object):
             self.imread_func = lambda x: io.imread(x)
         
         else:
-            import rawpy
-            self.imread_func = lambda x: rawpy.imread(x).raw_image
+            def read_raw(x):
+                import rawpy
+                with rawpy.imread(x) as raw:
+                    return raw.raw_image
+            self.imread_func = read_raw
         
         
         # settings for background image:
@@ -770,8 +773,11 @@ def calculate_BG_image(dir_name, extension, savename, N_img=200,
     if raw_format == False:
         imread_func = lambda x: io.imread(x)
     else:
-        import rawpy
-        imread_func = lambda x: rawpy.imread(x).raw_image
+        def read_raw(x):
+            import rawpy
+            with rawpy.imread(x) as raw:
+                return raw.raw_image
+        imread_func = read_raw
 
     BG_image_paths = get_img_list(dir_name, extension, N_img=N_img)
 
@@ -872,8 +878,11 @@ def calculate_equilization_map(dir_name, extension, sigma, savename, N_img=200,
         imread_func = lambda x: io.imread(x)
         
     else:
-        import rawpy
-        imread_func = lambda x: rawpy.imread(x).raw_image
+        def read_raw(x):
+            import rawpy
+            with rawpy.imread(x) as raw:
+                return raw.raw_image
+        imread_func = read_raw
     
     EQ_imnames = get_img_list(dir_name, extension, N_img=N_img)
     

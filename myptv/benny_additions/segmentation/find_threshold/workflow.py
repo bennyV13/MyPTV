@@ -244,8 +244,11 @@ class workflow(object):
         if eq_raw is False:
             imread_func = lambda p: io.imread(p)
         else:
-            import rawpy
-            imread_func = lambda p: rawpy.imread(p).raw_image
+            def read_raw(p):
+                import rawpy
+                with rawpy.imread(p) as r:
+                    return r.raw_image
+            imread_func = read_raw
     
         # Load BG and EQ arrays (needed for processing even if not saving)
         _require_file(bg_out, "BG image")
@@ -890,8 +893,11 @@ class workflow(object):
         if raw_format==False:
             imread_func = lambda x: imread(x)
         else:
-            import rawpy
-            imread_func = lambda x: rawpy.imread(x).raw_image
+            def read_raw(x):
+                import rawpy
+                with rawpy.imread(x) as r:
+                    return r.raw_image
+            imread_func = read_raw
         
         
         # get the shape of the images

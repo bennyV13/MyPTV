@@ -496,8 +496,11 @@ class loop_fiber_segmentation(object):
             self.imread_func = lambda x: io.imread(x)
         
         else:
-            import rawpy
-            self.imread_func = lambda x: rawpy.imread(x).raw_image
+            def read_raw(x):
+                import rawpy
+                with rawpy.imread(x) as raw:
+                    return raw.raw_image
+            self.imread_func = read_raw
     
     
     def get_file_names(self):
