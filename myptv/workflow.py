@@ -696,8 +696,15 @@ class workflow(object):
         except:
             iterations = 1
 
+        try:
+            run_if_exists = self.get_param('calculate_BG_image_batch', 'run_if_exists')
+            if run_if_exists is None: run_if_exists = True
+        except:
+            run_if_exists = True
+
         calculate_BG_image_batch(recordings_dir, output_dir, ext, N_img=N_img,
-                                 raw_format=raw_format, iterations=iterations)
+                                 raw_format=raw_format, iterations=iterations,
+                                 run_if_exists=run_if_exists)
         
         
     

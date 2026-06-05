@@ -806,7 +806,8 @@ def calculate_BG_image(dir_name, extension, savename, N_img=200,
 
 
 def calculate_BG_image_batch(recordings_dir, output_dir, extension, 
-                             N_img=200, raw_format=False, iterations=1):
+                             N_img=200, raw_format=False, iterations=1,
+                             run_if_exists=True):
     '''
     Calculates background images for all recordings and cameras in a given
     directory structure and saves them in the output directory.
@@ -839,6 +840,10 @@ def calculate_BG_image_batch(recordings_dir, output_dir, extension,
             cam_path = os.path.join(rec_path, cam)
             save_name = os.path.join(out_rec_path, f'BG_{cam}.tif')
             
+            if not run_if_exists and os.path.exists(save_name):
+                print(f'\nSKIP: {save_name} already exists and run_if_exists=False.')
+                continue
+
             print(f'\nProcessing {rec} - {cam}...')
             calculate_BG_image(cam_path, extension, save_name, N_img=N_img,
                                raw_format=raw_format, iterations=iterations)
