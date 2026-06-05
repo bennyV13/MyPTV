@@ -45,6 +45,11 @@ class workflow(object):
         
         # read the parameter file:
         self.param_file_path = param_file
+        with open(self.param_file_path, 'r') as f:
+            try:
+                self.yaml_params = safe_load(f)
+            except Exception:
+                raise ValueError('Error in loading the parameters file.')
         self.params = self.read_params_file()
         self.comment = comment
         
@@ -218,16 +223,9 @@ class workflow(object):
         Reads the yaml file and formats it as a DataFrame.
         '''
         
-        with open(self.param_file_path, 'r') as f:
-            params = {}
-            
-            try:
-                sl = safe_load(f)
-            except:
-                raise ValueError('Error in loading the parameters file.')
-                
-            for i in range(len(sl)):
-                params.update(sl[i])
+        params = {}
+        for i in range(len(self.yaml_params)):
+            params.update(self.yaml_params[i])
                     
         as_dict = {'operation':[], 'param': [], 'value': [] }
         for k in params.keys():
@@ -2423,8 +2421,7 @@ class workflow(object):
                         actual_save_name = os.path.join(out_dir, f"temp_blobs_{cam}_{datetime.now().strftime('%H%M%S')}")
                     print(f"INFO: save_blobs=False. {actual_save_name} will be deleted after counting.")
 
-                with open(self.param_file_path, "r", encoding="utf-8") as f:
-                    base_params = safe_load(f)
+                base_params = copy.deepcopy(self.yaml_params)
 
                 seg_block = None
                 for d in base_params:
@@ -2664,16 +2661,15 @@ class workflow(object):
         # Extract custom save_name basenames from parameter file
         m_save, t_save, s_save, o_save = "particles", "trajectories", "trajectories_smoothed", "fiber_orientations"
         try:
-            with open(self.param_file_path, "r", encoding="utf-8") as f:
-                for block in safe_load(f):
-                    if "matching" in block and "save_name" in block["matching"] and block["matching"]["save_name"]:
-                        m_save = os.path.basename(block["matching"]["save_name"].strip())
-                    if "tracking" in block and "save_name" in block["tracking"] and block["tracking"]["save_name"]:
-                        t_save = os.path.basename(block["tracking"]["save_name"].strip())
-                    if "smoothing" in block and "save_name" in block["smoothing"] and block["smoothing"]["save_name"]:
-                        s_save = os.path.basename(block["smoothing"]["save_name"].strip())
-                    if "fiber_orientations" in block and "save_name" in block["fiber_orientations"] and block["fiber_orientations"]["save_name"]:
-                        o_save = os.path.basename(block["fiber_orientations"]["save_name"].strip())
+            for block in self.yaml_params:
+                if "matching" in block and "save_name" in block["matching"] and block["matching"]["save_name"]:
+                    m_save = os.path.basename(block["matching"]["save_name"].strip())
+                if "tracking" in block and "save_name" in block["tracking"] and block["tracking"]["save_name"]:
+                    t_save = os.path.basename(block["tracking"]["save_name"].strip())
+                if "smoothing" in block and "save_name" in block["smoothing"] and block["smoothing"]["save_name"]:
+                    s_save = os.path.basename(block["smoothing"]["save_name"].strip())
+                if "fiber_orientations" in block and "save_name" in block["fiber_orientations"] and block["fiber_orientations"]["save_name"]:
+                    o_save = os.path.basename(block["fiber_orientations"]["save_name"].strip())
         except Exception:
             pass
 
@@ -2794,8 +2790,7 @@ class workflow(object):
                 # Step 1: Matching
                 if item["matching"] == "RUN" and not error_occurred:
                     print(f"\n--- Running Matching for {rec} ---")
-                    with open(self.param_file_path, "r", encoding="utf-8") as f:
-                        params_dict = safe_load(f)
+                    params_dict = copy.deepcopy(self.yaml_params)
                     
                     m_block = None
                     for block in params_dict:
@@ -2847,8 +2842,7 @@ class workflow(object):
                 # Step 2: Tracking
                 if item["tracking"] == "RUN" and not error_occurred:
                     print(f"--- Running Tracking for {rec} ---")
-                    with open(self.param_file_path, "r", encoding="utf-8") as f:
-                        params_dict = safe_load(f)
+                    params_dict = copy.deepcopy(self.yaml_params)
                     
                     t_block = None
                     for block in params_dict:
@@ -2895,8 +2889,7 @@ class workflow(object):
                 # Step 3: Smoothing
                 if item["smoothing"] == "RUN" and not error_occurred:
                     print(f"--- Running Smoothing for {rec} ---")
-                    with open(self.param_file_path, "r", encoding="utf-8") as f:
-                        params_dict = safe_load(f)
+                    params_dict = copy.deepcopy(self.yaml_params)
                     
                     s_block = None
                     for block in params_dict:
@@ -2941,8 +2934,7 @@ class workflow(object):
                 # Step 4: Orientations
                 if item["orientations"] == "RUN" and not error_occurred:
                     print(f"--- Running Orientations for {rec} ---")
-                    with open(self.param_file_path, "r", encoding="utf-8") as f:
-                        params_dict = safe_load(f)
+                    params_dict = copy.deepcopy(self.yaml_params)
                     
                     o_block = None
                     for block in params_dict:
@@ -2999,8 +2991,7 @@ class workflow(object):
                 # Step 4.5: Smoothed Orientations
                 if item.get("smoothed_orientations") == "RUN" and not error_occurred:
                     print(f"--- Running Smoothed Orientations for {rec} ---")
-                    with open(self.param_file_path, "r", encoding="utf-8") as f:
-                        params_dict = safe_load(f)
+                    params_dict = copy.deepcopy(self.yaml_params)
                     
                     so_block = None
                     for block in params_dict:
