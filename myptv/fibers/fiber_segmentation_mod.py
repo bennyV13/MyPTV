@@ -571,7 +571,11 @@ class loop_fiber_segmentation(object):
         for i in range(N):
             print('', end='\r')
             print(' frame: %d'%(i+i0), end='\r')
-            im = self.imread_func(os.path.join(self.dir_name, self.image_files[i]))
+            img_path = os.path.join(self.dir_name, self.image_files[i])
+            try:
+                im = self.imread_func(img_path)
+            except Exception as e:
+                raise type(e)(f'{e}\n  File: {img_path}') from e
             ps = fiber_segmentation(im,
                                     sigma=self.sigma, 
                                     threshold=self.th,
