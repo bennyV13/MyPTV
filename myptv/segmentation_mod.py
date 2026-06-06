@@ -754,12 +754,16 @@ def iter_frame_from_path(i, img_path, params, raw_format=False):
     through IPC pipes, which causes BrokenPipeError on large datasets.
     '''
     from skimage import io as skio
-    if raw_format:
-        import rawpy
-        with rawpy.imread(img_path) as raw:
-            im = raw.raw_image.copy()
-    else:
-        im = skio.imread(img_path)
+    try:
+        if raw_format:
+            import rawpy
+            with rawpy.imread(img_path) as raw:
+                im = raw.raw_image.copy()
+        else:
+            im = skio.imread(img_path)
+    except Exception as e:
+        print(f'WARNING: Frame {i} - skipping corrupted file: {img_path}\n  ({e})')
+        return []
     
     return iter_frame(i, im, params)
 
@@ -802,9 +806,21 @@ def calculate_BG_image(dir_name, extension, savename, N_img=200,
 
     # Load images into memory as float32 to allow signed residuals
     images = []
+    skipped = 0
     for path in tqdm.tqdm(BG_image_paths, desc='Loading images for BG'):
-        img = imread_func(path).astype('float32')
-        images.append(img)
+        try:
+            img = imread_func(path).astype('float32')
+            images.append(img)
+        except Exception as e:
+            skipped += 1
+            print(f'\n  WARNING: Skipping corrupted file: {path}\n    ({e})')
+    
+    if len(images) == 0:
+        raise ValueError(f'All {skipped} images failed to load — cannot '
+                         f'compute background for {dir_name}')
+    if skipped > 0:
+        print(f'  Loaded {len(images)}/{len(images)+skipped} images '
+              f'({skipped} corrupted, skipped)')
     images = np.array(images)
 
     # Initial background calculation (Iteration 1)
