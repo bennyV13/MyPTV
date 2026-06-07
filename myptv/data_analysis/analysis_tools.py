@@ -64,6 +64,48 @@ def is_inside_a_box(tr, xmin, xmax, ymin, ymax, zmin, zmax):
 
 
 
+
+def filter_trajectories(traj_list, roi=None, min_length=2, remove_zero_dynamics=True):
+    '''
+    Filters a list of trajectories based on:
+    1. Region of interest (ROI) boundaries: roi = {'x_min': ..., 'x_max': ..., etc.}
+    2. Removal of points with all-zero velocity and acceleration (columns 4-9).
+    3. Trajectory length constraints.
+    '''
+    filtered_trajs = []
+    for tr in traj_list:
+        tr_filtered = tr.copy()
+        
+        # 1. Remove rows with all-zero velocity and acceleration
+        if remove_zero_dynamics:
+            dynamics = tr_filtered[:, 4:10]
+            non_zero_mask = np.any(dynamics != 0, axis=1)
+            tr_filtered = tr_filtered[non_zero_mask]
+            
+        if len(tr_filtered) == 0:
+            continue
+            
+        # 2. ROI Filtering
+        if roi is not None:
+            roi_mask = (
+                (tr_filtered[:, 1] >= roi.get('x_min', -np.inf)) & 
+                (tr_filtered[:, 1] <= roi.get('x_max', np.inf)) &
+                (tr_filtered[:, 2] >= roi.get('y_min', -np.inf)) & 
+                (tr_filtered[:, 2] <= roi.get('y_max', np.inf)) &
+                (tr_filtered[:, 3] >= roi.get('z_min', -np.inf)) & 
+                (tr_filtered[:, 3] <= roi.get('z_max', np.inf))
+            )
+            tr_filtered = tr_filtered[roi_mask]
+            
+        # 3. Minimum length check
+        if len(tr_filtered) >= min_length:
+            filtered_trajs.append(tr_filtered)
+            
+    return filtered_trajs
+
+
+
+
 def convert_trajs_to_physical_units(traj_list, fps):
     '''
     Converts trajectory data from frame-based units to physical units.
@@ -580,6 +622,73 @@ def get_pairs(traj_list):
                 pairs.append(p_ij)
             
     return pairs
+
+
+
+
+def save_trajs_feather(trajs, filename):
+    '''
+    Saves a list of trajectory arrays (or a single concatenated array/DataFrame)
+    to a Feather file for quick loading.
+    
+    Parameters:
+    -----------
+    trajs : list of numpy arrays, or numpy array, or pandas DataFrame
+        The trajectory data to be saved. If it's a list of numpy arrays,
+        each array is expected to have shape (N, 11) with columns:
+        [traj_id, x, y, z, vx, vy, vz, ax, ay, az, time].
+    filename : str
+        Path to the output Feather file.
+    '''
+    if isinstance(trajs, list):
+        if len(trajs) == 0:
+            df = pd.DataFrame(columns=['traj_id', 'x', 'y', 'z', 'vx', 'vy', 'vz', 'ax', 'ay', 'az', 'time'])
+        else:
+            all_data = np.vstack(trajs)
+            df = pd.DataFrame(all_data, columns=['traj_id', 'x', 'y', 'z', 'vx', 'vy', 'vz', 'ax', 'ay', 'az', 'time'])
+    elif isinstance(trajs, np.ndarray):
+        df = pd.DataFrame(trajs, columns=['traj_id', 'x', 'y', 'z', 'vx', 'vy', 'vz', 'ax', 'ay', 'az', 'time'])
+    elif isinstance(trajs, pd.DataFrame):
+        df = trajs
+    else:
+        raise TypeError("trajs must be a list of numpy arrays, a numpy array, or a pandas DataFrame")
+    
+    df.to_feather(filename)
+    print(f"Saved {len(df)} points to {filename} in Feather format.")
+
+
+
+
+def load_trajs_feather(filename, as_arrays=True):
+    '''
+    Loads trajectory data from a Feather file.
+    
+    Parameters:
+    -----------
+    filename : str
+        Path to the Feather file.
+    as_arrays : bool, default True
+        If True, returns a list of numpy arrays (grouped by trajectory ID),
+        matching the format returned by load_ptv_trajectories.
+        If False, returns the raw pandas DataFrame.
+    '''
+    df = pd.read_feather(filename)
+    if not as_arrays:
+        return df
+    
+    if len(df) == 0:
+        return []
+    
+    # Sort by traj_id and then by time to ensure correct chronological order
+    df_sorted = df.sort_values(by=['traj_id', 'time'])
+    values = df_sorted.values
+    
+    traj_ids = values[:, 0]
+    split_indices = np.where(traj_ids[:-1] != traj_ids[1:])[0] + 1
+    
+    trajs = np.split(values, split_indices)
+    return trajs
+
 
 
 
