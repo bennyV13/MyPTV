@@ -111,7 +111,7 @@ def convert_trajs_to_physical_units(traj_list, fps):
     Converts trajectory data from frame-based units to physical units.
     vx, vy, vz (cols 4,5,6) : mm/frame -> mm/s (multiply by fps)
     ax, ay, az (cols 7,8,9) : mm/frame^2 -> mm/s^2 (multiply by fps^2)
-    time (col 10)           : frame -> s (divide by fps)
+    time (last col)         : frame -> s (divide by fps)
     '''
     dt = 1.0 / fps
     physical_trajs = []
@@ -119,7 +119,12 @@ def convert_trajs_to_physical_units(traj_list, fps):
         tr_copy = tr.copy()
         tr_copy[:, 4:7] *= fps           # Velocities
         tr_copy[:, 7:10] *= (fps**2)     # Accelerations
-        tr_copy[:, 10] *= dt             # Time
+        
+        if tr_copy.shape[1] == 25:
+            tr_copy[:, 13:16] *= fps         # pdot
+            tr_copy[:, 16:19] *= (fps**2)    # pddot
+            
+        tr_copy[:, -1] *= dt             # Time
         physical_trajs.append(tr_copy)
     return physical_trajs
 
@@ -292,15 +297,10 @@ def get_mean_std_time_series(traj_list, kind='x'):
     else:
         raise ValueError('undefined kind "%s"'%kind)
     
-    tm_lst = []
+    tm_arr = np.concatenate([tr[:, -1] for tr in traj_list])
+    v_arr = np.concatenate([get_component(tr) for tr in traj_list])
     
-    v_lst = []
-    
-    for tr in traj_list:
-        tm_lst += list(tr[:,-1])
-        v_lst += list(get_component(tr))
-    
-    vals = pd.DataFrame({'tm': tm_lst, 'v': v_lst})
+    vals = pd.DataFrame({'tm': tm_arr, 'v': v_arr})
     grouped = [[k, len(g['v']), np.mean(g['v']), np.std(g['v'])] for k,g in 
                vals.groupby('tm')]
     
@@ -359,16 +359,12 @@ def get_mean_velocity_profiles(traj_list, start, stop, nbins, direction, kind):
         raise ValueError('undefined direction "%s"'%direction)
     
     
-    cord_lst = []
-    v_lst = []
+    cord_arr = np.concatenate([get_cordinate(tr) for tr in traj_list])
+    v_arr = np.concatenate([get_component(tr) for tr in traj_list])
     
-    for tr in traj_list:
-        cord_lst += list(get_cordinate(tr))
-        v_lst += list(get_component(tr))
+    bins = ((cord_arr - start)/(stop-start)*nbins).astype('int')
     
-    bins = ((np.array(cord_lst) - start)/(stop-start)*nbins).astype('int')
-    
-    vals = pd.DataFrame({'bins': bins, 'v': v_lst})
+    vals = pd.DataFrame({'bins': bins, 'v': v_arr})
     
     avg_V = []
     grouped = dict(list(vals.groupby('bins')))
@@ -435,16 +431,12 @@ def get_std_velocity_profiles(traj_list, start, stop, nbins, direction, kind):
         raise ValueError('undefined direction "%s"'%direction)
     
     
-    cord_lst = []
-    v_lst = []
+    cord_arr = np.concatenate([get_cordinate(tr) for tr in traj_list])
+    v_arr = np.concatenate([get_component(tr) for tr in traj_list])
     
-    for tr in traj_list:
-        cord_lst += list(get_cordinate(tr))
-        v_lst += list(get_component(tr))
+    bins = ((cord_arr - start)/(stop-start)*nbins).astype('int')
     
-    bins = ((np.array(cord_lst) - start)/(stop-start)*nbins).astype('int')
-    
-    vals = pd.DataFrame({'bins': bins, 'v': v_lst})
+    vals = pd.DataFrame({'bins': bins, 'v': v_arr})
     
     std_V = []
     grouped = dict(list(vals.groupby('bins')))
@@ -481,32 +473,45 @@ def list_corelation(arr_list):
     S - array of standard deviations for R as a funciton of time
     N - array of number of elements used at each time 
     '''
-    N = max( [len(i) for i in arr_list] )
-    r = [  [ [],[] ]   for i in range(N)]
+    N_max = max([len(i) for i in arr_list]) if arr_list else 0
+    r0 = [[] for _ in range(N_max)]
+    r1 = [[] for _ in range(N_max)]
     
     for arr in arr_list:
-        for val in arr:
-            r[0][0].append(val)
-            r[0][1].append(val)
-        for i in range(1,len(arr)):
-            for val in arr[:-i]:
-                r[i][0].append(val)
-            for val in arr[i:]:
-                r[i][1].append(val) 
-    R,S,N = [],[],[]
-    for i in r:
-        if len(i[1]) <= 1:
+        if len(arr) == 0: continue
+        r0[0].append(arr)
+        r1[0].append(arr)
+        for i in range(1, len(arr)):
+            r0[i].append(arr[:-i])
+            r1[i].append(arr[i:])
+            
+    R, S, counts = [], [], []
+    for i in range(N_max):
+        if len(r1[i]) == 0:
             R.append(0)
             S.append(0)
-            N.append(1)
+            counts.append(0)
+            continue
+            
+        arr0 = np.concatenate(r0[i])
+        arr1 = np.concatenate(r1[i])
+        if len(arr1) <= 1:
+            R.append(0)
+            S.append(0)
+            counts.append(len(arr1))
         else:
-            r1 = np.array(i[0]) - np.mean(i[0])
-            r2 = np.array(i[1]) - np.mean(i[1])
-            R.append( np.mean(r1*r2) / np.sqrt(np.mean(r1**2) * np.mean(r2**2) ) )
-            S.append( np.std(r1*r2) / np.sqrt(np.mean(r1**2) * np.mean(r2**2) ) )
-            N.append(len(r1))
+            arr0 = arr0 - np.mean(arr0)
+            arr1 = arr1 - np.mean(arr1)
+            denominator = np.sqrt(np.mean(arr0**2) * np.mean(arr1**2))
+            if denominator == 0:
+                R.append(0)
+                S.append(0)
+            else:
+                R.append(np.mean(arr0 * arr1) / denominator)
+                S.append(np.std(arr0 * arr1) / denominator)
+            counts.append(len(arr0))
 
-    return np.array(R), np.array(S), np.array(N)
+    return np.array(R), np.array(S), np.array(counts)
 
 
 
@@ -539,19 +544,19 @@ def get_relative_samples(data):
     ids, indexes 1-3 are selative positions, 4-6
     are relative velocitied, and the last is time.
     '''
-    # group the data according to frames
-    by_time = [np.array(g) for k,g in data.groupby(10)]
+    merged = pd.merge(data, data, on=10, suffixes=('_i', '_j'))
+    merged = merged[merged['0_i'] < merged['0_j']]
+    
+    v = merged.values
+    dr = v[:, 1:4] - v[:, 12:15]
+    dv = v[:, 4:7] - v[:, 15:18]
+    
     relative_sample = []
-    
-    for lst in by_time:
-        for i in range(len(lst)):
-            for j in range(i+1, len(lst)):
-                id_ = (lst[i][0], lst[j][0])
-                dr = list(lst[i][1:4] - lst[j][1:4])
-                dv = list(lst[i][4:7] - lst[j][4:7])
-                new_sample = [id_] + dr + dv + [lst[i][-1]]
-                relative_sample.append(new_sample)
-    
+    for i in range(len(v)):
+        id_tuple = (v[i, 0], v[i, 11])
+        new_sample = [id_tuple] + dr[i].tolist() + dv[i].tolist() + [v[i, 10]]
+        relative_sample.append(new_sample)
+        
     return relative_sample
 
 
@@ -598,29 +603,27 @@ def get_pairs(traj_list):
             number. Inedx 0 is the id number of particle
             i and 1 is the id of particle j.
     '''
-    from numpy import intersect1d, where, hstack, ones
+    if len(traj_list) == 0:
+        return []
     
-    def in_list(arr, lst):
-        return [arr[i] in lst for i in range(len(arr))]
-        
+    all_data = np.vstack(traj_list)
+    df = pd.DataFrame(all_data)
+    
+    merged = pd.merge(df, df, on=10, suffixes=('_i', '_j'))
+    merged = merged[merged['0_i'] < merged['0_j']]
+    
     pairs = []
-    for i in range(len(traj_list)):
+    merged = merged.sort_values(['0_i', '0_j', 10])
+    for (id_i, id_j), group in merged.groupby(['0_i', '0_j']):
+        v = group.values
         
-        for j in range(i+1, len(traj_list)):
-            
-            common_times = intersect1d(traj_list[i][:,-1], traj_list[j][:,-1])
-            
-            if len(common_times)>0:
-                
-                ind_i = where(in_list(traj_list[i][:,-1], common_times))[0]
-                ind_j = where(in_list(traj_list[j][:,-1], common_times))[0]
-                p_ij = traj_list[i][ind_i, 1:10] - traj_list[j][ind_j, 1:10] 
-                
-                p_ij = hstack([traj_list[i][ind_i, :1], 
-                               traj_list[j][ind_j, :1],
-                               p_ij, traj_list[i][ind_i, -1:]])
-                pairs.append(p_ij)
-            
+        rel_pos = v[:, 1:4] - v[:, 12:15]
+        rel_vel = v[:, 4:7] - v[:, 15:18]
+        rel_acc = v[:, 7:10] - v[:, 18:21]
+        
+        p_ij = np.hstack([v[:, 0:1], v[:, 11:12], rel_pos, rel_vel, rel_acc, v[:, 10:11]])
+        pairs.append(p_ij)
+        
     return pairs
 
 
@@ -634,12 +637,18 @@ def save_trajs_feather(trajs, filename):
     Parameters:
     -----------
     trajs : list of numpy arrays, or numpy array, or pandas DataFrame
-        The trajectory data to be saved. If it's a list of numpy arrays,
-        each array is expected to have shape (N, 11) with columns:
-        [traj_id, x, y, z, vx, vy, vz, ax, ay, az, time].
+        The trajectory data to be saved.
     filename : str
         Path to the output Feather file.
     '''
+    def get_col_names(num_cols):
+        if num_cols == 11:
+            return ['traj_id', 'x', 'y', 'z', 'vx', 'vy', 'vz', 'ax', 'ay', 'az', 'time']
+        elif num_cols == 25:
+            return ['traj_id', 'x', 'y', 'z', 'vx', 'vy', 'vz', 'ax', 'ay', 'az', 'px', 'py', 'pz', 'pdot_x', 'pdot_y', 'pdot_z', 'pddot_x', 'pddot_y', 'pddot_z', 'cam0', 'cam1', 'cam2', 'cam3', 'error', 'time']
+        else:
+            return [f'col_{j}' for j in range(num_cols)]
+
     if isinstance(trajs, list):
         if len(trajs) == 0:
             df = pd.DataFrame(columns=['traj_id', 'x', 'y', 'z', 'vx', 'vy', 'vz', 'ax', 'ay', 'az', 'time', 'unique_id'])
@@ -649,10 +658,12 @@ def save_trajs_feather(trajs, filename):
                 unique_col = np.full((tr.shape[0], 1), i, dtype=np.float64)
                 arrays_with_id.append(np.hstack((tr, unique_col)))
             all_data = np.vstack(arrays_with_id)
-            df = pd.DataFrame(all_data, columns=['traj_id', 'x', 'y', 'z', 'vx', 'vy', 'vz', 'ax', 'ay', 'az', 'time', 'unique_id'])
+            cols = get_col_names(all_data.shape[1] - 1) + ['unique_id']
+            df = pd.DataFrame(all_data, columns=cols)
             df['unique_id'] = df['unique_id'].astype(int)
     elif isinstance(trajs, np.ndarray):
-        df = pd.DataFrame(trajs, columns=['traj_id', 'x', 'y', 'z', 'vx', 'vy', 'vz', 'ax', 'ay', 'az', 'time'])
+        cols = get_col_names(trajs.shape[1])
+        df = pd.DataFrame(trajs, columns=cols)
         df['unique_id'] = 0
     elif isinstance(trajs, pd.DataFrame):
         df = trajs.copy()
@@ -692,8 +703,8 @@ def load_trajs_feather(filename, as_arrays=True):
     # Sort by group_col and then by time to ensure correct chronological order
     df_sorted = df.sort_values(by=[group_col, 'time'])
     
-    # Extract only the first 11 columns (original trajectory columns)
-    original_cols = df.columns[:11]
+    # Extract only the original columns (all except unique_id or group_col)
+    original_cols = [c for c in df.columns if c != group_col]
     values = df_sorted[original_cols].values
     
     group_ids = df_sorted[group_col].values
