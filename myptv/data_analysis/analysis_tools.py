@@ -642,14 +642,22 @@ def save_trajs_feather(trajs, filename):
     '''
     if isinstance(trajs, list):
         if len(trajs) == 0:
-            df = pd.DataFrame(columns=['traj_id', 'x', 'y', 'z', 'vx', 'vy', 'vz', 'ax', 'ay', 'az', 'time'])
+            df = pd.DataFrame(columns=['traj_id', 'x', 'y', 'z', 'vx', 'vy', 'vz', 'ax', 'ay', 'az', 'time', 'unique_id'])
         else:
-            all_data = np.vstack(trajs)
-            df = pd.DataFrame(all_data, columns=['traj_id', 'x', 'y', 'z', 'vx', 'vy', 'vz', 'ax', 'ay', 'az', 'time'])
+            arrays_with_id = []
+            for i, tr in enumerate(trajs):
+                unique_col = np.full((tr.shape[0], 1), i, dtype=np.float64)
+                arrays_with_id.append(np.hstack((tr, unique_col)))
+            all_data = np.vstack(arrays_with_id)
+            df = pd.DataFrame(all_data, columns=['traj_id', 'x', 'y', 'z', 'vx', 'vy', 'vz', 'ax', 'ay', 'az', 'time', 'unique_id'])
+            df['unique_id'] = df['unique_id'].astype(int)
     elif isinstance(trajs, np.ndarray):
         df = pd.DataFrame(trajs, columns=['traj_id', 'x', 'y', 'z', 'vx', 'vy', 'vz', 'ax', 'ay', 'az', 'time'])
+        df['unique_id'] = 0
     elif isinstance(trajs, pd.DataFrame):
-        df = trajs
+        df = trajs.copy()
+        if 'unique_id' not in df.columns:
+            df['unique_id'] = 0
     else:
         raise TypeError("trajs must be a list of numpy arrays, a numpy array, or a pandas DataFrame")
     
@@ -679,12 +687,17 @@ def load_trajs_feather(filename, as_arrays=True):
     if len(df) == 0:
         return []
     
-    # Sort by traj_id and then by time to ensure correct chronological order
-    df_sorted = df.sort_values(by=['traj_id', 'time'])
-    values = df_sorted.values
+    group_col = 'unique_id' if 'unique_id' in df.columns else 'traj_id'
     
-    traj_ids = values[:, 0]
-    split_indices = np.where(traj_ids[:-1] != traj_ids[1:])[0] + 1
+    # Sort by group_col and then by time to ensure correct chronological order
+    df_sorted = df.sort_values(by=[group_col, 'time'])
+    
+    # Extract only the first 11 columns (original trajectory columns)
+    original_cols = df.columns[:11]
+    values = df_sorted[original_cols].values
+    
+    group_ids = df_sorted[group_col].values
+    split_indices = np.where(group_ids[:-1] != group_ids[1:])[0] + 1
     
     trajs = np.split(values, split_indices)
     return trajs
