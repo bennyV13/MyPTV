@@ -189,6 +189,15 @@ def get_trajectory_velocities(traj_list, kind='x'):
     elif kind=='z':
         get_component = lambda tr: tr[:,6]
         
+    elif kind=='px':
+        get_component = lambda tr: tr[:,10]
+        
+    elif kind=='py':
+        get_component = lambda tr: tr[:,11]
+        
+    elif kind=='pz':
+        get_component = lambda tr: tr[:,12]
+        
     elif kind=='KE':
         get_component = lambda tr: 0.5*(np.sum(tr[:,4:7]**2, axis=1))
         
