@@ -820,6 +820,53 @@ def get_orientation_correlation_by_distance(traj_list, nbins=50):
     return bin_centers, bin_means, counts
 
 
+def compute_opcf(positions, orientations, box_size, num_bins, max_r):
+    """
+    Computes g(r) and the orientational correlation <cos(theta)>.
+    positions: (N, 3) array in metric units (e.g., meters or millimeters).
+    orientations: (N, 3) array of unit vectors representing fiber direction.
+    """
+    from scipy.spatial.distance import pdist, squareform
+    num_particles = len(positions)
+    
+    # Calculate pairwise Euclidean distances
+    dist_matrix = squareform(pdist(positions))
+    
+    # Calculate dot products of orientation vectors to get cos(theta_12)
+    # Using absolute value because fibers are apolar, but the raw formula uses normal dot product
+    # The user specifies np.dot(orientations, orientations.T), we will use their exact code but handle abs if needed.
+    # We will compute the absolute dot products to handle apolar fiber symmetry as discussed before.
+    dot_products = np.abs(np.dot(orientations, orientations.T))
+    
+    # Setup radial bins in your chosen metric unit
+    bins = np.linspace(0, max_r, num_bins + 1)
+    bin_centers = 0.5 * (bins[1:] + bins[:-1])
+    
+    g_r = np.zeros(num_bins)
+    orient_corr = np.zeros(num_bins)
+    
+    # Ideal gas density
+    rho = num_particles / (box_size**3)
+    
+    for i in range(num_bins):
+        # Find pairs within the current radial bin
+        mask = (dist_matrix >= bins[i]) & (dist_matrix < bins[i+1])
+        np.fill_diagonal(mask, False) # Ignore self-pairs
+        
+        # Count pairs for standard g(r)
+        pair_count = np.sum(mask)
+        
+        # Normalize g(r) by ideal shell volume
+        shell_volume = (4.0 / 3.0) * np.pi * (bins[i+1]**3 - bins[i]**3)
+        g_r[i] = pair_count / (num_particles * rho * shell_volume)
+        
+        # Calculate average orientational correlation <cos(theta_12)>
+        if pair_count > 0:
+            orient_corr[i] = np.mean(dot_products[mask])
+            
+    return bin_centers, g_r, orient_corr
+
+
 
 
 
