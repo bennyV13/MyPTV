@@ -723,6 +723,104 @@ def load_trajs_feather(filename, as_arrays=True):
     return trajs
 
 
+def get_orientation_correlation_by_distance(traj_list, nbins=50):
+    '''
+    Calculates the spatial correlation of fiber orientations as a function of 
+    distance between pairs of fibers in the same frame.
+    
+    Formula:
+    C(R) = < |n̂₁ · n̂₂| >_R
+    where n̂₁ and n̂₂ are the normalized orientation unit vectors of a pair of 
+    fibers in the same frame, and R is their distance.
+    
+    Parameters:
+    -----------
+    traj_list : list of numpy arrays, or numpy array, or pandas DataFrame
+        List of trajectory arrays, where each array/row has columns:
+        [id, x, y, z, vx, vy, vz, ax, ay, az, px, py, pz, ..., frame]
+        with x, y, z at index 1:4, px, py, pz at index 10:13, and frame at index 24.
+    nbins : int, default 50
+        Number of distance bins.
+        
+    Returns:
+    --------
+    bin_centers : numpy array
+        Centers of the distance bins.
+    bin_means : numpy array
+        Averaged absolute dot product of orientations in each bin.
+    counts : numpy array
+        Number of pairs in each bin.
+    '''
+    if isinstance(traj_list, list):
+        if len(traj_list) == 0:
+            return np.array([]), np.array([]), np.array([])
+        all_data = np.vstack(traj_list)
+    elif isinstance(traj_list, np.ndarray):
+        all_data = traj_list
+    elif hasattr(traj_list, 'values'):
+        all_data = traj_list.values
+    else:
+        raise ValueError("traj_list must be a list of numpy arrays, a numpy array, or a pandas DataFrame")
+        
+    pos = all_data[:, 1:4]
+    ori = all_data[:, 10:13]
+    frames = all_data[:, 24]
+    
+    # Normalize orientation vectors
+    norms = np.linalg.norm(ori, axis=1, keepdims=True)
+    # Avoid division by zero
+    norms[norms == 0] = 1.0
+    ori_normed = ori / norms
+    
+    unique_frames = np.unique(frames)
+    
+    all_dists = []
+    all_corrs = []
+    
+    for f in unique_frames:
+        mask = (frames == f)
+        P = pos[mask]
+        O = ori_normed[mask]
+        
+        M = P.shape[0]
+        if M < 2:
+            continue
+            
+        # Get unique pairs indices
+        idx_i, idx_j = np.triu_indices(M, k=1)
+        
+        # Calculate distances
+        dr = P[idx_i] - P[idx_j]
+        dists = np.linalg.norm(dr, axis=1)
+        
+        # Calculate absolute dot products
+        dot_products = np.sum(O[idx_i] * O[idx_j], axis=1)
+        abs_dots = np.abs(dot_products)
+        
+        all_dists.append(dists)
+        all_corrs.append(abs_dots)
+        
+    if len(all_dists) == 0:
+        return np.array([]), np.array([]), np.array([])
+        
+    all_dists = np.concatenate(all_dists)
+    all_corrs = np.concatenate(all_corrs)
+    
+    # Binning
+    counts, bin_edges = np.histogram(all_dists, bins=nbins)
+    sums, _ = np.histogram(all_dists, bins=nbins, weights=all_corrs)
+    
+    bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
+    bin_means = np.zeros_like(bin_centers)
+    
+    valid = counts > 0
+    bin_means[valid] = sums[valid] / counts[valid]
+    bin_means[~valid] = np.nan
+    
+    return bin_centers, bin_means, counts
+
+
+
 
 
 
