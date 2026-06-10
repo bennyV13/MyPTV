@@ -806,9 +806,10 @@ def get_orientation_correlation_by_distance(traj_list, nbins=50):
     all_dists = np.concatenate(all_dists)
     all_corrs = np.concatenate(all_corrs)
     
-    # Binning
-    counts, bin_edges = np.histogram(all_dists, bins=nbins)
-    sums, _ = np.histogram(all_dists, bins=nbins, weights=all_corrs)
+    # Binning - force bins to start exactly at 0.0 mm
+    max_dist = np.max(all_dists) if len(all_dists) > 0 else 1.0
+    counts, bin_edges = np.histogram(all_dists, bins=nbins, range=(0.0, max_dist))
+    sums, _ = np.histogram(all_dists, bins=nbins, range=(0.0, max_dist), weights=all_corrs)
     
     bin_centers = (bin_edges[:-1] + bin_edges[1:]) / 2
     bin_means = np.zeros_like(bin_centers)
