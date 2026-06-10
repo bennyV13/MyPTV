@@ -844,6 +844,7 @@ def compute_opcf(positions, orientations, box_size, num_bins, max_r):
     
     g_r = np.zeros(num_bins)
     orient_corr = np.zeros(num_bins)
+    counts = np.zeros(num_bins)
     
     # Ideal gas density
     rho = num_particles / (box_size**3)
@@ -855,6 +856,7 @@ def compute_opcf(positions, orientations, box_size, num_bins, max_r):
         
         # Count pairs for standard g(r)
         pair_count = np.sum(mask)
+        counts[i] = pair_count
         
         # Normalize g(r) by ideal shell volume
         shell_volume = (4.0 / 3.0) * np.pi * (bins[i+1]**3 - bins[i]**3)
@@ -864,7 +866,7 @@ def compute_opcf(positions, orientations, box_size, num_bins, max_r):
         if pair_count > 0:
             orient_corr[i] = np.mean(dot_products[mask])
             
-    return bin_centers, g_r, orient_corr
+    return bin_centers, g_r, orient_corr, counts
 
 
 
