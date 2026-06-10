@@ -723,37 +723,21 @@ def load_trajs_feather(filename, as_arrays=True):
     return trajs
 
 
-def get_orientation_correlation_by_distance(traj_list, nbins=50):
+def extract_orientation_pairs(traj_list):
     '''
-    Calculates the spatial correlation of fiber orientations as a function of 
-    distance between pairs of fibers in the same frame.
+    Extracts raw pairwise distances and orientation dot products for all pairs 
+    of fibers that exist in the exact same frame.
     
-    Formula:
-    C(R) = < |n̂₁ · n̂₂| >_R
-    where n̂₁ and n̂₂ are the normalized orientation unit vectors of a pair of 
-    fibers in the same frame, and R is their distance.
-    
-    Parameters:
-    -----------
-    traj_list : list of numpy arrays, or numpy array, or pandas DataFrame
-        List of trajectory arrays, where each array/row has columns:
-        [id, x, y, z, vx, vy, vz, ax, ay, az, px, py, pz, ..., frame]
-        with x, y, z at index 1:4, px, py, pz at index 10:13, and frame at index 24.
-    nbins : int, default 50
-        Number of distance bins.
-        
     Returns:
     --------
-    bin_centers : numpy array
-        Centers of the distance bins.
-    bin_means : numpy array
-        Averaged absolute dot product of orientations in each bin.
-    counts : numpy array
-        Number of pairs in each bin.
+    all_dists : numpy array
+        1D array of pairwise Euclidean distances between fibers.
+    all_corrs : numpy array
+        1D array of the absolute dot products of their orientation unit vectors.
     '''
     if isinstance(traj_list, list):
         if len(traj_list) == 0:
-            return np.array([]), np.array([]), np.array([])
+            return np.array([]), np.array([])
         all_data = np.vstack(traj_list)
     elif isinstance(traj_list, np.ndarray):
         all_data = traj_list
@@ -768,7 +752,6 @@ def get_orientation_correlation_by_distance(traj_list, nbins=50):
     
     # Normalize orientation vectors
     norms = np.linalg.norm(ori, axis=1, keepdims=True)
-    # Avoid division by zero
     norms[norms == 0] = 1.0
     ori_normed = ori / norms
     
@@ -801,13 +784,33 @@ def get_orientation_correlation_by_distance(traj_list, nbins=50):
         all_corrs.append(abs_dots)
         
     if len(all_dists) == 0:
-        return np.array([]), np.array([]), np.array([])
+        return np.array([]), np.array([])
         
     all_dists = np.concatenate(all_dists)
     all_corrs = np.concatenate(all_corrs)
     
-    # Binning - force bins to start exactly at 0.0 mm
-    max_dist = np.max(all_dists) if len(all_dists) > 0 else 1.0
+    return all_dists, all_corrs
+
+
+def bin_orientation_pairs(all_dists, all_corrs, nbins=50, max_dist=None):
+    '''
+    Bins the raw pairwise distances and correlations.
+    
+    Returns:
+    --------
+    bin_centers : numpy array
+        Centers of the distance bins.
+    bin_means : numpy array
+        Averaged absolute dot product of orientations in each bin.
+    counts : numpy array
+        Number of pairs in each bin.
+    '''
+    if len(all_dists) == 0:
+        return np.array([]), np.array([]), np.array([])
+        
+    if max_dist is None:
+        max_dist = np.max(all_dists) if len(all_dists) > 0 else 1.0
+        
     counts, bin_edges = np.histogram(all_dists, bins=nbins, range=(0.0, max_dist))
     sums, _ = np.histogram(all_dists, bins=nbins, range=(0.0, max_dist), weights=all_corrs)
     
@@ -819,6 +822,24 @@ def get_orientation_correlation_by_distance(traj_list, nbins=50):
     bin_means[~valid] = np.nan
     
     return bin_centers, bin_means, counts
+
+
+def get_orientation_correlation_by_distance(traj_list, nbins=50):
+    '''
+    Calculates the spatial correlation of fiber orientations as a function of 
+    distance between pairs of fibers in the same frame.
+    
+    Formula:
+    C(R) = < |n̂₁ · n̂₂| >_R
+    where n̂₁ and n̂₂ are the normalized orientation unit vectors of a pair of 
+    fibers in the same frame, and R is their distance.
+    
+    Returns:
+    --------
+    bin_centers, bin_means, counts
+    '''
+    all_dists, all_corrs = extract_orientation_pairs(traj_list)
+    return bin_orientation_pairs(all_dists, all_corrs, nbins)
 
 
 def compute_opcf(positions, orientations, box_size, num_bins, max_r):
