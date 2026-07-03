@@ -326,6 +326,11 @@ class matching_quality_GUI(check_matching):
                          width=button_width)
         btn4.pack(pady=10)
         
+        btn5 = tk.Button(root, text="Plot Orientation Disparity", 
+                         command=self.btn_plot_orientation_disparity,
+                         width=button_width)
+        btn5.pack(pady=10)
+        
         root.mainloop()
         
     
@@ -350,6 +355,47 @@ class matching_quality_GUI(check_matching):
     def btn_plot_disparity_histogram(self):
         self.plot_disparity_histogram(self.f_range)
         plt.show()
+
+    def btn_plot_orientation_disparity(self):
+        self.plot_orientation_disparity(self.f_range)
+        plt.show()
+
+    def plot_orientation_disparity(self, frames=None):
+        # ponytail: assuming particles file has 3D orientation at indices [10,11,12] 
+        # and blobs file has 2D dir vector at indices [3,4]. Adjust if needed.
+        import numpy as np
+        disp = []
+        if frames is None: frames = list(self.particles.keys())
+        for frame in frames:
+            for i, p in enumerate(self.particles[frame]):
+                try:
+                    center_3d, ori_3d = p[:3], p[10:13]
+                except IndexError: continue
+                
+                for cn in range(len(self.imsys.cameras)):
+                    try:
+                        blob_ind = int(p[cn+3])
+                        if blob_ind == -1: continue
+                        blob = self.blob_dics[cn][frame][blob_ind]
+                        
+                        b_dir = np.array([blob[3], blob[4]])
+                        if np.linalg.norm(b_dir) == 0: continue
+                        b_dir = b_dir / np.linalg.norm(b_dir)
+                        
+                        p1, p2 = center_3d + ori_3d, center_3d - ori_3d
+                        cam = self.imsys.cameras[cn]
+                        p_dir = np.array(cam.projection(p1)) - np.array(cam.projection(p2))
+                        if np.linalg.norm(p_dir) == 0: continue
+                        p_dir = p_dir / np.linalg.norm(p_dir)
+                        
+                        angle = np.arccos(np.clip(np.abs(np.dot(b_dir, p_dir)), 0, 1))
+                        disp.append(np.degrees(angle))
+                    except: continue
+        
+        fig, ax = plt.subplots()
+        ax.hist(disp, bins='auto')
+        ax.set_xlabel('Orientation Disparity [degrees]')
+        ax.set_ylabel('counts')
 
 
 
