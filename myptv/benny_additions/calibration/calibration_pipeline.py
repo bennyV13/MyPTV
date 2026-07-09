@@ -274,7 +274,8 @@ def _save_indexed_and_plot(indexed_rows, out_csv, out_plot, cam_cfg):
     ax.set_title(f"Indexing Validation — {cam_cfg['name']}")
     ax.set_xlabel("Image X (px)")
     ax.set_ylabel("Image Y (px)")
-    ax.invert_yaxis()
+    if not ax.yaxis_inverted():
+        ax.invert_yaxis()
     ax.legend(title="World X-columns", bbox_to_anchor=(1.05, 1), loc="upper left")
     ax.grid(True, linestyle=":", alpha=0.5)
     fig.tight_layout()
