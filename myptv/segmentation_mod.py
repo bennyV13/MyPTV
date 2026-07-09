@@ -559,7 +559,7 @@ class loop_segmentation(object):
             def read_raw(x):
                 import rawpy
                 with rawpy.imread(x) as raw:
-                    return raw.raw_image
+                    return raw.raw_image.copy()
             self.imread_func = read_raw
         
         
@@ -798,7 +798,7 @@ def calculate_BG_image(dir_name, extension, savename, N_img=200,
         def read_raw(x):
             import rawpy
             with rawpy.imread(x) as raw:
-                return raw.raw_image
+                return raw.raw_image.copy()
         imread_func = read_raw
 
     BG_image_paths = get_img_list(dir_name, extension, N_img=N_img)
@@ -906,7 +906,7 @@ def calculate_equilization_map(dir_name, extension, sigma, savename, N_img=200,
         def read_raw(x):
             import rawpy
             with rawpy.imread(x) as raw:
-                return raw.raw_image
+                return raw.raw_image.copy()
         imread_func = read_raw
     
     EQ_imnames = get_img_list(dir_name, extension, N_img=N_img)

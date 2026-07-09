@@ -504,9 +504,18 @@ class smooth_orientations(object):
             
             # sort samples according to time:
             traj = sorted(traj_dic[tr_num], key=lambda s: s[-1])
+            traj_arr = np.array(traj)
+            
+            # Enforce sign continuity on the raw orientations
+            # so that the numerical derivatives and smoothing do not
+            # encounter sudden jumps between p and -p.
+            for i in range(1, len(traj_arr)):
+                dot_prod = traj_arr[i, 1]*traj_arr[i-1, 1] + traj_arr[i, 2]*traj_arr[i-1, 2] + traj_arr[i, 3]*traj_arr[i-1, 3]
+                if dot_prod < 0:
+                    traj_arr[i, 1:4] = -traj_arr[i, 1:4]
             
             # smoothing orientations
-            p, v, a = smooth_traj_poly(np.array(traj).T[1:4,:], 
+            p, v, a = smooth_traj_poly(traj_arr.T[1:4,:], 
                                        W, 
                                        self.polyorder,
                                        repetitions=self.repetitions)
