@@ -835,7 +835,7 @@ class workflow(object):
             def read_raw(x):
                 import rawpy
                 with rawpy.imread(x) as raw:
-                    return raw.raw_image
+                    return raw.raw_image.copy()
             imread_func = read_raw
         
         
