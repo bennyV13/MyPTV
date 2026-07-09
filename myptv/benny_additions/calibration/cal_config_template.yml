@@ -1,0 +1,44 @@
+cal_dir: /path/to/cal_directory      # root for all outputs
+target_points: /path/to/cal_points   # 3-column (X, Y, Z) world target file
+
+calibration:
+  alpha: 0.001                       # regularisation (default 0.001)
+  step1_quadratic: false             # Step 1 solver order (default cubic)
+  step2_quadratic: false             # Step 2 solver order (default cubic)
+
+cameras:
+  - name: Cam1
+    camera_id: 0
+    blobs_file: /path/to/Cam1_blobs.txt   # 2-column PixelX, PixelY file
+    origin: bl                            # tl | tr | bl | br
+    swap_xy: false                        # swap Real X↔Y axes
+    x_dir: null                           # plus | minus | null
+    y_dir: null                           # plus | minus | null
+    cal_image: /path/to/BG_Cam1.tif       # optional, overlaid on validation plot
+
+  - name: Cam2
+    camera_id: 1
+    blobs_file: /path/to/Cam2_blobs.txt
+    origin: bl
+    swap_xy: false
+    x_dir: null
+    y_dir: null
+    cal_image: null
+
+  - name: Cam3
+    camera_id: 2
+    blobs_file: /path/to/Cam3_blobs.txt
+    origin: bl
+    swap_xy: false
+    x_dir: null
+    y_dir: null
+    cal_image: null
+
+  - name: Cam4
+    camera_id: 3
+    blobs_file: /path/to/Cam4_blobs.txt
+    origin: bl
+    swap_xy: false
+    x_dir: null
+    y_dir: null
+    cal_image: null
