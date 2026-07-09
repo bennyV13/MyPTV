@@ -829,14 +829,8 @@ class workflow(object):
         if shape not in ['particles', 'fibers']:
             raise ValueError('Shape can be only "particles" or "fibers"')
         
-        if raw_format==False:
-            imread_func = lambda x: imread(x)
-        else:
-            def read_raw(x):
-                import rawpy
-                with rawpy.imread(x) as raw:
-                    return raw.raw_image.copy()
-            imread_func = read_raw
+        from myptv.segmentation_mod import get_imread_func
+        imread_func = get_imread_func(raw_format)
         
         
         # get the shape of the images

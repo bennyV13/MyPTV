@@ -492,15 +492,8 @@ class loop_fiber_segmentation(object):
         self.BG_remove = remove_ststic_BG
         self.raw_format=raw_format
         
-        if self.raw_format == False:
-            self.imread_func = lambda x: io.imread(x)
-        
-        else:
-            def read_raw(x):
-                import rawpy
-                with rawpy.imread(x) as raw:
-                    return raw.raw_image
-            self.imread_func = read_raw
+        from myptv.segmentation_mod import get_imread_func
+        self.imread_func = get_imread_func(self.raw_format)
     
     
     def get_file_names(self):

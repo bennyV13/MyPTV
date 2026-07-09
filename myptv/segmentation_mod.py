@@ -34,6 +34,19 @@ import os
 from time import time
 
 
+def get_imread_func(raw_format=False):
+    '''Returns an image reading function depending on whether the image is in raw format.'''
+    from skimage import io
+    if not raw_format:
+        return lambda x: io.imread(x)
+    else:
+        def read_raw(x):
+            import rawpy
+            with rawpy.imread(x) as raw:
+                return raw.raw_image.copy()
+        return read_raw
+
+
 class particle_segmentation(object):
     '''a class for segmenting out particles (blobs) for a given image'''
     
@@ -552,15 +565,7 @@ class loop_segmentation(object):
         self.multiprocess = multiprocessing
         
         
-        if self.raw_format == False:
-            self.imread_func = lambda x: io.imread(x)
-        
-        else:
-            def read_raw(x):
-                import rawpy
-                with rawpy.imread(x) as raw:
-                    return raw.raw_image.copy()
-            self.imread_func = read_raw
+        self.imread_func = get_imread_func(self.raw_format)
         
         
         # settings for background image:
@@ -792,14 +797,7 @@ def calculate_BG_image(dir_name, extension, savename, N_img=200,
     import tqdm
     import os
 
-    if raw_format == False:
-        imread_func = lambda x: io.imread(x)
-    else:
-        def read_raw(x):
-            import rawpy
-            with rawpy.imread(x) as raw:
-                return raw.raw_image.copy()
-        imread_func = read_raw
+    imread_func = get_imread_func(raw_format)
 
     BG_image_paths = get_img_list(dir_name, extension, N_img=N_img)
 
@@ -899,15 +897,7 @@ def calculate_equilization_map(dir_name, extension, sigma, savename, N_img=200,
     raw_format - mark True is the images are raw format (.dng)
     
     '''
-    if raw_format == False:
-        imread_func = lambda x: io.imread(x)
-        
-    else:
-        def read_raw(x):
-            import rawpy
-            with rawpy.imread(x) as raw:
-                return raw.raw_image.copy()
-        imread_func = read_raw
+    imread_func = get_imread_func(raw_format)
     
     EQ_imnames = get_img_list(dir_name, extension, N_img=N_img)
     
