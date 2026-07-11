@@ -819,6 +819,7 @@ class workflow(object):
         # reading preprepared mask
         if type(mask)==str:
             mask = imread(mask)
+            mask = (mask / amax(mask)).astype('float32')
         
         if method not in ['dilation', 'labeling']:
             raise ValueError('Method can be only "dilation" or "labeling"')
@@ -848,7 +849,7 @@ class workflow(object):
             mask_ROI = zeros(image0.shape)
             mask_ROI[ROI[2]:ROI[3]+1, ROI[0]:ROI[1]+1] = 1
             mask = mask * mask_ROI
-            mask = (mask / amax(mask)).astype('uint')
+            mask = (mask / amax(mask)).astype('float32')
             
             
         # getting equilization map
@@ -896,7 +897,7 @@ class workflow(object):
             # Load images into memory as float32
             images = []
             for path in im_paths:
-                images.append(io.imread(path).astype('float32'))
+                images.append(imread_func(path).astype('float32'))
             images = np.array(images)
             
             # Initial background calculation (Iteration 1)

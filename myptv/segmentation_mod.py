@@ -461,7 +461,7 @@ class particle_segmentation(object):
         import matplotlib.pyplot as plt
         
         if vmax is None:
-            vmax = min([self.th*2, max(self.im.ravel())])
+            vmax = min([self.th*2, max(self.im.ravel())]) or 1
         
         fig, ax = plt.subplots()
         ax.imshow(self.processed_im, vmin=vmin, vmax=vmax)
