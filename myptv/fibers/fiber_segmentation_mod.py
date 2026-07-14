@@ -288,7 +288,7 @@ class fiber_segmentation(object):
                 a = props.major_axis_length
                 b = props.minor_axis_length
             pca_lim = a / b if b > 0 else -1
-            mass = a * b
+            mass = float(self.processed_im[label_img == props.label].sum())
             
             pca = [math.cos(ori), math.sin(ori), pca_lim]
             endpoints = [x + math.cos(ori)*a/2, y + math.sin(ori)*a/2, 
