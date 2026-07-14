@@ -17,20 +17,8 @@ import argparse
 import numpy as np
 from skimage import io
 
-# Attempt to import MyPTV functions using jcodemunch context
-try:
-    from myptv.segmentation_mod import get_imread_func
-except ImportError:
-    # Fallback to local definition if MyPTV is not in python path
-    def get_imread_func(raw_format=False):
-        if not raw_format:
-            return lambda x: io.imread(x)
-        else:
-            def read_raw(x):
-                import rawpy
-                with rawpy.imread(x) as raw:
-                    return raw.raw_image.copy()
-            return read_raw
+# Import MyPTV functions
+from myptv.segmentation_mod import get_imread_func
 
 
 def multiply_image(image_path, factor=2.0, output_path=None, force_raw=False):
