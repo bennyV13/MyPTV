@@ -345,7 +345,7 @@ class fiber_segmentation(object):
             vmax = min([self.th*2, max(self.im.ravel())])
         
         fig, ax = plt.subplots()
-        ax.imshow(self.processed_im, vmin=vmin, vmax=vmax, cmap='gray')
+        ax.imshow(self.processed_im, vmin=vmin, vmax=vmax)
         
         # ponytail: conditional overlay addition
         if add_overlay:
