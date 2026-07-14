@@ -877,6 +877,12 @@ class workflow(object):
         arrow_scale = self.get_param('segmentation', 'arrow_scale')
         if arrow_scale is None: arrow_scale = 100.0
         
+        try:
+            add_overlay = self.get_param('segmentation', 'add_overlay')
+            if add_overlay is None: add_overlay = True
+        except:
+            add_overlay = True
+        
         # reading preprepared mask
         if type(mask)==str:
             mask = imread(mask)
@@ -1073,7 +1079,7 @@ class workflow(object):
                 
                 if plot_res:
                     from matplotlib.pyplot import show
-                    particleSegment.plot_blobs()
+                    particleSegment.plot_blobs(add_overlay=add_overlay)
                     show()
                     
                     
@@ -1202,7 +1208,7 @@ class workflow(object):
                 
                 if plot_res:
                     from matplotlib.pyplot import show
-                    particleSegment.plot_blobs(scale=arrow_scale)
+                    particleSegment.plot_blobs(scale=arrow_scale, add_overlay=add_overlay)
                     show()
                     
                     

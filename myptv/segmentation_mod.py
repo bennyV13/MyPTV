@@ -457,7 +457,7 @@ class particle_segmentation(object):
             
             
             
-    def plot_blobs(self, vmin=None, vmax=None):
+    def plot_blobs(self, vmin=None, vmax=None, add_overlay=True):
         import matplotlib.pyplot as plt
         
         if vmax is None:
@@ -466,11 +466,13 @@ class particle_segmentation(object):
         fig, ax = plt.subplots()
         ax.imshow(self.processed_im, vmin=vmin, vmax=vmax)
         
-        for blb in self.blobs:
-            
-            ax.errorbar( [blb[0][1]], [blb[0][0]], 
-                        xerr=blb[1][1]/2, yerr=blb[1][0]/2,
-                        fmt='xr', lw=0.7, capsize=2)
+        # ponytail: conditional overlay addition
+        if add_overlay:
+            for blb in self.blobs:
+                
+                ax.errorbar( [blb[0][1]], [blb[0][0]], 
+                            xerr=blb[1][1]/2, yerr=blb[1][0]/2,
+                            fmt='xr', lw=0.7, capsize=2)
         
         
         

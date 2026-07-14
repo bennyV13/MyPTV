@@ -803,6 +803,12 @@ class workflow(object):
             if arrow_scale is None: arrow_scale = 100.0
         except:
             arrow_scale = 100.0
+            
+        try:
+            add_overlay = self.get_param('segmentation', 'add_overlay')
+            if add_overlay is None: add_overlay = True
+        except:
+            add_overlay = True
         
         # Pre-check the save directory
         if save_name is not None:
@@ -1029,7 +1035,7 @@ class workflow(object):
                 
                 if plot_res:
                     from matplotlib.pyplot import show
-                    particleSegment.plot_blobs()
+                    particleSegment.plot_blobs(add_overlay=add_overlay)
                     show()
                     
                     
@@ -1165,7 +1171,7 @@ class workflow(object):
                 
                 if plot_res:
                     from matplotlib.pyplot import show
-                    particleSegment.plot_blobs(draw_fiber_features=draw_fiber_features, scale=arrow_scale)
+                    particleSegment.plot_blobs(draw_fiber_features=draw_fiber_features, scale=arrow_scale, add_overlay=add_overlay)
                     show()
                     
                     
