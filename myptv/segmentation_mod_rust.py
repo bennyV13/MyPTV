@@ -680,8 +680,7 @@ class loop_segmentation(object):
                      os.path.join(params[0], params[1][X]),
                      params, self.raw_format) for X in range(N)]
             with multiprocessing.Pool() as pool:
-                results_list = list(pool.starmap(iter_frame_from_path,
-                                                 args))
+                results_list = list(tqdm.tqdm(pool.imap(iter_frame_from_path_star, args), total=N))
             print('finished segmentation loop (%.1f sec)'%(time() - t0))
         else:
             # Running without paralelization:
@@ -739,6 +738,10 @@ def iter_frame(i, im, params):
     res_i = [[b[0][0], b[0][1], b[1][0], b[1][1], b[2], i+params[14]] for b in ps.blobs]
     # print('Frame: %d  ;  Blobs: %d'%(i, len(res_i)))
     return res_i
+
+
+def iter_frame_from_path_star(args):
+    return iter_frame_from_path(*args)
 
 
 def iter_frame_from_path(i, img_path, params, raw_format=False):
