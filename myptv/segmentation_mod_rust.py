@@ -737,7 +737,7 @@ def iter_frame(i, im, params):
     ps.get_blobs()
     ps.apply_blobs_size_filter()
     res_i = [[b[0][0], b[0][1], b[1][0], b[1][1], b[2], i+params[14]] for b in ps.blobs]
-    print('Frame: %d  ;  Blobs: %d'%(i, len(res_i)))
+    # print('Frame: %d  ;  Blobs: %d'%(i, len(res_i)))
     return res_i
 
 
