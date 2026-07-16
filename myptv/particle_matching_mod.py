@@ -402,102 +402,38 @@ class matching_with_marching_particles_algorithm(object):
         
         # fetching the cameras and the blobs
         cam1 = self.imsys.cameras[camNum1] ; cam2 = self.imsys.cameras[camNum2]
-        # O1 = cam1.O ; O2 = cam2.O
         blobs1 = self.blobs[camNum1][frame]
         blobs2 = self.blobs[camNum2][frame]
         
-        # getting the center point of the ROI (for epipolar line seach)
-        O_ROI = [(self.ROI[1]+self.ROI[0])/2, 
-                 (self.ROI[3]+self.ROI[2])/2, 
-                 (self.ROI[5]+self.ROI[4])/2]
+        import myptv_rust
         
-        # getting the size of the ROI diagonal
-        a_range = sum([(self.ROI[2*i+1]-self.ROI[2*i])**2 for i in range(3)])**0.5
-        da = self.voxel_size/4.0
-        
-        # the number of voxel in each direction
-        nx = int((self.ROI[1]-self.ROI[0])/self.voxel_size)+1
-        ny = int((self.ROI[3]-self.ROI[2])/self.voxel_size)+1
-        nz = int((self.ROI[5]-self.ROI[4])/self.voxel_size)+1
-        
-        
-        # a dicionary that holds the blob numbers traversed in each voxel
-        voxel_dic = {}
-        
-        # listing the traversed volxels for blobs in camera 2
-        for e,b in enumerate(blobs2):
-            
-            identifier = (camNum2, frame, e)
-            if identifier in self.matchedBlobs[frame]: # this blob has been used
-                continue
-            
-            #r = cam2.get_r(b[0], b[1])
-            O2, r = cam2.get_epipolarline(b[0], b[1])
-            a_center = sum([r[i]*(O_ROI[i]-O2[i]) for i in range(3)]) 
-            a1, a2 = a_center - a_range/2 , a_center + a_range/2 
-            
-            # traversing the blob from O2+a1*r to O2+a2*r to list the voxels
-            blob_voxels = set([])
-            a = a1
-            while a<=a2:
-                x, y, z = O2[0] + r[0]*a, O2[1] + r[1]*a, O2[2] + r[2]*a
-                
-                if self.ROI[0] < x < self.ROI[1]:
-                    if self.ROI[2] < y < self.ROI[3]:
-                        if self.ROI[4] < z < self.ROI[5]:
-                            i = int((x-self.ROI[0])/(self.ROI[1]-self.ROI[0])*nx)
-                            j = int((y-self.ROI[2])/(self.ROI[3]-self.ROI[2])*ny)
-                            k = int((z-self.ROI[4])/(self.ROI[5]-self.ROI[4])*nz)
-                            blob_voxels.add((i,j,k))
-                a += da
-            
-            for voxel in blob_voxels:
-                try:
-                    voxel_dic[voxel].append(e)
-                except:
-                    voxel_dic[voxel] = [e]
-            
-        candidate_pairs = set([])
-        # traversing the blobs in camera1 to obtain candidates pairs
-        for e,b in enumerate(blobs1):
-            
+        lines1 = []
+        used1 = []
+        for e, b in enumerate(blobs1):
             identifier = (camNum1, frame, e)
-            if identifier in self.matchedBlobs[frame]: # this blob has been used
-                continue
-            
-            # r = cam1.get_r(b[0], b[1])
-            O1, r = cam1.get_epipolarline(b[0], b[1])
-            a_center = sum([r[i]*(O_ROI[i]-O1[i]) for i in range(3)]) 
-            a1, a2 = a_center - a_range/2 , a_center + a_range/2 
-            
-            # traversing the blob from O2+a1*r to O2+a2*r to list the candidates
-            a = a1
-            while a<=a2:
-                x, y, z = O1[0] + r[0]*a, O1[1] + r[1]*a, O1[2] + r[2]*a
+            if identifier in self.matchedBlobs[frame]:
+                used1.append(True)
+                lines1.append(((0.0, 0.0, 0.0), (0.0, 0.0, 0.0)))
+            else:
+                used1.append(False)
+                O, r = cam1.get_epipolarline(b[0], b[1])
+                lines1.append((tuple(O), tuple(r)))
+
+        lines2 = []
+        used2 = []
+        for e, b in enumerate(blobs2):
+            identifier = (camNum2, frame, e)
+            if identifier in self.matchedBlobs[frame]:
+                used2.append(True)
+                lines2.append(((0.0, 0.0, 0.0), (0.0, 0.0, 0.0)))
+            else:
+                used2.append(False)
+                O, r = cam2.get_epipolarline(b[0], b[1])
+                lines2.append((tuple(O), tuple(r)))
                 
-                if self.ROI[0] < x < self.ROI[1]:
-                    if self.ROI[2] < y < self.ROI[3]:
-                        if self.ROI[4] < z < self.ROI[5]:
-                            i = int((x-self.ROI[0])/(self.ROI[1]-self.ROI[0])*nx)
-                            j = int((y-self.ROI[2])/(self.ROI[3]-self.ROI[2])*ny)
-                            k = int((z-self.ROI[4])/(self.ROI[5]-self.ROI[4])*nz)
-                            try:
-                                candidates = voxel_dic[(i,j,k)]
-                                for cnd in candidates:
-                                    candidate_pairs.add((e, cnd))
-                            except:
-                                pass
-                a += da
-        
-        
-        candidate_points = []
-        for e1, e2 in candidate_pairs:
-            coords = {camNum1:blobs1[e1], camNum2:blobs2[e2]}
-            # stereoMatch = self.imsys.stereo_match(coords, self.max_d_err)
-            stereoMatch = self.imsys.stereo_match(coords, self.max_d_err, 
-                                                  strict_match=True)
-            if stereoMatch is not None:
-                candidate_points.append(stereoMatch[0])
+        candidate_points = myptv_rust.ray_traversal_candidates(
+            lines1, lines2, used1, used2, list(self.ROI), float(self.voxel_size), float(self.max_d_err)
+        )
         
         return candidate_points
         
