@@ -404,6 +404,8 @@ class particle_segmentation(object):
             
             
         elif self.method=='labeling':
+            from myptv_rust import extract_label_centroids
+            import numpy as np
             
             # getting the binary image
             self.bin_im = self.get_binary_image() 
@@ -411,22 +413,16 @@ class particle_segmentation(object):
             # labeling connected foreground pixels to form "blobs"
             blob_pixels = self.blob_labeling(self.bin_im)
             
-            blobs = []
+            # Convert images to contiguous arrays with correct types for rust-numpy zero copy
+            im_f64 = np.ascontiguousarray(self.processed_im, dtype=np.float64)
+            lbl_i64 = np.ascontiguousarray(self.labeled, dtype=np.int64)
             
-            stamp_y, stamp_x = meshgrid(range(self.im.shape[1]), 
-                                        range(self.im.shape[0]))
+            # Extract centroids using the ultra-fast Rust single-pass scanner
+            num_features = len(blob_pixels)
+            results = extract_label_centroids(im_f64, lbl_i64, num_features)
             
-            for e, loc in enumerate(blob_pixels):
-                # extracting blob parameters
-                mask = 1.0*(self.labeled[loc]>0)*(self.labeled[loc]==e+1)
-                mass = npsum(self.processed_im[loc] * mask)
-                X = npsum(stamp_x[loc] * self.processed_im[loc] * mask) / mass
-                Y = npsum(stamp_y[loc] * self.processed_im[loc] * mask) / mass
-                center = [round(X, ndigits=2), round(Y, ndigits=2)]
-                box_size = list(mask.shape)
-                blobs.append( [center, box_size, mass])
-                
-            self.blobs = blobs
+            # Map the Rust tuples back to the Python list format MyPTV expects
+            self.blobs = [ [list(c), list(b), m] for c, b, m in results ]
    
         
    
