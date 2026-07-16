@@ -18,6 +18,7 @@ from numpy import savetxt, meshgrid, float32, array, divide, zeros_like #, ones
 from numpy import sum as npsum
 from numpy import abs as npabs
 from numpy import max as npmax
+from numpy import maximum as npmaximum
 # from numpy import median as npmedian
 from numpy import append as npappend
 
@@ -180,9 +181,7 @@ class particle_segmentation(object):
             if self.subtract_type == 'absolute':
                 imNoBG = npabs(self.im - self.BG_image).astype(self.im.dtype)
             elif self.subtract_type == 'simple':
-                imNoBG = self.im - self.BG_image
-                imNoBG[imNoBG < 0] = 0
-                imNoBG = imNoBG.astype(self.im.dtype)
+                imNoBG = npmaximum(self.im - self.BG_image, 0).astype(self.im.dtype)
             else:
                 raise ValueError("subtract_type must be 'absolute' or 'simple'")
         else:
@@ -239,8 +238,8 @@ class particle_segmentation(object):
         
         if self.method=='labeling':
             # find bright regions and generate a binary image
-            global_filt = self.processed_im > self.th
-            bin_image = 1.0 * global_filt * self.mask
+            # No need to multiply by mask again or cast to float; label() handles booleans!
+            bin_image = self.processed_im > self.th
             return bin_image 
                 
         elif self.method == 'dilation':
