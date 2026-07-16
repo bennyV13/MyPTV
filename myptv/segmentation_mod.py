@@ -671,31 +671,19 @@ class loop_segmentation(object):
                   self.p_size, i0, self.subtract_type]
         
         if self.multiprocess:
-            try:
-                import multiprocessing
-                # Running with paralelization:
-                print('Running with multiplrocessing...')
-                t0 = time()
-                # Pass file paths to workers instead of pre-loaded images
-                # to avoid holding all images in memory simultaneously
-                args = [(X,
-                         os.path.join(params[0], params[1][X]),
-                         params, self.raw_format) for X in range(N)]
-                with multiprocessing.Pool() as pool:
-                    results_list = list(pool.starmap(iter_frame_from_path,
-                                                     args))
-                print('finished segmentation loop (%.1f sec)'%(time() - t0))
-        
-            except ImportError as e:
-                # Running without paralelization:
-                print('Cant import multiprocessing - running on a single core')
-                results_list = [iter_frame(i, 
-                                           self.imread_func(
-                                               os.path.join(params[0], 
-                                                            params[1][i])),
-                                           params) 
-                                for i in tqdm.tqdm(range(N))] 
-                
+            import multiprocessing
+            # Running with paralelization:
+            print('Running with multiplrocessing...')
+            t0 = time()
+            # Pass file paths to workers instead of pre-loaded images
+            # to avoid holding all images in memory simultaneously
+            args = [(X,
+                     os.path.join(params[0], params[1][X]),
+                     params, self.raw_format) for X in range(N)]
+            with multiprocessing.Pool() as pool:
+                results_list = list(pool.starmap(iter_frame_from_path,
+                                                 args))
+            print('finished segmentation loop (%.1f sec)'%(time() - t0))
         else:
             # Running without paralelization:
             print('Cant import multiprocessing - running on a single core')

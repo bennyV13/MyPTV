@@ -571,26 +571,16 @@ class loop_fiber_segmentation(object):
                   self.p_size, i0, self.pca_limit]
                   
         if self.multiprocess:
-            try:
-                import multiprocessing
-                print('Running with multiprocessing...')
-                import time
-                t0 = time.time()
-                args = [(X,
-                         os.path.join(params[0], params[1][X]),
-                         params, self.raw_format) for X in range(N)]
-                with multiprocessing.Pool() as pool:
-                    results_list = list(pool.starmap(iter_fiber_frame_from_path, args))
-                print('finished segmentation loop (%.1f sec)' % (time.time() - t0))
-            except ImportError as e:
-                print('Cant import multiprocessing - running on a single core')
-                import tqdm
-                results_list = [iter_fiber_frame(i, 
-                                           self.imread_func(
-                                               os.path.join(params[0], 
-                                                            params[1][i])),
-                                           params) 
-                                for i in tqdm.tqdm(range(N))] 
+            import multiprocessing
+            print('Running with multiprocessing...')
+            import time
+            t0 = time.time()
+            args = [(X,
+                     os.path.join(params[0], params[1][X]),
+                     params, self.raw_format) for X in range(N)]
+            with multiprocessing.Pool() as pool:
+                results_list = list(pool.starmap(iter_fiber_frame_from_path, args))
+            print('finished segmentation loop (%.1f sec)' % (time.time() - t0))
         else:
             print('Running on a single core')
             import tqdm
