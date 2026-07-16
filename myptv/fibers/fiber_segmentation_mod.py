@@ -461,7 +461,8 @@ class loop_fiber_segmentation(object):
                  min_mass=None, max_mass=None,
                  pca_limit=None,
                  method='labeling',
-                 raw_format=False): #agambino
+                 raw_format=False,
+                 multiprocessing=True): #agambino
         '''
         dir_name - string with the name of the directory that holds the 
                    images. Images should have a sequential numbers in their
@@ -493,6 +494,7 @@ class loop_fiber_segmentation(object):
         self.pca_limit = pca_limit
         self.BG_remove = remove_ststic_BG
         self.raw_format=raw_format
+        self.multiprocess = multiprocessing
         
         from myptv.segmentation_mod import get_imread_func
         self.imread_func = get_imread_func(self.raw_format)
@@ -561,38 +563,45 @@ class loop_fiber_segmentation(object):
         
         i0 = (self.image_start is not None) * self.image_start
         
-        blob_list = []
         print('Starting loop segmentation.')
-        for i in range(N):
-            print('', end='\r')
-            print(' frame: %d'%(i+i0), end='\r')
-            img_path = os.path.join(self.dir_name, self.image_files[i])
+        
+        params = [self.dir_name, self.image_files, self.sigma, self.th, 
+                  self.median, self.loc_filter, self.BG, self.mask,
+                  self.bbox_limits, self.mass_limits, self.method, 
+                  self.p_size, i0, self.pca_limit]
+                  
+        if self.multiprocess:
             try:
-                im = self.imread_func(img_path)
-            except Exception as e:
-                raise type(e)(f'{e}\n  File: {img_path}') from e
-            ps = fiber_segmentation(im,
-                                    sigma=self.sigma, 
-                                    threshold=self.th,
-                                    median=self.median,
-                                    local_filter=self.loc_filter,
-                                    BG_image=self.BG,
-                                    mask=self.mask,
-                                    max_xsize=self.bbox_limits[1],
-                                    min_xsize=self.bbox_limits[0],
-                                    max_ysize=self.bbox_limits[3],
-                                    min_ysize=self.bbox_limits[2],
-                                    min_mass=self.mass_limits[0],
-                                    max_mass=self.mass_limits[1],
-                                    pca_limit=self.pca_limit,
-                                    method = self.method,
-                                    particle_size=self.p_size)
-            ps.get_blobs()
-            ps.apply_blobs_size_filter()
-            for blb in ps.blobs:
-                blob_list.append([blb[0][0], blb[0][1], blb[1][0], blb[1][1],
-                                  blb[2], i+i0, blb[3][0], blb[3][1]])
-        self.blobs = blob_list
+                import multiprocessing
+                print('Running with multiprocessing...')
+                import time
+                t0 = time.time()
+                args = [(X,
+                         os.path.join(params[0], params[1][X]),
+                         params, self.raw_format) for X in range(N)]
+                with multiprocessing.Pool() as pool:
+                    results_list = list(pool.starmap(iter_fiber_frame_from_path, args))
+                print('finished segmentation loop (%.1f sec)' % (time.time() - t0))
+            except ImportError as e:
+                print('Cant import multiprocessing - running on a single core')
+                import tqdm
+                results_list = [iter_fiber_frame(i, 
+                                           self.imread_func(
+                                               os.path.join(params[0], 
+                                                            params[1][i])),
+                                           params) 
+                                for i in tqdm.tqdm(range(N))] 
+        else:
+            print('Running on a single core')
+            import tqdm
+            results_list = [iter_fiber_frame(i, 
+                                       self.imread_func(
+                                           os.path.join(params[0], 
+                                                        params[1][i])),
+                                       params) 
+                            for i in tqdm.tqdm(range(N))] 
+
+        self.blobs = [b for res_i in results_list for b in res_i]
         
                                        
     def save_results(self, fname):
@@ -630,6 +639,46 @@ class loop_fiber_segmentation(object):
         '''
         savetxt(fname, self.blobs, 
                 fmt=['%.03f','%.03f','%d','%.03f','%.03f','%.03f','%.03f'], delimiter='\t')
+
+
+def iter_fiber_frame(i, im, params):
+    '''
+    Worker function for the multiprocessing (legacy: receives pre-loaded image)
+    '''
+    ps = fiber_segmentation(im,
+                            sigma=params[2], 
+                            threshold=params[3],
+                            median=params[4],
+                            local_filter=params[5],
+                            BG_image=params[6],
+                            mask=params[7],
+                            min_xsize=params[8][0],
+                            max_xsize=params[8][1],
+                            min_ysize=params[8][2],
+                            max_ysize=params[8][3],
+                            min_mass=params[9][0],
+                            max_mass=params[9][1],
+                            method=params[10],
+                            particle_size=params[11],
+                            pca_limit=params[13])
+    ps.get_blobs()
+    ps.apply_blobs_size_filter()
+    res_i = [[b[0][0], b[0][1], b[1][0], b[1][1], b[2], i+params[12], b[3][0], b[3][1]] for b in ps.blobs]
+    print('Frame: %d  ;  Blobs: %d'%(i, len(res_i)))
+    return res_i
+
+def iter_fiber_frame_from_path(i, img_path, params, raw_format=False):
+    '''
+    Worker function for multiprocessing that loads its own image from disk.
+    '''
+    from myptv.segmentation_mod import get_imread_func
+    imread_func = get_imread_func(raw_format)
+    try:
+        im = imread_func(img_path)
+    except Exception as e:
+        raise type(e)(f'{e}\n  File: {img_path}') from e
+    
+    return iter_fiber_frame(i, im, params)
 
 
 
