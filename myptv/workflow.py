@@ -2288,6 +2288,9 @@ class workflow(object):
         try: global_min_mass = self.get_param('batch_segmentation', 'min_mass')
         except: global_min_mass = None
 
+        try: global_max_mass = self.get_param('batch_segmentation', 'max_mass')
+        except: global_max_mass = None
+
         try: camera_thresholds = self.get_param('batch_segmentation', 'camera_thresholds')
         except: camera_thresholds = None
 
@@ -2296,6 +2299,21 @@ class workflow(object):
 
         try: camera_min_masses = self.get_param('batch_segmentation', 'camera_min_masses')
         except: camera_min_masses = None
+
+        try: camera_max_masses = self.get_param('batch_segmentation', 'camera_max_masses')
+        except: camera_max_masses = None
+
+        try: batch_min_xsize = self.get_param('batch_segmentation', 'min_xsize')
+        except: batch_min_xsize = None
+
+        try: batch_min_ysize = self.get_param('batch_segmentation', 'min_ysize')
+        except: batch_min_ysize = None
+
+        try: batch_max_xsize = self.get_param('batch_segmentation', 'max_xsize')
+        except: batch_max_xsize = None
+
+        try: batch_max_ysize = self.get_param('batch_segmentation', 'max_ysize')
+        except: batch_max_ysize = None
 
         if not os.path.exists(recordings_dir):
             print(f"ERROR: recordings_dir does not exist: {recordings_dir}")
@@ -2385,8 +2403,14 @@ class workflow(object):
                 thr = camera_thresholds.get(cam, "Default") if camera_thresholds else "Default"
                 bs = camera_blur_sigmas.get(cam, global_blur_sigma if global_blur_sigma is not None else "Default") if camera_blur_sigmas else (global_blur_sigma if global_blur_sigma is not None else "Default")
                 mm = camera_min_masses.get(cam, global_min_mass if global_min_mass is not None else "Default") if camera_min_masses else (global_min_mass if global_min_mass is not None else "Default")
+                mam = camera_max_masses.get(cam, global_max_mass if global_max_mass is not None else "Default") if camera_max_masses else (global_max_mass if global_max_mass is not None else "Default")
 
-                print(f" - Rec={rec} | Cam={cam} | threshold={thr} | blur_sigma={bs} | min_mass={mm} | Mask={mask_info} | BG={bg_info} | Status={status_str}")
+                mxs = batch_min_xsize.get(cam, "Default") if isinstance(batch_min_xsize, dict) else (batch_min_xsize if batch_min_xsize is not None else "Default")
+                mys = batch_min_ysize.get(cam, "Default") if isinstance(batch_min_ysize, dict) else (batch_min_ysize if batch_min_ysize is not None else "Default")
+                maxs = batch_max_xsize.get(cam, "Default") if isinstance(batch_max_xsize, dict) else (batch_max_xsize if batch_max_xsize is not None else "Default")
+                mays = batch_max_ysize.get(cam, "Default") if isinstance(batch_max_ysize, dict) else (batch_max_ysize if batch_max_ysize is not None else "Default")
+
+                print(f" - Rec={rec} | Cam={cam} | threshold={thr} | blur_sigma={bs} | min_mass={mm} | max_mass={mam} | min_xsize={mxs} | min_ysize={mys} | max_xsize={maxs} | max_ysize={mays} | Mask={mask_info} | BG={bg_info} | Status={status_str}")
             print(f"--- Dry run complete. No files written. ---")
             return
 
@@ -2395,7 +2419,7 @@ class workflow(object):
 
         with open(results_csv_path, "w", newline="") as csvfile:
             writer = csv.writer(csvfile)
-            writer.writerow(["Recording", "Camera", "Threshold", "BlurSigma", "MinMass", "BlobCount"])
+            writer.writerow(["Recording", "Camera", "Threshold", "BlurSigma", "MinMass", "MaxMass", "MinXSize", "MinYSize", "MaxXSize", "MaxYSize", "BlobCount"])
             csvfile.flush()
 
             for rec, cam, cam_img_dir in planned:
@@ -2473,6 +2497,31 @@ class workflow(object):
                 elif global_min_mass is not None:
                     seg_block["min_mass"] = global_min_mass
 
+                if camera_max_masses and cam in camera_max_masses:
+                    seg_block["max_mass"] = camera_max_masses[cam]
+                elif global_max_mass is not None:
+                    seg_block["max_mass"] = global_max_mass
+
+                if isinstance(batch_min_xsize, dict) and cam in batch_min_xsize:
+                    seg_block["min_xsize"] = batch_min_xsize[cam]
+                elif batch_min_xsize is not None and not isinstance(batch_min_xsize, dict):
+                    seg_block["min_xsize"] = batch_min_xsize
+
+                if isinstance(batch_min_ysize, dict) and cam in batch_min_ysize:
+                    seg_block["min_ysize"] = batch_min_ysize[cam]
+                elif batch_min_ysize is not None and not isinstance(batch_min_ysize, dict):
+                    seg_block["min_ysize"] = batch_min_ysize
+
+                if isinstance(batch_max_xsize, dict) and cam in batch_max_xsize:
+                    seg_block["max_xsize"] = batch_max_xsize[cam]
+                elif batch_max_xsize is not None and not isinstance(batch_max_xsize, dict):
+                    seg_block["max_xsize"] = batch_max_xsize
+
+                if isinstance(batch_max_ysize, dict) and cam in batch_max_ysize:
+                    seg_block["max_ysize"] = batch_max_ysize[cam]
+                elif batch_max_ysize is not None and not isinstance(batch_max_ysize, dict):
+                    seg_block["max_ysize"] = batch_max_ysize
+
                 if bg_dir:
                     bg_file_rec = None
                     rec_bg_subfolder = None
@@ -2512,6 +2561,11 @@ class workflow(object):
                 threshold_used = seg_block.get("threshold", "N/A")
                 blur_sigma_used = seg_block.get("blur_sigma", "N/A")
                 min_mass_used = seg_block.get("min_mass", "N/A")
+                max_mass_used = seg_block.get("max_mass", "N/A")
+                min_xsize_used = seg_block.get("min_xsize", "N/A")
+                min_ysize_used = seg_block.get("min_ysize", "N/A")
+                max_xsize_used = seg_block.get("max_xsize", "N/A")
+                max_ysize_used = seg_block.get("max_ysize", "N/A")
 
                 params_dir = os.path.dirname(os.path.abspath(self.param_file_path))
                 temp_params_file = os.path.join(params_dir, f"temp_params_batch_{cam}.yml")
@@ -2531,7 +2585,7 @@ class workflow(object):
                     m = re.search(r"blobs found:\s*(\d+)", result.stdout)
                     count = int(m.group(1)) if m else 0
 
-                writer.writerow([rec, cam, threshold_used, blur_sigma_used, min_mass_used, count])
+                writer.writerow([rec, cam, threshold_used, blur_sigma_used, min_mass_used, max_mass_used, min_xsize_used, min_ysize_used, max_xsize_used, max_ysize_used, count])
                 csvfile.flush()
                 print(f"Done | Rec={rec} | Cam={cam} | blobs: {count}")
 

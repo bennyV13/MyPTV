@@ -35,7 +35,11 @@ def test_batch_segmentation_dry_run(capsys):
             "dry_run": True,
             "blur_sigma": 1.2,
             "min_mass": 30,
-            "camera_thresholds": {"Cam1": 15}
+            "camera_thresholds": {"Cam1": 15},
+            "min_xsize": {"Cam1": 2},
+            "min_ysize": {"Cam1": 3},
+            "max_xsize": 5,
+            "camera_max_masses": {"Cam1": 500}
         }}
     ]
 
@@ -63,4 +67,9 @@ def test_batch_segmentation_dry_run(capsys):
     assert "threshold=15" in captured.out
     assert "blur_sigma=1.2" in captured.out
     assert "min_mass=30" in captured.out
+    assert "max_mass=500" in captured.out
+    assert "min_xsize=2" in captured.out
+    assert "min_ysize=3" in captured.out
+    assert "max_xsize=5" in captured.out
+    assert "max_ysize=Default" in captured.out
     assert "Recording-specific" in captured.out
