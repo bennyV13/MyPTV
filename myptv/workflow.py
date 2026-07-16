@@ -1294,12 +1294,14 @@ class workflow(object):
         
         if march_forwards==True:
             print('Matching forwards. Frames: %d -> %d'%(frames[0], frames[-1]))
-            for f in frames:
+            from tqdm import tqdm
+            for f in tqdm(frames, desc="Matching frames"):
                 mps.match_frame(f)
                 
         if march_backwards==True:
             print('\n','Matching backwards. Frames: %d -> %d'%(frames[-1], frames[0]))
-            for f in frames[::-1]:
+            from tqdm import tqdm
+            for f in tqdm(frames[::-1], desc="Matching frames"):
                 mps.match_frame(f)
         
         
@@ -2886,7 +2888,35 @@ class workflow(object):
                         safe_dump(params_dict, tf, sort_keys=False)
 
                     cmd = [sys.executable, workflow_path, os.path.abspath(temp_file), "matching"]
-                    res = subprocess.run(cmd, input="1\n", capture_output=True, text=True, cwd=params_dir)
+                    
+                    process = subprocess.Popen(
+                        cmd,
+                        stdin=subprocess.PIPE,
+                        stdout=subprocess.PIPE,
+                        stderr=subprocess.STDOUT,
+                        text=True,
+                        cwd=params_dir
+                    )
+                    process.stdin.write("1\n")
+                    process.stdin.close()
+                    
+                    stdout_buffer = []
+                    while True:
+                        char = process.stdout.read(1)
+                        if not char:
+                            break
+                        print(char, end="", flush=True)
+                        stdout_buffer.append(char)
+                    
+                    res_stdout = "".join(stdout_buffer)
+                    
+                    class MockCompletedProcess:
+                        def __init__(self, returncode, stdout):
+                            self.returncode = returncode
+                            self.stdout = stdout
+                            self.stderr = stdout
+                            
+                    res = MockCompletedProcess(process.wait(), res_stdout)
 
                     if os.path.exists(temp_file):
                         os.remove(temp_file)
