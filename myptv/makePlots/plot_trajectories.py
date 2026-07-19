@@ -72,9 +72,8 @@ def plot_trajectories(fname, min_length, write_trajID=False, t0=0, te=-1):
     trajIDs = list(trajectories.keys())
     
     
-    # compute \dot{pi}^2 for each trajectory
-    all_v_sq = []
-    pi_sq_dict = {}
+    # estimate maximum velocity
+    v_lst = [[],[],[]]
     used_ids = []
     for id_ in trajIDs:
         if len(trajectories[id_][:,1])<min_length: continue
@@ -99,22 +98,12 @@ def plot_trajectories(fname, min_length, write_trajID=False, t0=0, te=-1):
         ys = trajectories[id_][i0:ie,2]
         zs = trajectories[id_][i0:ie,3]
         if len(xs)<2: continue
-        
-        v_sq = gradient(xs)**2 + gradient(ys)**2 + gradient(zs)**2
-        all_v_sq.extend(v_sq)
-        pi_sq_dict[id_] = sum(v_sq) / len(v_sq)
+        v_lst[0].append(abs(sum(gradient(xs))/len(xs)))
+        v_lst[1].append(abs(sum(gradient(ys))/len(ys)))
+        v_lst[2].append(abs(sum(gradient(zs))/len(zs)))
         used_ids.append(id_)
     
-    mean_pi_sq = sum(all_v_sq) / len(all_v_sq) if len(all_v_sq) > 0 else 1.0
-    
-    import matplotlib.cm as cm
-    import matplotlib.colors as mcolors
-    cmap = plt.get_cmap('viridis')
-    pi_sq_vals = [pi_sq_dict[i]/mean_pi_sq for i in used_ids]
-    if len(pi_sq_vals) > 0:
-        norm = mcolors.Normalize(vmin=amin(pi_sq_vals), vmax=amax(pi_sq_vals))
-    else:
-        norm = mcolors.Normalize(vmin=0, vmax=1)
+    V = amax(v_lst)
     
     count = 0
     for id_ in used_ids:
@@ -138,10 +127,15 @@ def plot_trajectories(fname, min_length, write_trajID=False, t0=0, te=-1):
         xs = trajectories[id_][i0:ie,1]
         ys = trajectories[id_][i0:ie,2]
         zs = trajectories[id_][i0:ie,3]
-        
-        val = pi_sq_dict[id_] / mean_pi_sq
-        c = cmap(norm(val))
-        
+        vx = sum(gradient(xs))/len(xs) / V
+        vy = sum(gradient(ys))/len(ys) / V
+        vz = sum(gradient(zs))/len(zs) / V
+        #c = (1-(xs[0]-xmin)/(xmax-xmin)*0.97, 
+        #     (ys[0]-ymin)/(ymax-ymin)*0.97, 
+        #     (zs[0]-zmin)/(zmax-zmin)*0.97)
+        c = [0.5-vx, 0.5+vy, 0.5+vz]
+        c = [1*(ci>1) + ci*(ci<=1) for ci in c]
+        c = [0*(ci<0) + ci*(ci>=0) for ci in c]
         l = ax.plot(xs, zs, ys, 'o-', ms=1, lw=0.5, color=c)
         
         xm.append(amin(xs)) ; xm.append(amax(xs))
@@ -154,11 +148,6 @@ def plot_trajectories(fname, min_length, write_trajID=False, t0=0, te=-1):
                     fontdict={'fontsize': 12, 'color':color})
         
         count += 1
-        
-    sm = cm.ScalarMappable(norm=norm, cmap=cmap)
-    sm.set_array([])
-    cbar = fig.colorbar(sm, ax=ax, pad=0.1, shrink=0.7)
-    cbar.set_label(r'$\dot{\pi}^2 / \langle \dot{\pi}^2 \rangle$')
     
     ax.set_box_aspect((ptp(xm), ptp(zm), ptp(ym)))
     
