@@ -287,7 +287,7 @@ class fiber_segmentation(object):
                 a = props.major_axis_length
                 b = props.minor_axis_length
             
-            # Fitted ellipse major (length) and minor (diameter) axes in pixels
+            # Fixed on 2026-08-20 (Issue #66): Fitted ellipse major (length) and minor (diameter) axes in pixels
             box_size = [round(a, ndigits=2), round(b, ndigits=2)]
             
             pca_lim = a / b if b > 0 else -1
