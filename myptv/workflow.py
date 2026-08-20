@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# PYTHON_ARGCOMPLETE_OK
 # -*- coding: utf-8 -*-
 """
 Created on Sun 20 March 2022
@@ -29,6 +31,30 @@ class workflow(object):
     in a dedicated text file.
     '''
     
+    allowed_actions = ['help', 'initial_calibration', 
+                            'final_calibration',
+                            'analyze_calibration_error',
+                            'calibration_with_particles', 
+                            'matching', 'analyze_disparity',
+                            'segmentation',
+                            'calculate_BG_image',
+                            'calculate_BG_image_batch',
+                            'calculate_equilization_map',
+                            'smoothing', 'stitching', 'tracking', 
+                            'calibration', 'calibration_point_gui', 
+                            'match_target_file', '2D_tracking', 
+                            'manual_matching',
+                            'fiber_orientations',
+                            'smoothed_orientations',
+                            'plot_trajectories',
+                            'plot_fibers',
+                            'animate_trajectories',
+                            'run_extention',
+                            'web_gui',
+                            'create_blob_mask',
+                            'batch_segmentation',
+                            'batch_pipeline']
+
     def __init__(self, param_file, action, comment=""):
         '''
         input -
@@ -52,31 +78,6 @@ class workflow(object):
                 raise ValueError('Error in loading the parameters file.')
         self.params = self.read_params_file()
         self.comment = comment
-        
-        
-        self.allowed_actions = ['help', 'initial_calibration', 
-                                'final_calibration',
-                                'analyze_calibration_error',
-                                'calibration_with_particles', 
-                                'matching', 'analyze_disparity',
-                                'segmentation',
-                                'calculate_BG_image',
-                                'calculate_BG_image_batch',
-                                'calculate_equilization_map',
-                                'smoothing', 'stitching', 'tracking', 
-                                'calibration', 'calibration_point_gui', 
-                                'match_target_file', '2D_tracking', 
-                                'manual_matching',
-                                'fiber_orientations',
-                                'smoothed_orientations',
-                                'plot_trajectories',
-                                'plot_fibers',
-                                'animate_trajectories',
-                                'run_extention',
-                                'web_gui',
-                                'create_blob_mask',
-                                'batch_segmentation',
-                                'batch_pipeline']
         
         
         # perform the wanted action:
@@ -3058,10 +3059,7 @@ class workflow(object):
                     if "trajectory_file" in o_block and o_block["trajectory_file"]:
                         o_block["trajectory_file"] = os.path.join(out_dir, os.path.basename(o_block["trajectory_file"].strip())).replace("\\", "/")
                     else:
-                        traj_file = os.path.join(out_dir, "trajectories_smoothed").replace("\\", "/")
-                        if not os.path.exists(traj_file) and not run_smoothing:
-                            traj_file = os.path.join(out_dir, "trajectories").replace("\\", "/")
-                        o_block["trajectory_file"] = traj_file
+                        o_block["trajectory_file"] = os.path.join(out_dir, "trajectories").replace("\\", "/")
 
                     temp_file = os.path.join(params_dir, f"temp_params_pipeline_{rec}_orientations_{randint(100, 999)}.yml")
                     with open(temp_file, "w", encoding="utf-8") as tf:
@@ -3151,11 +3149,15 @@ class workflow(object):
 if __name__ == '__main__':
     
     import argparse
+    import argcomplete
+    
     parser = argparse.ArgumentParser(description='Run MyPTV workflow.')
-    parser.add_argument('fname', help='Parameters file name')
-    parser.add_argument('action', help='Action to perform')
+    parser.add_argument('fname', help='Parameters file name').completer = argcomplete.completers.FilesCompleter()
+    parser.add_argument('action', choices=workflow.allowed_actions, help='Action to perform')
     parser.add_argument('--comment', default='', help='Comment for the log entry')
     parser.add_argument('--dry-run', '-d', action='store_true', help='Run in dry-run mode for batch action')
+    
+    argcomplete.autocomplete(parser)
     args = parser.parse_args()
 
     print('\n','given inputs -')
