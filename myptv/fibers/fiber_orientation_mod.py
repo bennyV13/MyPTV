@@ -534,9 +534,9 @@ class smooth_orientations(object):
             for i in range(N, len(traj_dic[tr_num]) - N):
                 new_traj.append([])
                 new_traj[-1].append(traj[i][0])
-                new_traj[-1].append(traj_arr[i, 1])
-                new_traj[-1].append(traj_arr[i, 2])
-                new_traj[-1].append(traj_arr[i, 3])
+                new_traj[-1].append(p[0][i])
+                new_traj[-1].append(p[1][i])
+                new_traj[-1].append(p[2][i])
                 new_traj[-1].append(v[0][i])
                 new_traj[-1].append(v[1][i])
                 new_traj[-1].append(v[2][i])
