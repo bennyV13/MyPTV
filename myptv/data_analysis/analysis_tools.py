@@ -120,7 +120,7 @@ def convert_trajs_to_physical_units(traj_list, fps):
         tr_copy[:, 4:7] *= fps           # Velocities
         tr_copy[:, 7:10] *= (fps**2)     # Accelerations
         
-        if tr_copy.shape[1] == 25:
+        if tr_copy.shape[1] >= 25:
             tr_copy[:, 13:16] *= fps         # pdot
             tr_copy[:, 16:19] *= (fps**2)    # pddot
             
