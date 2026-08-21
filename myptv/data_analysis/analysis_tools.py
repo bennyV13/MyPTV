@@ -748,7 +748,7 @@ def extract_orientation_pairs(traj_list):
         
     pos = all_data[:, 1:4]
     ori = all_data[:, 10:13]
-    frames = all_data[:, 24]
+    frames = all_data[:, -1]
     
     # Normalize orientation vectors
     norms = np.linalg.norm(ori, axis=1, keepdims=True)
