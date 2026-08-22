@@ -27,6 +27,31 @@ def load_trajs_as_arrays(fname):
     return trajs
 
 
+def convert_trajs_to_physical_units(traj_list, fps):
+    '''
+    Given a list of trajectories in mm/frame, this converts the
+    velocities and accelerations to mm/s and mm/s^2 using the
+    given frames per second (fps).
+
+    inputs:
+    traj_list - a list of trajectory arrays.
+    fps - frames per second.
+
+    returns:
+    new_traj_list - a list of trajectory arrays with physical units.
+    '''
+    if fps <= 0:
+        raise ValueError("fps must be a positive number.")
+    new_traj_list = []
+    for tr in traj_list:
+        new_tr = tr.copy()
+        new_tr[:, 4:7] = new_tr[:, 4:7] * fps       # velocities: mm/frame -> mm/s
+        if tr.shape[1] >= 10:                       # check if accelerations exist
+            new_tr[:, 7:10] = new_tr[:, 7:10] * fps**2 # accelerations: mm/frame^2 -> mm/s^2
+        new_traj_list.append(new_tr)
+    return new_traj_list
+
+
 
 
 def load_samles_vs_time(fname):

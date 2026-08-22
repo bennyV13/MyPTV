@@ -28,7 +28,7 @@ class workflow(object):
     in a dedicated text file.
     '''
     
-    def __init__(self, param_file, action):
+    def __init__(self, param_file, action, comment="", html=False):
         '''
         input -
         
@@ -38,11 +38,17 @@ class workflow(object):
         action - string; the name of the PTV action to be performed. Accepted
                  values are: 'segmentation', 'matching', 'tracking',
                  'smoothing', and 'stitching'.
+        
+        comment - string; a comment to be added to the log entry.
+
+        html - boolean; if True, use the web-based GUI for initial calibration.
         '''
         
         # read the parameter file:
         self.param_file_path = param_file
         self.params = self.read_params_file()
+        self.comment = comment
+        self.html = html
         
         
         self.allowed_actions = ['help', 'initial_calibration', 
@@ -52,7 +58,7 @@ class workflow(object):
                                 'matching', 'analyze_disparity',
                                 'segmentation',
                                 'calculate_BG_image',
-                                'calculate_equilization_map',                                
+                                'calculate_equilization_map',
                                 'smoothing', 'stitching', 'tracking', 
                                 'calibration', 'calibration_point_gui', 
                                 'match_target_file', '2D_tracking', 
@@ -61,7 +67,8 @@ class workflow(object):
                                 'plot_trajectories',
                                 'animate_trajectories',
                                 'run_extention',
-                                'calculate_BG_and_EQ','segmentation_fibers', 'apply_BG_and_EQ'          # <-- add this
+                                'create_blob_mask',
+                                'calculate_BG_and_EQ'
                                 ]
         
         
@@ -75,335 +82,95 @@ class workflow(object):
             msg2 = 'allowed actions are:'+str(self.allowed_actions)
             if action not in self.allowed_actions:
                 raise ValueError(msg1+'\n'+msg2)
+            
+            from myptv.logging_utils import ActionLogger
+            action_params = self.get_action_params(action)
+            
+            with ActionLogger(action, action_params, self.param_file_path, comment=self.comment):
+                if action == 'initial_calibration':
+                    self.initial_calibration()
+                    
+                elif action == 'final_calibration':
+                    self.final_calibration()
+                    
+                elif action == 'analyze_calibration_error':
+                    self.calibration_error_estimation()
+                    
+                elif action == 'calibration_with_particles':
+                    self.calibration_with_particles()
+                    
+                elif action == 'segmentation':
+                    self.do_segmentation()
+                    
+                elif action == 'matching':
+                    self.do_matching()
+                    
+                elif action == 'analyze_disparity':
+                    self.do_analyze_disparity()
+                    
+                elif action == 'tracking':
+                    self.do_tracking()
+                    
+                elif action == '2D_tracking':
+                    self.do_2d_tracking()
+                    
+                elif action == 'smoothing':
+                    self.do_smoothing()
+                
+                elif action == 'stitching':
+                    self.do_stitching()
+                
+                elif action == 'manual_matching':
+                    self.do_manual_matching()
+                    
+                elif action == 'fiber_orientations':
+                    self.do_orientations()
+                    
+                elif action == 'plot_trajectories':
+                    self.do_plot_trajectories()
+                    
+                elif action == 'animate_trajectories':
+                    self.do_animate_trajectories()
+                
+                elif action == 'run_extention':
+                    self.do_run_extention()    
+                
+                elif action == 'calculate_BG_image':
+                    self.do_calculate_BG_image()
+                    
+                elif action == 'calculate_equilization_map':
+                    self.do_calculate_equilization_map()
 
-        
-            elif action == 'initial_calibration':
-                self.initial_calibration()
-                
-            elif action == 'final_calibration':
-                self.final_calibration()
-                
-            elif action == 'analyze_calibration_error':
-                self.calibration_error_estimation()
-                
-            elif action == 'calibration_with_particles':
-                self.calibration_with_particles()
-                
-            elif action == 'segmentation':
-                self.do_segmentation()
-                
-            elif action == 'matching':
-                self.do_matching()
-                
-            elif action == 'analyze_disparity':
-                self.do_analyze_disparity()
-                
-            elif action == 'tracking':
-                self.do_tracking()
-                
-            elif action == '2D_tracking':
-                self.do_2d_tracking()
-                
-            elif action == 'smoothing':
-                self.do_smoothing()
-            
-            elif action == 'stitching':
-                self.do_stitching()
-            
-            elif action == 'manual_matching':
-                self.do_manual_matching()
-                
-            elif action == 'fiber_orientations':
-                self.do_orientations()
-                
-            elif action == 'plot_trajectories':
-                self.do_plot_trajectories()
-                
-            elif action == 'animate_trajectories':
-                self.do_animate_trajectories()
-            
-            elif action == 'run_extention':
-                self.do_run_extention()    
-            
-            elif action == 'calculate_BG_image':
-                self.do_calculate_BG_image()
-                
-            elif action == 'calculate_equilization_map':
-                self.do_calculate_equilization_map()
-            
-            elif action == 'help':
-                self.help_me()
-                
-            elif action == 'calculate_BG_and_EQ':
-                self.do_calculate_BG_and_EQ()
+                elif action == 'calculate_BG_and_EQ':
+                    self.do_calculate_BG_and_EQ()
 
-            elif action == 'apply_BG_and_EQ':
-                self.do_apply_BG_and_EQ()
-
+                elif action == 'create_blob_mask':
+                    self.do_create_blob_mask()
                 
-            # legacy functions:
-            elif action == 'calibration':
-                print('Note: you are running an outdated action!')
-                print('consider using the initial_calibration and')
-                print('final_calibration actions instead.')
-                self.calibration_sequence()
+                elif action == 'help':
+                    self.help_me()
+                    
+                    
+                # legacy functions:
+                elif action == 'calibration':
+                    print('Note: you are running an outdated action!')
+                    print('consider using the initial_calibration and')
+                    print('final_calibration actions instead.')
+                    self.calibration_sequence()
+                
+                elif action == 'calibration_point_gui':
+                    print('Note: you are running an outdated action!')
+                    print('consider using the initial_calibration and')
+                    print('final_calibration actions instead.')
+                    self.calibration_point_gui()
+                
+                elif action == 'match_target_file':
+                    print('Note: you are running an outdated action!')
+                    print('consider using the initial_calibration and')
+                    print('final_calibration actions instead.')
+                    self.match_target_file()
             
-            elif action == 'calibration_point_gui':
-                print('Note: you are running an outdated action!')
-                print('consider using the initial_calibration and')
-                print('final_calibration actions instead.')
-                self.calibration_point_gui()
             
-            elif action == 'match_target_file':
-                print('Note: you are running an outdated action!')
-                print('consider using the initial_calibration and')
-                print('final_calibration actions instead.')
-                self.match_target_file()
-            
-
-    def do_calculate_BG_and_EQ(self):
-        """
-        One-shot (stage-gated by params):
-        1) Calculate BG image (if calculate_BG_image.enabled is True).
-        2) Calculate EQ map (if calculate_equilization_map.enabled is True).
-        3) Apply BG subtraction + EQ normalization and (optionally) save
-           (if calculate_BG_and_EQ.enabled is True; saving controlled by
-            calculate_BG_and_EQ.save).
-        """
-    
-        from myptv.segmentation_mod import (
-            calculate_BG_image as _calc_bg,
-            calculate_equilization_map as _calc_eq,
-        )
-        import os
-        from skimage import io
-        import numpy as np
-    
-        def _safe_get(op, key, default=None):
-            try:
-                return self.get_param(op, key)
-            except Exception:
-                return default
-    
-        def _require_file(path, label):
-            if not os.path.isfile(path):
-                raise FileNotFoundError(f"Required {label} not found: {path}")
-    
-        # ---------------- Flags ----------------
-        bg_enabled  = bool(_safe_get("calculate_BG_image", "enabled", True))
-        eq_enabled  = bool(_safe_get("calculate_equilization_map", "enabled", True))
-        proc_enabled = bool(_safe_get("calculate_BG_and_EQ", "enabled", True))
-        proc_save    = bool(_safe_get("calculate_BG_and_EQ", "save", True))
-    
-        # ------------ BG params ------------
-        bg_dir  = self.get_param("calculate_BG_image", "images_folder")
-        bg_ext  = self.get_param("calculate_BG_image", "image_extension")
-        bg_raw  = self.get_param("calculate_BG_image", "raw_format")
-        bg_n    = self.get_param("calculate_BG_image", "N_img")
-        bg_out  = _safe_get("calculate_BG_image", "save_name", "BG_image.tif")
-    
-        if bg_enabled:
-            print("\n[1/3] Calculating background image...")
-            _calc_bg(bg_dir, bg_ext, bg_out, N_img=bg_n, raw_format=bg_raw)
-            print(f"Done. BG saved to: {bg_out}\n")
-        else:
-            print("\n[1/3] Skipping BG calculation (calculate_BG_image.enabled=False)")
-            # If later stages need BG, make sure a file is present (either default or provided)
-            _require_file(bg_out, "BG image")
-    
-        # ------------ EQ params ------------
-        eq_dir   = _safe_get("calculate_equilization_map", "images_folder", bg_dir)
-        eq_ext   = _safe_get("calculate_equilization_map", "image_extension", bg_ext)
-        eq_raw   = _safe_get("calculate_equilization_map", "raw_format", bg_raw)
-        eq_n     = _safe_get("calculate_equilization_map", "N_img", bg_n)
-        eq_sigma = _safe_get("calculate_equilization_map", "sigma", 20)
-        eq_out   = _safe_get("calculate_equilization_map", "save_name", "EQ_map.tif")
-        eq_bg_in = _safe_get("calculate_equilization_map", "BG_image", "auto")
-        if eq_bg_in in (None, "auto", "use_previous", True):
-            eq_bg_in = bg_out
-    
-        if eq_enabled:
-            print("[2/3] Calculating equalization map...")
-            _calc_eq(eq_dir, eq_ext, eq_sigma, eq_out, N_img=eq_n, BG_image=eq_bg_in, raw_format=eq_raw)
-            print(f"Done. EQ map saved to: {eq_out}\n")
-        else:
-            print("[2/3] Skipping EQ calculation (calculate_equilization_map.enabled=False)")
-            _require_file(eq_out, "EQ map")
-    
-        # ------------ Apply & Save ------------
-        if not proc_enabled:
-            print("[3/3] Skipping processing (calculate_BG_and_EQ.enabled=False)")
-            return
-    
-        out_dir = _safe_get("calculate_BG_and_EQ", "save_processed_folder",
-                            os.path.join(eq_dir, "BG_EQ"))
-        if proc_save:
-            os.makedirs(out_dir, exist_ok=True)
-    
-        # Reader aligned with your raw_format handling
-        if eq_raw is False:
-            imread_func = lambda p: io.imread(p)
-        else:
-            def read_raw(p):
-                import rawpy
-                with rawpy.imread(p) as r:
-                    return r.raw_image
-            imread_func = read_raw
-    
-        # Load BG and EQ arrays (needed for processing even if not saving)
-        _require_file(bg_out, "BG image")
-        _require_file(eq_out, "EQ map")
-        BG = io.imread(bg_out)
-        EQ = io.imread(eq_out)
-    
-        # Collect input images (top level only)
-        allfiles = sorted([f for f in os.listdir(eq_dir) if f.endswith(eq_ext)])
-        if not allfiles:
-            raise ValueError("No input images found for processing.")
-    
-        # Shape sanity using the first image
-        ref_im = imread_func(os.path.join(eq_dir, allfiles[0]))
-        if BG.shape != ref_im.shape:
-            raise ValueError(f"BG image shape {BG.shape} != image shape {ref_im.shape}")
-        if EQ.shape != ref_im.shape:
-            raise ValueError(f"EQ map shape {EQ.shape} != image shape {ref_im.shape}")
-    
-        if not proc_save:
-            print("[3/3] Processing without saving (calculate_BG_and_EQ.save=False)")
-    
-        for i, fname in enumerate(allfiles, 1):
-            src = os.path.join(eq_dir, fname)
-    
-            # Skip the saved BG or EQ files themselves if they sit in the same folder
-            if os.path.abspath(src) in (os.path.abspath(bg_out), os.path.abspath(eq_out)):
-                continue
-    
-            frame = imread_func(src)
-    
-            # BG subtraction: absdiff
-            diff = np.abs(frame.astype(np.int32) - BG.astype(np.int32))
-            diff = np.clip(diff, 0, 65535)
-    
-            # EQ normalize with safety
-            eq = diff.astype(np.float32) / np.maximum(EQ.astype(np.float32), 1e-6)
-    
-            if proc_save:
-                # Save as uint16 TIFF
-                eq_u16 = np.clip(eq, 0, 65535).astype(np.uint16)
-                base = os.path.splitext(fname)[0]
-                dst = os.path.join(out_dir, base + ".tif")
-                io.imsave(dst, eq_u16, check_contrast=False)
-    
-            if i % 100 == 0:
-                print(f"  Processed {i} / {len(allfiles)}")
-    
-        print("All set")
-        if proc_save:
-            print(f"Processed images saved to: {out_dir}")
-        else:
-            print("Processed images were not saved (save=False).")
-    
-    
-    def do_apply_BG_and_EQ(self):
-        """
-        Apply BG subtraction and optional EQ normalization to images.
-        """
-        import os
-        import numpy as np
-        from skimage import io
-    
-        def _safe_get(section, key, default=None):
-            try:
-                return self.get_param(section, key)
-            except Exception:
-                return default
-    
-        # Read params safely
-        img_dir = _safe_get("apply_BG_and_EQ", "images_folder", None)
-        img_ext = _safe_get("apply_BG_and_EQ", "image_extension", ".tif")
-        raw_fmt = bool(_safe_get("apply_BG_and_EQ", "raw_format", False))
-        bg_path = _safe_get("apply_BG_and_EQ", "remove_background", None)
-        eq_path = _safe_get("apply_BG_and_EQ", "equilization_map", None)
-        out_dir = _safe_get("apply_BG_and_EQ", "save_processed_folder",
-                            os.path.join(img_dir if img_dir else ".", "BG_EQ_applied"))
-    
-        # Required inputs present? BG is mandatory, EQ is optional.
-        if not img_dir or bg_path in (None, "None"):
-            print("Missing images_folder or remove_background path. Skipping.")
-            return
-    
-        # Files exist?
-        if not os.path.isfile(bg_path):
-            print(f"BG file does not exist: {bg_path}. Skipping.")
-            return
-        if eq_path not in (None, "None") and not os.path.isfile(eq_path):
-            print(f"EQ map file was specified but does not exist: {eq_path}. Skipping.")
-            return
-    
-        os.makedirs(out_dir, exist_ok=True)
-    
-        # Decide reader for frames
-        use_raw = raw_fmt or str(img_ext).lower() == ".dng"
-        if use_raw:
-            import rawpy
-            def _imread_frame(p):
-                with rawpy.imread(p) as r:
-                    return r.raw_image.copy()
-        else:
-            def _imread_frame(p):
-                return io.imread(p)
-    
-        # Load BG and EQ (EQ is optional)
-        BG = io.imread(bg_path)
-        EQ = None
-        if eq_path not in (None, "None"):
-            EQ = io.imread(eq_path)
-            print("Applying BG and EQ...")
-        else:
-            print("Applying BG only (no EQ map provided)...")
-
-    
-        # Collect input images
-        img_ext_lc = str(img_ext).lower()
-        allfiles = sorted([f for f in os.listdir(img_dir) if f.lower().endswith(img_ext_lc)])
-        if not allfiles:
-            print("No input images found. Skipping.")
-            return
-    
-        # Sanity: shapes
-        ref_im = _imread_frame(os.path.join(img_dir, allfiles[0]))
-        if BG.shape != ref_im.shape:
-            raise ValueError(f"BG image shape {BG.shape} != image shape {ref_im.shape}")
-        if EQ is not None and EQ.shape != ref_im.shape:
-            raise ValueError(f"EQ map shape {EQ.shape} != image shape {ref_im.shape}")
-    
-        print(f"[apply_BG_and_EQ] Processing {len(allfiles)} images from: {img_dir}")
-        for i, fname in enumerate(allfiles, 1):
-            src = os.path.join(img_dir, fname)
-            frame = _imread_frame(src)
-    
-            # BG subtraction (abs difference)
-            diff = np.abs(frame.astype(np.int32) - BG.astype(np.int32))
-            diff = np.clip(diff, 0, 65535)
-    
-            # EQ normalization (optional)
-            if EQ is not None:
-                processed_img = diff.astype(np.float32) / np.maximum(EQ.astype(np.float32), 1e-6)
-            else:
-                processed_img = diff
-            
-            processed_img = np.clip(processed_img, 0, 65535).astype(np.uint16)
-    
-            dst = os.path.join(out_dir, os.path.splitext(fname)[0] + ".tif")
-            io.imsave(dst, processed_img, check_contrast=False)
-    
-            if i % 100 == 0:
-                print(f"  Processed {i}/{len(allfiles)}")
-    
-        print(f"All processed images saved to: {out_dir}")
-    
-    
- 
     
     def help_me(self):
         '''
@@ -425,7 +192,7 @@ class workflow(object):
         print('\nP.S. - try using the user manual that is found on the main')
         print('Github repository.')
             
-        
+    
             
     
     
@@ -478,11 +245,71 @@ class workflow(object):
     
     
     
+    def get_action_params(self, action):
+        '''
+        Extract the parameters from the self.params DataFrame for the given action.
+        Returns a dictionary of key-value pairs (param and value).
+        '''
+        if action not in set(self.params['operation']):
+            return {}
+        
+        par_seg = self.params[self.params['operation'] == action]
+        return dict(zip(par_seg['param'], par_seg['value']))
+    
+    
     
     def initial_calibration(self):
         '''
         Starts the initial calibration GUI
         '''
+        
+        if self.html:
+            import os
+            import sys
+            import threading
+            import time
+            import webbrowser
+            import uvicorn
+            
+            # 1) Get the path to the web_gui directory relative to myptv
+            # The workflow.py might be in example/ or myptv/
+            # We'll try to find it via the myptv package
+            try:
+                import myptv
+                web_gui_path = os.path.join(os.path.dirname(myptv.__file__), 'web_gui')
+            except ImportError:
+                # Fallback to a relative path if not installed
+                web_gui_path = os.path.join(os.path.dirname(__file__), '..', 'myptv', 'web_gui')
+            
+            if not os.path.exists(web_gui_path):
+                print(f"Error: web_gui not found at {web_gui_path}")
+                return
+
+            print("Starting MyPTV Web-based Initial Calibration GUI...")
+            print("Point your browser to http://localhost:8000 if it doesn't open automatically.")
+            
+            def open_browser():
+                time.sleep(1.5)
+                webbrowser.open("http://localhost:8000")
+            
+            threading.Thread(target=open_browser, daemon=True).start()
+            
+            # We need to be in the web_gui directory for uvicorn to find the app
+            original_cwd = os.getcwd()
+            os.chdir(web_gui_path)
+            try:
+                # Add web_gui to path so backend.main can be imported
+                if web_gui_path not in sys.path:
+                    sys.path.append(web_gui_path)
+                
+                # Import the app to ensure it exists before running
+                from backend.main import app
+                uvicorn.run(app, host="127.0.0.1", port=8000, log_level="info")
+            finally:
+                os.chdir(original_cwd)
+            
+            return
+
         from matplotlib.pyplot import imread
         
         # fetch parameters from the file
@@ -495,7 +322,7 @@ class workflow(object):
         
         
         if model_name == 'Tsai':
-            from myptv.TsaiModel.gui_intial_cal import initial_cal_gui
+            from myptv.TsaiModel.gui_initial_cal import initial_cal_gui
             image = imread(cal_image)
             if image.shape[1] != res[0] or image.shape[0] != res[1]:
                 msg = 'The given resolution doesnt match the image size'
@@ -505,7 +332,7 @@ class workflow(object):
         
         
         elif model_name == 'extendedZolof':
-            from myptv.extendedZolof.gui_intial_cal import initial_cal_gui
+            from myptv.extendedZolof.gui_initial_cal import initial_cal_gui
             image = imread(cal_image)
             gui = initial_cal_gui(cam_name, cal_image, target_file)
             
@@ -605,7 +432,7 @@ class workflow(object):
             raise ValueError(msg + models)                                
             
     
-
+    
     
     
     def calibration_error_estimation(self):
@@ -734,6 +561,7 @@ class workflow(object):
             from myptv.TsaiModel.gui_final_cal import cal_gui
             from myptv.TsaiModel.camera import camera_Tsai
             from myptv.TsaiModel.calibrate import calibrate_with_particles_Tsai
+            from numpy import zeros
             
             # setting up a camera instance            
             cam = camera_Tsai(camera_name)
@@ -751,6 +579,7 @@ class workflow(object):
             
             # run the final calibration gui
             print('starting calibration GIU using calibration with particles\n')
+            cal_image = zeros(100,100,dtype='int8')
             gui = cal_gui(cal, cal_image) 
             
             
@@ -833,6 +662,147 @@ class workflow(object):
         
         calculate_equilization_map(dirname, ext, sigma, savename, N_img=N_img,
                                BG_image=BG_image, raw_format=raw_format)
+
+
+
+    def do_calculate_BG_and_EQ(self):
+        """
+        One-shot (stage-gated by params):
+        1) Calculate BG image (if calculate_BG_image.enabled is True).
+        2) Calculate EQ map (if calculate_equilization_map.enabled is True).
+        3) Apply BG subtraction + EQ normalization and (optionally) save
+           (if calculate_BG_and_EQ.enabled is True; saving controlled by
+            calculate_BG_and_EQ.save).
+        """
+    
+        from myptv.segmentation_mod import (
+            calculate_BG_image as _calc_bg,
+            calculate_equilization_map as _calc_eq,
+        )
+        import os
+        from skimage import io
+        import numpy as np
+    
+        def _safe_get(op, key, default=None):
+            try:
+                return self.get_param(op, key)
+            except Exception:
+                return default
+    
+        def _require_file(path, label):
+            if not os.path.isfile(path):
+                raise FileNotFoundError(f"Required {label} not found: {path}")
+    
+        # ---------------- Flags ----------------
+        bg_enabled  = bool(_safe_get("calculate_BG_image", "enabled", True))
+        eq_enabled  = bool(_safe_get("calculate_equilization_map", "enabled", True))
+        proc_enabled = bool(_safe_get("calculate_BG_and_EQ", "enabled", True))
+        proc_save    = bool(_safe_get("calculate_BG_and_EQ", "save", True))
+    
+        # ------------ BG params ------------
+        bg_dir  = self.get_param("calculate_BG_image", "images_folder")
+        bg_ext  = self.get_param("calculate_BG_image", "image_extension")
+        bg_raw  = self.get_param("calculate_BG_image", "raw_format")
+        bg_n    = self.get_param("calculate_BG_image", "N_img")
+        bg_out  = _safe_get("calculate_BG_image", "save_name", "BG_image.tif")
+    
+        if bg_enabled:
+            print("\n[1/3] Calculating background image...")
+            _calc_bg(bg_dir, bg_ext, bg_out, N_img=bg_n, raw_format=bg_raw)
+            print(f"Done. BG saved to: {bg_out}\n")
+        else:
+            print("\n[1/3] Skipping BG calculation (calculate_BG_image.enabled=False)")
+            # If later stages need BG, make sure a file is present (either default or provided)
+            _require_file(bg_out, "BG image")
+    
+        # ------------ EQ params ------------
+        eq_dir   = _safe_get("calculate_equilization_map", "images_folder", bg_dir)
+        eq_ext   = _safe_get("calculate_equilization_map", "image_extension", bg_ext)
+        eq_raw   = _safe_get("calculate_equilization_map", "raw_format", bg_raw)
+        eq_n     = _safe_get("calculate_equilization_map", "N_img", bg_n)
+        eq_sigma = _safe_get("calculate_equilization_map", "sigma", 20)
+        eq_out   = _safe_get("calculate_equilization_map", "save_name", "EQ_map.tif")
+        eq_bg_in = _safe_get("calculate_equilization_map", "BG_image", "auto")
+        if eq_bg_in in (None, "auto", "use_previous", True):
+            eq_bg_in = bg_out
+    
+        if eq_enabled:
+            print("[2/3] Calculating equalization map...")
+            _calc_eq(eq_dir, eq_ext, eq_sigma, eq_out, N_img=eq_n, BG_image=eq_bg_in, raw_format=eq_raw)
+            print(f"Done. EQ map saved to: {eq_out}\n")
+        else:
+            print("[2/3] Skipping EQ calculation (calculate_equilization_map.enabled=False)")
+            _require_file(eq_out, "EQ map")
+    
+        # ------------ Apply & Save ------------
+        if not proc_enabled:
+            print("[3/3] Skipping processing (calculate_BG_and_EQ.enabled=False)")
+            return
+    
+        out_dir = _safe_get("calculate_BG_and_EQ", "save_processed_folder",
+                            os.path.join(eq_dir, "BG_EQ"))
+        if proc_save:
+            os.makedirs(out_dir, exist_ok=True)
+    
+        # Reader aligned with your raw_format handling
+        if eq_raw is False:
+            imread_func = lambda p: io.imread(p)
+        else:
+            import rawpy
+            imread_func = lambda p: rawpy.imread(p).raw_image
+    
+        # Load BG and EQ arrays (needed for processing even if not saving)
+        _require_file(bg_out, "BG image")
+        _require_file(eq_out, "EQ map")
+        BG = io.imread(bg_out)
+        EQ = io.imread(eq_out)
+    
+        # Collect input images (top level only)
+        allfiles = sorted([f for f in os.listdir(eq_dir) if f.endswith(eq_ext)])
+        if not allfiles:
+            raise ValueError("No input images found for processing.")
+    
+        # Shape sanity using the first image
+        ref_im = imread_func(os.path.join(eq_dir, allfiles[0]))
+        if BG.shape != ref_im.shape:
+            raise ValueError(f"BG image shape {BG.shape} != image shape {ref_im.shape}")
+        if EQ.shape != ref_im.shape:
+            raise ValueError(f"EQ map shape {EQ.shape} != image shape {ref_im.shape}")
+    
+        if not proc_save:
+            print("[3/3] Processing without saving (calculate_BG_and_EQ.save=False)")
+    
+        for i, fname in enumerate(allfiles, 1):
+            src = os.path.join(eq_dir, fname)
+    
+            # Skip the saved BG or EQ files themselves if they sit in the same folder
+            if os.path.abspath(src) in (os.path.abspath(bg_out), os.path.abspath(eq_out)):
+                continue
+    
+            frame = imread_func(src)
+    
+            # BG subtraction: absdiff
+            diff = np.abs(frame.astype(np.int32) - BG.astype(np.int32))
+            diff = np.clip(diff, 0, 65535)
+    
+            # EQ normalize with safety
+            eq = diff.astype(np.float32) / np.maximum(EQ.astype(np.float32), 1e-6)
+    
+            if proc_save:
+                # Save as uint16 TIFF
+                eq_u16 = np.clip(eq, 0, 65535).astype(np.uint16)
+                base = os.path.splitext(fname)[0]
+                dst = os.path.join(out_dir, base + ".tif")
+                io.imsave(dst, eq_u16, check_contrast=False)
+    
+            if i % 100 == 0:
+                print(f"  Processed {i} / {len(allfiles)}")
+    
+        print("All set")
+        if proc_save:
+            print(f"Processed images saved to: {out_dir}")
+        else:
+            print("Processed images were not saved (save=False).")
     
     
     
@@ -873,15 +843,8 @@ class workflow(object):
         eq_map = self.get_param('segmentation', 'equilization_map')
         raw_format = self.get_param('segmentation', 'raw_format')
         DoG_sigmas = self.get_param('segmentation', 'DoG_sigmas')
-        pca_limit = self.get_param('segmentation', 'pca_limit')
-        arrow_scale = self.get_param('segmentation', 'arrow_scale')
-        if arrow_scale is None: arrow_scale = 100.0
+        multiprocessing = self.get_param('segmentation', 'multiprocessing')
         
-        try:
-            add_overlay = self.get_param('segmentation', 'add_overlay')
-            if add_overlay is None: add_overlay = True
-        except:
-            add_overlay = True
         
         # reading preprepared mask
         if type(mask)==str:
@@ -899,15 +862,11 @@ class workflow(object):
         if raw_format==False:
             imread_func = lambda x: imread(x)
         else:
-            def read_raw(x):
-                import rawpy
-                with rawpy.imread(x) as r:
-                    return r.raw_image
-            imread_func = read_raw
+            import rawpy
+            imread_func = lambda x: rawpy.imread(x).raw_image
         
         
         # get the shape of the images
-        # os.makedirs(dirname, exist_ok=False)
         allfiles = os.listdir(dirname)
         n_ext = len(ext)
         image_files = sorted(list(filter(lambda s: s[-n_ext:]==ext, allfiles)))
@@ -954,6 +913,19 @@ class workflow(object):
             from skimage import io
             from numpy import median
             
+            # create a cache folder if it doesn't exist
+            cache_dir = 'BG_cache'
+            if not os.path.exists(cache_dir):
+                os.makedirs(cache_dir)
+            
+            # create a unique name for the cache file based on the directory
+            safe_dirname = dirname.replace('/','_').replace('\\','_').replace(':','_').strip('_')
+            cache_name = os.path.join(cache_dir, f"BG_{safe_dirname}_{extension.strip('.')}.tif")
+            
+            if os.path.exists(cache_name):
+                print(f'\nloading background from cache: {cache_name}')
+                return io.imread(cache_name)
+            
             print('\ncalculating background...')
             
             allfiles = os.listdir(dirname)
@@ -963,13 +935,21 @@ class workflow(object):
             image_files = [os.path.join(dirname, fn) for fn in image_files]
             
             if len(image_files)<=200:
-                ic = io.ImageCollection(image_files)
+                ic = io.ImageCollection(image_files, load_func=imread_func)
                 
             else:
                 ic = io.ImageCollection(
-                            image_files[::int(len(image_files)/400+1)][:200])
+                            image_files[::int(len(image_files)/400+1)][:200],
+                            load_func=imread_func)
             
             BG = median(ic, axis=0)
+            
+            # save the calculated background for future use
+            print(f'saving background to cache: {cache_name}')
+            try:
+                io.imsave(cache_name, BG.astype(image0.dtype), check_contrast=False)
+            except:
+                io.imsave(cache_name, BG.astype('uint16'), check_contrast=False)
             
             return BG
             
@@ -1011,7 +991,8 @@ class workflow(object):
                                                 min_mass=min_mass,
                                                 mask=mask,
                                                 method=method,
-                                                raw_format=raw_format)
+                                                raw_format=raw_format,
+                                                multiprocessing=multiprocessing)
             
                 loopSegment.segment_folder_images()
                 
@@ -1079,7 +1060,7 @@ class workflow(object):
                 
                 if plot_res:
                     from matplotlib.pyplot import show
-                    particleSegment.plot_blobs(add_overlay=add_overlay)
+                    particleSegment.plot_blobs()
                     show()
                     
                     
@@ -1138,7 +1119,7 @@ class workflow(object):
                                                 mask=mask,
                                                 method=method,
                                                 raw_format=raw_format,
-                                                pca_limit=pca_limit)
+                                                pca_limit=1.0)
                 
                 loopSegment.segment_folder_images()
                 
@@ -1199,7 +1180,7 @@ class workflow(object):
                                                         min_mass=min_mass,
                                                         mask=mask,
                                                         method=method,
-                                                        pca_limit=pca_limit)
+                                                        pca_limit=1.0)
                 
                 particleSegment.get_blobs()
                 particleSegment.apply_blobs_size_filter()
@@ -1208,7 +1189,7 @@ class workflow(object):
                 
                 if plot_res:
                     from matplotlib.pyplot import show
-                    particleSegment.plot_blobs(scale=arrow_scale, add_overlay=add_overlay)
+                    particleSegment.plot_blobs()
                     show()
                     
                     
@@ -1664,7 +1645,7 @@ class workflow(object):
         Will perform 2D tracking of segmented blobs using give data.
         '''
             
-        from myptv.imaging_mod import camera
+        from myptv.imaging_mod import camera_wrapper
         from myptv.tracking_2D_mod import track_2D
         
         # fetchhing the stitching parameters
@@ -1681,8 +1662,12 @@ class workflow(object):
 
         print('\ninitiating 2D tracking...')
 
-        cam = camera(cam_name, res)
-        cam.load('')
+        if cam_name==None:
+            cam = None
+        
+        else:
+            cam = camera_wrapper(cam_name, '')
+            cam.load()
         
         print('\nloading blobs and transforming to lab-space coordinates')
         t2d = track_2D(cam, fname, z_particles, d_max=d_max, dv_max = dv_max, 
@@ -1755,120 +1740,62 @@ class workflow(object):
             
         Will perform a fiber orientation analysis
         '''
-        from numpy import loadtxt, empty, array, zeros, pi, sign, savetxt
+        from numpy import loadtxt, empty, array, zeros, pi, sign, savetxt, shape
         from numpy import abs as absnp
         from numpy.linalg import norm
         from pandas import read_csv
-        from myptv.fibers.fiber_orientation_mod import FiberOrientation
-        from myptv.imaging_mod import camera, img_system
-        # from myptv.particle_matching_mod import match_blob_files
-    
-        
+        #from myptv.fibers.fiber_orientation_mod import read_camera_data initialize_camera assign_2d_positions_and_orientations
+        from myptv.fibers.fiber_2cams_orientation_mod import run_2cams_orientation
+        from myptv.fibers.fiber_3cams_orientation_mod import run_3cams_orientation
+
         # fetching the parameters
-        blob_fn = self.get_param('fiber_orientations', 'blob_files')
-        blob_fn = [val.strip() for val in blob_fn.split(',')]
         cam_names = self.get_param('fiber_orientations', 'camera_names')
         cam_names = [val.strip() for val in cam_names.split(',')]
-        res = self.get_param('fiber_orientations', 'cam_resolution')
-        res = tuple([float(val) for val in res.split(',')])
+        blob_fn = self.get_param('fiber_orientations', 'blob_files')
+        blob_fn = [val.strip() for val in blob_fn.split(',')]
+        ori_lim = self.get_param('fiber_orientations', 'ori_lim')
         trajectory_file = self.get_param('fiber_orientations','trajectory_file')
-        
         save_name = self.get_param('fiber_orientations', 'save_name')
-        print(save_name)
-        # setting up the img_system 
-        cams = [camera(cn, res) for cn in cam_names]
-        for cam in cams:
-            try:
-                cam.load('')
-            except:
-                raise ValueError('camera file %s not found'%cam.name)
-        imsys = img_system(cams)
-        # fibers = loadtxt(fibers_file)
-        trajectories = loadtxt(trajectory_file)
+        method = self.get_param('fiber_orientations','method')
         
-        oris = empty((len(trajectories[:,0]),8))
-        shape = (3,1)
-        blobs = []
-        for fn in blob_fn:
-            blobs.append(array(read_csv(fn, sep='\t', header=None)))
-
-        count = 0
-        for frame in range(int(trajectories[-1,-1])+1):
+        allowed_methods = ['MinProjection', 'PlaneIntersect']
+        if method not in allowed_methods:
+            raise ValueError('Method should be one of ' + str(allowed_methods))
+        
+        print('Running fiber orientations with the %s method'%allowed_methods)
+        
+        
+        # The original Aschari Gambino and Brizzolara method
+        # ==================================================
+        if method == 'PlaneIntersect':  
+            #run orientation code
+            camn = shape(cam_names)[0]
+            print('Running MyFTV on', camn, 'cameras...')
+            if camn == 2:
+                run_2cams_orientation(cam_names,blob_fn,trajectory_file,save_name)
+            elif camn == 3:
+                run_3cams_orientation(ori_lim,cam_names,blob_fn,trajectory_file,save_name)
+            else:
+                print('Currently the PlaneIntersect is limited to a maximum of 3 cameras.')
+                print('Please either continue with the post-processing by matching and tracking') 
+                print('fiber centroids with either 2 or 3 cameras, or use the MinProjection method')
+        
+        
+        # The projection method, based on Verhille's 
+        # work (10.1103/PhysRevLett.121.124502)
+        # ==========================================
+        if method=='MinProjection':
+            from myptv.fibers.fiber_orientation_mod import fiber_ori_projection_method
+            from myptv.fibers.fiber_orientation_mod import fiber_traj_orientation
+            from myptv.imaging_mod import camera_wrapper
             
-            frame_trajectories = [line for line in trajectories if line[7] == frame]
+            cams = [camera_wrapper(cn, '.') for cn in cam_names]
+            for c in cams:
+                c.load()
 
-            for line in range(len(frame_trajectories)):    
-                X = array([zeros(shape),zeros(shape)])
-                B = array([zeros(shape),zeros(shape)])
-                
-                n_x_prev = 0
-                n_y_prev = 0
-                n_z_prev = 0
-                
-                for cam in range(2):
-                    
-                    frame_blobs = [line for line in blobs[cam] if line[5] == frame]
-                    reso = cams[cam].resolution[0]
-                    index = int(frame_trajectories[line][4+cam])
-                    
-                    x_corr = cams[cam].xh
-                    y_corr = cams[cam].yh
-                    
-                    temp1_x = (frame_blobs[index][0]) - (reso/2. + x_corr)
-                    temp1_b = temp1_x + frame_blobs[index][6]*100
-                    
-                    temp2_x = (frame_blobs[index][1]) - (reso/2. + y_corr)
-                    temp2_b = temp2_x + frame_blobs[index][7]*100
-                    
-                    # coordinate transformation
-                    X[cam][0,0] = temp2_x
-                    B[cam][0,0] = temp2_b
-                    
-                    X[cam][1,0] = temp1_x
-                    B[cam][1,0] = temp1_b
-                    
-                # get orientations
-                o = FiberOrientation(X, B)
-                c,u,ori = o.image2fiber(imsys.cameras)
-                ori = ori/pi*180
-                u /= norm(u)
-                
-                if line == 0:
-                    n_x_prev = u[0]
-                    n_y_prev = u[1]
-                    n_z_prev = u[2]
-                
-                # correct sign
-                value = 0.2
-                if absnp(absnp(u[0]) - absnp(n_x_prev)) < value and sign(u[0]) != sign(n_x_prev):
-                    u[0] *= -1
-                if absnp(absnp(u[1]) - absnp(n_y_prev)) < value and sign(u[1]) != sign(n_y_prev):
-                    u[1] *= -1
-                if absnp(absnp(u[2]) - absnp(n_z_prev)) < value and sign(u[2]) != sign(n_z_prev):
-                    u[2] *= -1
-                
-                n_x_prev = u[0]
-                n_y_prev = u[1]
-                n_z_prev = u[2]
-            
-                temp = frame_trajectories[line]
-
-                temp[1] = u[0]
-                temp[2] = u[1]
-                temp[3] = u[2]
-
-                oris[count] = temp
-                count += 1
-
-                
-                
-        # saving the data
-        if save_name is not None:
-            print('\n', 'Saving the data.')    
-            # o.save_results(save_name, oris)
-            savetxt(save_name, oris, fmt = 
-                       ['%d', '%.3f', '%.3f', '%.3f', '%d', '%d', '%.2f', '%.2f'], delimiter='\t')
-        print('\n', 'Done.')
+            fto = fiber_traj_orientation(trajectory_file, blob_fn, cams)
+            fto.get_ori_lst()
+            fto.save_orientations(save_name)
     
     
     
@@ -1949,6 +1876,33 @@ class workflow(object):
         
         return None
         
+    
+    
+    def do_create_blob_mask(self):
+        '''
+        This is used to create a polygon mask around a blob file.
+        '''
+        p = self.get_action_params('create_blob_mask')
+        from myptv.masking_mod import generate_blob_polygon_mask
+        
+        # Check for optional parameters
+        max_sides = p.get('max_sides', None)
+        alpha = p.get('alpha', None)
+        
+        try:
+            generate_blob_polygon_mask(
+                p['blob_file'],
+                p['reference_image'],
+                p['padding'],
+                p['output_bit_depth'],
+                p['save_name'],
+                max_sides=max_sides,
+                alpha=alpha
+            )
+        except Exception as e:
+            print(f"\nError creating blob mask: {e}")
+            return
+            
     
     
     
@@ -2107,15 +2061,23 @@ class workflow(object):
 
 if __name__ == '__main__':
     
-    import sys
-    fname, action = sys.argv[1], sys.argv[2]
-    print('\n','given inputs -')
-    print('params file name:', fname)
-    print('action:', action, '\n')
-    wf = workflow(fname, action)
-    
-    
-    
-    
-    
+    import argparse
+    parser = argparse.ArgumentParser(description='Run MyPTV workflow.')
+    parser.add_argument('fname', help='Parameters file name')
+    parser.add_argument('action', help='Action to perform')
+    parser.add_argument('--comment', default='', help='Comment for the log entry')
+    parser.add_argument('--html', action='store_true', help='Use HTML GUI for initial calibration')
+    args = parser.parse_args()
 
+    print('\n','given inputs -')
+    print('params file name:', args.fname)
+    print('action:', args.action)
+    if args.html:
+        print('Using HTML GUI for initial calibration')
+    print('\n')
+    wf = workflow(args.fname, args.action, comment=args.comment, html=args.html)
+    
+    
+    
+    
+    
