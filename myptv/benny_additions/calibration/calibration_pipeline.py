@@ -15,7 +15,8 @@ Chains together all calibration steps for a 4-camera setup:
 Usage
 -----
     python calibration_pipeline.py config.yml
-    python calibration_pipeline.py --help        # show YAML format docs
+    python calibration_pipeline.py --help        # show YAML format docs - should also show origin usage
+    
 
 YAML Config Format
 ------------------

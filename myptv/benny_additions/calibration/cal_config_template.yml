@@ -1,4 +1,4 @@
-cal_dir: /path/to/cal_directory      # root for all outputs
+cal_dir: /Users/user/Desktop/Research/Data_Analysis/MyPTV_analysis/20260819/calibration/calibSmall/      # root for all outputs
 target_points: /path/to/cal_points   # 3-column (X, Y, Z) world target file
 
 calibration:
