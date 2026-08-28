@@ -345,10 +345,10 @@ class fiber_ori_projection_method(object):
             MSE = np.mean(np.sum(res**2, axis=0))
             return MSE
 
-        if self.smartIG: popsize = 5
-        else: popsize = 15
+        popsize = 15
 
-        res_de = differential_evolution(ori_MSE, bounds=[(0,1),(-1,1),(-1,1)], popsize=popsize)
+        res_de = differential_evolution(ori_MSE, bounds=[(0,1),(-1,1),(-1,1)],
+                                        popsize=popsize, x0=self.ori0)
         ori = res_de.x / np.linalg.norm(res_de.x)
 
         MSE = res_de.fun
@@ -399,11 +399,10 @@ class fiber_ori_projection_method(object):
             alpha = 0.3 if have_obs_lengths else 0.03
             return ang_cost + alpha * len_cost
 
-        if self.smartIG: popsize = 5
-        else: popsize = 15
+        popsize = 15
 
         res_de = differential_evolution(cost, bounds=[(0,1),(-1,1),(-1,1)],
-                                        popsize=popsize)
+                                        popsize=popsize, x0=self.ori0)
         ori = res_de.x / np.linalg.norm(res_de.x)
         MSE = res_de.fun
 
