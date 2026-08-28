@@ -259,6 +259,22 @@ class fiber_ori_projection_method(object):
             self.smartIG = 0 # index whether an initial guess was given
 
         else:
+            # Handle tuple (ori, MSE) passed from previous frame
+            if isinstance(ori0, (tuple, list)):
+                ori0 = ori0[0]
+            ori0 = np.array(ori0, dtype=float)
+            norm = np.linalg.norm(ori0)
+            if norm > 1e-6:
+                ori0 = ori0 / norm
+            else:
+                ori0 = np.array([1, 1, 1]) / 3**0.5
+            # Ensure p_x >= 0 to match bounds=[(0,1), (-1,1), (-1,1)]
+            if ori0[0] < 0:
+                ori0 = -ori0
+            # Clip strictly inside bounds
+            ori0[0] = np.clip(ori0[0], 0.0, 1.0)
+            ori0[1] = np.clip(ori0[1], -1.0, 1.0)
+            ori0[2] = np.clip(ori0[2], -1.0, 1.0)
             self.ori0 = ori0
             self.smartIG = 1
 
