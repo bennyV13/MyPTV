@@ -760,22 +760,6 @@ class smooth_orientations(object):
             
             total += 1
             
-            tr_len = len(traj_dic[tr_num])
-            
-            if tr_len < self.min_traj_length:
-                for i in range(len(traj_dic[tr_num])):
-                    tr = traj_dic[tr_num][i]
-                    new_tr = [tr[0], tr[1], tr[2], tr[3], 
-                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0] + list(tr[4:])
-                    short_trajs.append(new_tr)
-                continue
-            
-            elif tr_len < self.window:
-                W = tr_len - 1*(tr_len%2==0)
-            
-            else:
-                W = self.window
-            
             # sort samples according to time:
             traj = sorted(traj_dic[tr_num], key=lambda s: s[-1])
             traj_arr = np.array(traj)
@@ -787,6 +771,22 @@ class smooth_orientations(object):
                 dot_prod = traj_arr[i, 1]*traj_arr[i-1, 1] + traj_arr[i, 2]*traj_arr[i-1, 2] + traj_arr[i, 3]*traj_arr[i-1, 3]
                 if dot_prod < 0:
                     traj_arr[i, 1:4] = -traj_arr[i, 1:4]
+            
+            tr_len = len(traj_arr)
+            
+            if tr_len < self.min_traj_length:
+                for i in range(tr_len):
+                    tr = traj_arr[i]
+                    new_tr = [tr[0], tr[1], tr[2], tr[3], 
+                              0.0, 0.0, 0.0, 0.0, 0.0, 0.0] + list(tr[4:])
+                    short_trajs.append(new_tr)
+                continue
+            
+            elif tr_len < self.window:
+                W = tr_len - 1*(tr_len%2==0)
+            
+            else:
+                W = self.window
             
             # smoothing orientations
             p, v, a = smooth_traj_poly(traj_arr.T[1:4,:], 
