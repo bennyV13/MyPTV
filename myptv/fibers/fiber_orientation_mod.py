@@ -899,7 +899,7 @@ class smooth_orientations(object):
     
     def __init__(self, ori_list, window, polyorder, repetitions=1,
                  min_traj_length=4, phi_min=0.1, window_phi=None,
-                 use_weighted_smoothing=True, sigma_xy=0.05, sigma_z=0.05,
+                 use_weighted_smoothing=False, sigma_xy=0.05, sigma_z=0.05,
                  window_theta=None):
         self.ori_list = ori_list
         self.window = window

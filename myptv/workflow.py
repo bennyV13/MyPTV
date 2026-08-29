@@ -1883,7 +1883,7 @@ class workflow(object):
             pass
 
         # Optional weighted smoothing parameters
-        use_weighted_smoothing = True
+        use_weighted_smoothing = False
         try:
             val = self.get_param('smoothed_orientations', 'use_weighted_smoothing')
             if isinstance(val, str):
