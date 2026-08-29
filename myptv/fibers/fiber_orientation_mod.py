@@ -709,15 +709,105 @@ class fiber_traj_orientation(object):
     
     
 
+def _smooth_signal_poly(signal, window, polyorder, repetitions=1):
+    """Smooth a 1D signal using moving polynomial fitting.
+    
+    Uses the same method as smooth_traj_poly (Luethi et al 2005) but for
+    a single component. Returns the smoothed signal and its analytically
+    computed first and second derivatives.
+    
+    Parameters
+    ----------
+    signal : array-like, shape (N,)
+        The 1D signal to smooth.
+    window : int
+        Odd positive integer, the window size for polynomial fitting.
+    polyorder : int
+        Degree of the polynomial used in fitting.
+    repetitions : int
+        Number of smoothing passes (each pass feeds the smoothed output
+        back as input).
+    
+    Returns
+    -------
+    smoothed : numpy array, shape (N,)
+    first_deriv : numpy array, shape (N,)
+    second_deriv : numpy array, shape (N,)
+    """
+    from myptv.utils import fit_polynomial
+
+    N = len(signal)
+    current = np.array(signal, dtype=float).copy()
+
+    for rep in range(repetitions):
+        new_pos = np.zeros(N)
+        new_vel = np.zeros(N)
+        new_acc = np.zeros(N)
+
+        win = window
+        po = polyorder
+        time_ = list(range(win))
+
+        # Build derivative matrix (same as in smooth_traj_poly)
+        Deriv_mat = []
+        for i in range(po + 1):
+            a = [0.0] * (po + 1)
+            if i != 0:
+                a[i - 1] = po - (i - 1)
+            Deriv_mat.append(a)
+
+        for i in range(N):
+            if i < win / 2:
+                p_ = list(current[:win])
+            elif N - (1 + i) < win / 2:
+                p_ = list(current[-win:])
+            else:
+                p_ = list(current[i - int(win / 2): i + int(win / 2) + 1])
+
+            C = fit_polynomial(time_, p_, po)
+            C1 = np.dot(Deriv_mat, C)
+            C2 = np.dot(Deriv_mat, C1)
+
+            if i < win / 2:
+                ev_point = [float(i % (win / 2))**k
+                            for k in range(po + 1)[::-1]]
+            elif N - (1 + i) < win / 2:
+                ev_point = [float(win + i - N)**k
+                            for k in range(po + 1)[::-1]]
+            else:
+                ev_point = [float(win / 2 - 0.5)**k
+                            for k in range(po + 1)[::-1]]
+
+            new_pos[i] = np.dot(ev_point, C)
+            new_vel[i] = np.dot(ev_point, C1)
+            new_acc[i] = np.dot(ev_point, C2)
+
+        current = new_pos.copy()
+
+    return new_pos, new_vel, new_acc
+
+
+
 class smooth_orientations(object):
     '''
     A class used to smooth fiber orientations in a list. 
-    During smoothing, we also calculate the angular velocity (px_dot, py_dot, pz_dot)
-    and angular acceleration (px_ddot, py_ddot, pz_ddot) of the orientations.
-    The output has 12 + C columns: id, px, py, pz, px_dot, py_dot, pz_dot, px_ddot, py_ddot, pz_ddot, c1..cC, err, frame
+    
+    Smoothing is performed in spherical coordinates (theta, phi) to respect
+    the unit-sphere geometry, then converted back to Cartesian for output.
+    When phi < phi_min (pole region where theta is unobservable), theta is
+    interpolated through the pole zone rather than smoothed directly.
+    
+    Angular velocity (px_dot, py_dot, pz_dot) and angular acceleration
+    (px_ddot, py_ddot, pz_ddot) are computed via chain-rule differentiation
+    of the smoothed spherical signals.
+    
+    The output has 12 + C columns:
+        id, px, py, pz, px_dot, py_dot, pz_dot, px_ddot, py_ddot, pz_ddot,
+        c1..cC, err, frame
     '''
     
-    def __init__(self, ori_list, window, polyorder, repetitions=1, min_traj_length=4):
+    def __init__(self, ori_list, window, polyorder, repetitions=1,
+                 min_traj_length=4, phi_min=0.1):
         self.ori_list = ori_list
         self.window = window
         self.polyorder = polyorder
@@ -727,6 +817,7 @@ class smooth_orientations(object):
             raise ValueError('min_traj_length must be larger than polyorder')
             
         self.min_traj_length = min_traj_length
+        self.phi_min = phi_min
         self.smoothed_oris = []
         
     def smooth(self):
@@ -788,19 +879,90 @@ class smooth_orientations(object):
             else:
                 W = self.window
             
-            # smoothing orientations
-            p, v, a = smooth_traj_poly(traj_arr.T[1:4,:], 
-                                       W, 
-                                       self.polyorder,
-                                       repetitions=self.repetitions)
-            
-            # Normalizing the smoothed position vectors to have a magnitude of 1
-            for i in range(len(p[0])):
-                mag = math.sqrt(p[0][i]**2 + p[1][i]**2 + p[2][i]**2)
-                if mag > 0:
-                    p[0][i] /= mag
-                    p[1][i] /= mag
-                    p[2][i] /= mag
+            # ---- Spherical-coordinate smoothing ----
+            # Convert (px, py, pz) to spherical (theta, phi) so that
+            # smoothing respects the unit-sphere geometry.
+            px_raw = traj_arr[:, 1].astype(float)
+            py_raw = traj_arr[:, 2].astype(float)
+            pz_raw = traj_arr[:, 3].astype(float)
+
+            # Ensure unit vectors
+            norms = np.sqrt(px_raw**2 + py_raw**2 + pz_raw**2)
+            norms[norms == 0] = 1.0
+            px_raw /= norms
+            py_raw /= norms
+            pz_raw /= norms
+
+            phi = np.arccos(np.clip(pz_raw, -1.0, 1.0))   # inclination [0, pi]
+            theta = np.arctan2(py_raw, px_raw)              # azimuthal [-pi, pi]
+
+            # Unwrap theta for continuity across ±pi boundary
+            theta = np.unwrap(theta)
+
+            # Smooth phi (well-behaved everywhere including near poles)
+            phi_s, phi_dot, phi_ddot = _smooth_signal_poly(
+                phi, W, self.polyorder, self.repetitions)
+
+            # Smooth theta with pole guarding:
+            # When phi is small, theta is unobservable (north-pole singularity),
+            # so we interpolate theta through pole zones before smoothing.
+            safe_mask = phi_s > self.phi_min
+
+            if not np.any(safe_mask):
+                # Entire trajectory is near the pole — hold theta constant
+                theta_s = np.full_like(theta, np.mean(theta))
+                theta_dot = np.zeros_like(theta)
+                theta_ddot = np.zeros_like(theta)
+            else:
+                if not np.all(safe_mask):
+                    # Replace theta in pole zones with interpolation
+                    safe_idx = np.where(safe_mask)[0]
+                    pole_idx = np.where(~safe_mask)[0]
+                    theta_cleaned = theta.copy()
+                    theta_cleaned[pole_idx] = np.interp(
+                        pole_idx, safe_idx, theta[safe_idx])
+                    theta = theta_cleaned
+
+                theta_s, theta_dot, theta_ddot = _smooth_signal_poly(
+                    theta, W, self.polyorder, self.repetitions)
+
+            # Convert smoothed spherical back to Cartesian unit vectors
+            sin_phi = np.sin(phi_s)
+            cos_phi = np.cos(phi_s)
+            sin_theta = np.sin(theta_s)
+            cos_theta = np.cos(theta_s)
+
+            p = [list(sin_phi * cos_theta),
+                 list(sin_phi * sin_theta),
+                 list(cos_phi)]
+
+            # First derivatives via chain rule:
+            #   dpx/dt = cos(phi)cos(theta) phi_dot - sin(phi)sin(theta) theta_dot
+            #   dpy/dt = cos(phi)sin(theta) phi_dot + sin(phi)cos(theta) theta_dot
+            #   dpz/dt = -sin(phi) phi_dot
+            v = [list(cos_phi * cos_theta * phi_dot
+                      - sin_phi * sin_theta * theta_dot),
+                 list(cos_phi * sin_theta * phi_dot
+                      + sin_phi * cos_theta * theta_dot),
+                 list(-sin_phi * phi_dot)]
+
+            # Second derivatives via chain rule:
+            #   d2px = cos(phi)cos(theta) phi_ddot - sin(phi)sin(theta) theta_ddot
+            #        - sin(phi)cos(theta)(phi_dot^2 + theta_dot^2)
+            #        - 2 cos(phi)sin(theta) theta_dot phi_dot
+            #   d2py = cos(phi)sin(theta) phi_ddot + sin(phi)cos(theta) theta_ddot
+            #        - sin(phi)sin(theta)(phi_dot^2 + theta_dot^2)
+            #        + 2 cos(phi)cos(theta) theta_dot phi_dot
+            #   d2pz = -cos(phi) phi_dot^2 - sin(phi) phi_ddot
+            a = [list(cos_phi * cos_theta * phi_ddot
+                      - sin_phi * sin_theta * theta_ddot
+                      - sin_phi * cos_theta * (phi_dot**2 + theta_dot**2)
+                      - 2 * cos_phi * sin_theta * theta_dot * phi_dot),
+                 list(cos_phi * sin_theta * phi_ddot
+                      + sin_phi * cos_theta * theta_ddot
+                      - sin_phi * sin_theta * (phi_dot**2 + theta_dot**2)
+                      + 2 * cos_phi * cos_theta * theta_dot * phi_dot),
+                 list(-cos_phi * phi_dot**2 - sin_phi * phi_ddot)]
             
             # setting a new trajectories
             new_traj = []
