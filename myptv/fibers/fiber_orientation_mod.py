@@ -788,6 +788,97 @@ def _smooth_signal_poly(signal, window, polyorder, repetitions=1):
 
 
 
+def _weighted_savgol_smooth(signal, sigma2, window, polyorder, repetitions=1):
+    """Variance-weighted Savitzky-Golay 1D smoother.
+
+    Same interface as _smooth_signal_poly but uses weighted least squares
+    (WLS) where weights are inverse per-sample variances (w_i = 1/sigma2_i).
+    This down-weights noisy samples (e.g., near poles in spherical
+    coordinates where variance is amplified) proportionally.
+
+    When sigma2 is constant (uniform), this reduces exactly to ordinary
+    least squares and matches the output of _smooth_signal_poly.
+
+    Assumptions for the default sigma values used by smooth_orientations:
+      sigma_x = sigma_y ≈ 0.05 rad (in-plane Cartesian orientation noise).
+      sigma_z ≈ 0.05 rad (depth-direction noise — should be revisited if
+      experimental calibration data for the z-direction becomes available).
+
+    Parameters
+    ----------
+    signal : array-like, shape (N,)
+        1D signal to smooth.
+    sigma2 : array-like, shape (N,)
+        Per-sample propagated variance. Weights = 1/sigma2.
+    window : int
+        Odd positive integer, window size for polynomial fitting.
+    polyorder : int
+        Degree of the polynomial used in fitting.
+    repetitions : int
+        Number of smoothing passes (each pass feeds the smoothed output
+        back as input; weights stay fixed across repetitions).
+
+    Returns
+    -------
+    smoothed : numpy array, shape (N,)
+    first_deriv : numpy array, shape (N,)
+    second_deriv : numpy array, shape (N,)
+    """
+    N = len(signal)
+    current = np.array(signal, dtype=float).copy()
+    s2 = np.array(sigma2, dtype=float).copy()
+    s2 = np.maximum(s2, 1e-12)  # clamp away from zero
+
+    win = window
+    po = polyorder
+
+    for rep in range(repetitions):
+        new_pos = np.zeros(N)
+        new_vel = np.zeros(N)
+        new_acc = np.zeros(N)
+
+        for i in range(N):
+            # Window slice + evaluation offset
+            # (same edge handling as _smooth_signal_poly)
+            if i < win / 2:
+                sl = slice(0, win)
+                eval_offset = float(i)
+            elif N - (1 + i) < win / 2:
+                sl = slice(N - win, N)
+                eval_offset = float(win + i - N)
+            else:
+                sl = slice(i - int(win / 2), i + int(win / 2) + 1)
+                eval_offset = float(int(win / 2))
+
+            y_win = current[sl]
+            w = 1.0 / s2[sl]
+
+            # Time coords centered at evaluation point
+            t_local = np.arange(win, dtype=float) - eval_offset
+
+            # Vandermonde (increasing powers: 1, t, t^2, ...)
+            X = np.column_stack([t_local**k for k in range(po + 1)])
+
+            # WLS via sqrt-weight transform: lstsq(sqrt(W)X, sqrt(W)y)
+            sqrt_w = np.sqrt(w)
+            Xw = X * sqrt_w[:, None]
+            yw = y_win * sqrt_w
+            beta = np.linalg.lstsq(Xw, yw, rcond=None)[0]
+
+            # Taylor coefficients at the eval point (t_local = 0):
+            #   p(t) = beta[0] + beta[1]*t + beta[2]*t^2 + ...
+            #   p(0)   = beta[0]
+            #   p'(0)  = beta[1]
+            #   p''(0) = 2*beta[2]
+            new_pos[i] = beta[0]
+            new_vel[i] = beta[1] if po >= 1 else 0.0
+            new_acc[i] = 2.0 * beta[2] if po >= 2 else 0.0
+
+        current = new_pos.copy()
+
+    return new_pos, new_vel, new_acc
+
+
 class smooth_orientations(object):
     '''
     A class used to smooth fiber orientations in a list. 
@@ -807,7 +898,8 @@ class smooth_orientations(object):
     '''
     
     def __init__(self, ori_list, window, polyorder, repetitions=1,
-                 min_traj_length=4, phi_min=0.1, window_phi=None):
+                 min_traj_length=4, phi_min=0.1, window_phi=None,
+                 use_weighted_smoothing=True, sigma_xy=0.05, sigma_z=0.05):
         self.ori_list = ori_list
         self.window = window
         self.window_phi = window_phi if window_phi is not None else window
@@ -819,6 +911,9 @@ class smooth_orientations(object):
             
         self.min_traj_length = min_traj_length
         self.phi_min = phi_min
+        self.use_weighted_smoothing = use_weighted_smoothing
+        self.sigma_xy = sigma_xy
+        self.sigma_z = sigma_z
         self.smoothed_oris = []
         
     def smooth(self):
@@ -905,9 +1000,28 @@ class smooth_orientations(object):
             # Unwrap theta for continuity across ±pi boundary
             theta = np.unwrap(theta)
 
+            # Compute per-sample propagated variances for weighted smoothing
+            # (from delta-method error propagation of Cartesian noise → spherical)
+            if self.use_weighted_smoothing:
+                one_minus_pz2 = np.maximum(1.0 - pz_raw**2, 1e-6)
+                rho2 = np.maximum(px_raw**2 + py_raw**2, 1e-6)
+
+                # sigma_phi^2 = sigma_z^2 / (1 - pz^2)
+                sigma_phi2 = self.sigma_z**2 / one_minus_pz2
+
+                # sigma_theta^2 = (py^2*sx^2 + px^2*sy^2) / (px^2+py^2)^2
+                # With sx = sy = sigma_xy this simplifies to sigma_xy^2 / rho2,
+                # but we keep the general form for future sigma_x != sigma_y.
+                sigma_theta2 = (py_raw**2 * self.sigma_xy**2
+                                + px_raw**2 * self.sigma_xy**2) / rho2**2
+
             # Smooth phi (well-behaved everywhere including near poles)
-            phi_s, phi_dot, phi_ddot = _smooth_signal_poly(
-                phi, W_phi, self.polyorder, self.repetitions)
+            if self.use_weighted_smoothing:
+                phi_s, phi_dot, phi_ddot = _weighted_savgol_smooth(
+                    phi, sigma_phi2, W_phi, self.polyorder, self.repetitions)
+            else:
+                phi_s, phi_dot, phi_ddot = _smooth_signal_poly(
+                    phi, W_phi, self.polyorder, self.repetitions)
 
             # Smooth theta with pole guarding:
             # When phi is small, theta is unobservable (north-pole singularity),
@@ -929,8 +1043,13 @@ class smooth_orientations(object):
                         pole_idx, safe_idx, theta[safe_idx])
                     theta = theta_cleaned
 
-                theta_s, theta_dot, theta_ddot = _smooth_signal_poly(
-                    theta, W_theta, self.polyorder, self.repetitions)
+                if self.use_weighted_smoothing:
+                    theta_s, theta_dot, theta_ddot = _weighted_savgol_smooth(
+                        theta, sigma_theta2, W_theta, self.polyorder,
+                        self.repetitions)
+                else:
+                    theta_s, theta_dot, theta_ddot = _smooth_signal_poly(
+                        theta, W_theta, self.polyorder, self.repetitions)
 
             # Convert smoothed spherical back to Cartesian unit vectors
             sin_phi = np.sin(phi_s)
