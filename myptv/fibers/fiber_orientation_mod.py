@@ -899,10 +899,12 @@ class smooth_orientations(object):
     
     def __init__(self, ori_list, window, polyorder, repetitions=1,
                  min_traj_length=4, phi_min=0.1, window_phi=None,
-                 use_weighted_smoothing=True, sigma_xy=0.05, sigma_z=0.05):
+                 use_weighted_smoothing=True, sigma_xy=0.05, sigma_z=0.05,
+                 window_theta=None):
         self.ori_list = ori_list
         self.window = window
         self.window_phi = window_phi if window_phi is not None else window
+        self.window_theta = window_theta if window_theta is not None else window
         self.polyorder = polyorder
         self.repetitions = repetitions
         
@@ -975,10 +977,10 @@ class smooth_orientations(object):
             else:
                 W_phi = self.window_phi
             
-            if tr_len < self.window:
+            if tr_len < self.window_theta:
                 W_theta = tr_len - 1*(tr_len%2==0)
             else:
-                W_theta = self.window
+                W_theta = self.window_theta
             
             # ---- Spherical-coordinate smoothing ----
             # Convert (px, py, pz) to spherical (theta, phi) so that

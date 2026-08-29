@@ -1858,6 +1858,23 @@ class workflow(object):
         repetitions = self.get_param('smoothed_orientations', 'repetitions')
         save_name = self.get_param('smoothed_orientations', 'save_name')
         
+        # Optional independent window sizes for pz (phi) and theta
+        window_pz = None
+        for k in ['window_size_pz', 'window_size_phi', 'window_pz', 'window_phi']:
+            try:
+                window_pz = self.get_param('smoothed_orientations', k)
+                break
+            except Exception:
+                pass
+
+        window_theta = None
+        for k in ['window_size_theta', 'window_theta']:
+            try:
+                window_theta = self.get_param('smoothed_orientations', k)
+                break
+            except Exception:
+                pass
+
         if min_traj_length <= polyorder:
             raise ValueError('min_traj_length must be larger than polyorder')
 
@@ -1879,7 +1896,9 @@ class workflow(object):
                                  window, 
                                  polyorder,
                                  repetitions=repetitions,
-                                 min_traj_length=min_traj_length)
+                                 min_traj_length=min_traj_length,
+                                 window_phi=window_pz,
+                                 window_theta=window_theta)
         sm.smooth()
         
         # saving the data
