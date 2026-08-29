@@ -807,9 +807,10 @@ class smooth_orientations(object):
     '''
     
     def __init__(self, ori_list, window, polyorder, repetitions=1,
-                 min_traj_length=4, phi_min=0.1):
+                 min_traj_length=4, phi_min=0.1, window_phi=None):
         self.ori_list = ori_list
         self.window = window
+        self.window_phi = window_phi if window_phi is not None else window
         self.polyorder = polyorder
         self.repetitions = repetitions
         
@@ -835,6 +836,7 @@ class smooth_orientations(object):
                 new_tr = [tr[0], tr[1], tr[2], tr[3], 
                           0.0, 0.0, 0.0, 0.0, 0.0, 0.0] + list(tr[4:])
                 zero_length_trajs.append(new_tr)
+                continue
             
             # from the connected samples, make a trajectory dictionary
             else:
@@ -873,11 +875,15 @@ class smooth_orientations(object):
                     short_trajs.append(new_tr)
                 continue
             
-            elif tr_len < self.window:
-                W = tr_len - 1*(tr_len%2==0)
-            
+            if tr_len < self.window_phi:
+                W_phi = tr_len - 1*(tr_len%2==0)
             else:
-                W = self.window
+                W_phi = self.window_phi
+            
+            if tr_len < self.window:
+                W_theta = tr_len - 1*(tr_len%2==0)
+            else:
+                W_theta = self.window
             
             # ---- Spherical-coordinate smoothing ----
             # Convert (px, py, pz) to spherical (theta, phi) so that
@@ -901,7 +907,7 @@ class smooth_orientations(object):
 
             # Smooth phi (well-behaved everywhere including near poles)
             phi_s, phi_dot, phi_ddot = _smooth_signal_poly(
-                phi, W, self.polyorder, self.repetitions)
+                phi, W_phi, self.polyorder, self.repetitions)
 
             # Smooth theta with pole guarding:
             # When phi is small, theta is unobservable (north-pole singularity),
@@ -924,7 +930,7 @@ class smooth_orientations(object):
                     theta = theta_cleaned
 
                 theta_s, theta_dot, theta_ddot = _smooth_signal_poly(
-                    theta, W, self.polyorder, self.repetitions)
+                    theta, W_theta, self.polyorder, self.repetitions)
 
             # Convert smoothed spherical back to Cartesian unit vectors
             sin_phi = np.sin(phi_s)
