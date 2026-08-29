@@ -1875,6 +1875,36 @@ class workflow(object):
             except Exception:
                 pass
 
+        # Optional phi_min (pole-guard threshold)
+        phi_min = 0.1
+        try:
+            phi_min = float(self.get_param('smoothed_orientations', 'phi_min'))
+        except Exception:
+            pass
+
+        # Optional weighted smoothing parameters
+        use_weighted_smoothing = True
+        try:
+            val = self.get_param('smoothed_orientations', 'use_weighted_smoothing')
+            if isinstance(val, str):
+                use_weighted_smoothing = val.strip().lower() in ['true', '1', 'yes']
+            else:
+                use_weighted_smoothing = bool(val)
+        except Exception:
+            pass
+
+        sigma_xy = 0.05
+        try:
+            sigma_xy = float(self.get_param('smoothed_orientations', 'sigma_xy'))
+        except Exception:
+            pass
+
+        sigma_z = 0.05
+        try:
+            sigma_z = float(self.get_param('smoothed_orientations', 'sigma_z'))
+        except Exception:
+            pass
+
         if min_traj_length <= polyorder:
             raise ValueError('min_traj_length must be larger than polyorder')
 
@@ -1897,8 +1927,12 @@ class workflow(object):
                                  polyorder,
                                  repetitions=repetitions,
                                  min_traj_length=min_traj_length,
+                                 phi_min=phi_min,
                                  window_phi=window_pz,
-                                 window_theta=window_theta)
+                                 window_theta=window_theta,
+                                 use_weighted_smoothing=use_weighted_smoothing,
+                                 sigma_xy=sigma_xy,
+                                 sigma_z=sigma_z)
         sm.smooth()
         
         # saving the data
