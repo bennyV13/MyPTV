@@ -62,6 +62,8 @@ class workflow(object):
                                 'fiber_orientations',
                                 'plot_trajectories',
                                 'animate_trajectories',
+                                'trajectory_video',
+                                'make_trajectory_video',
                                 'plot_unmatched_blobs',
                                 'run_extention']
         
@@ -127,6 +129,9 @@ class workflow(object):
                 
             elif action == 'animate_trajectories':
                 self.do_animate_trajectories()
+
+            elif action in ['trajectory_video', 'make_trajectory_video']:
+                self.do_trajectory_video()
             
             elif action == 'run_extention':
                 self.do_run_extention()    
@@ -258,6 +263,17 @@ class workflow(object):
 
         return val
     
+    
+    def get_action_params(self, action):
+        '''
+        Extract the parameters from the self.params DataFrame for the given action.
+        Returns a dictionary of key-value pairs (param and value).
+        '''
+        if action not in set(self.params['operation']):
+            return {}
+        
+        par_seg = self.params[self.params['operation'] == action]
+        return dict(zip(par_seg['param'], par_seg['value']))
     
     
     @staticmethod
@@ -1998,7 +2014,19 @@ class workflow(object):
         print('animation saved. Done!')
         
         
+    def do_trajectory_video(self):
+        '''
+        Generates a synchronized multi-camera MP4 video (and GIF preview)
+        following a particle or fiber trajectory using old or smart bounding box.
+        '''
+        from myptv.makePlots.plot_trajectory_video import render_trajectory_video_from_params
         
+        p = self.get_action_params('trajectory_video')
+        if not p:
+            p = self.get_action_params('make_trajectory_video')
+            
+        render_trajectory_video_from_params(self.param_file_path, **p)
+        print('\nTrajectory video rendering completed.')
         
         
     def do_plot_unmatched_blobs(self):

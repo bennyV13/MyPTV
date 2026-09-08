@@ -7,6 +7,8 @@ Created on Sun March  20 2020
 MyPTV init file
 """
 
-        
-        
-        
+from .plot_trajectory_video import (
+    trajectory_video,
+    render_trajectory_video,
+    render_trajectory_video_from_params,
+)
