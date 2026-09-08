@@ -49,6 +49,8 @@ class workflow(object):
                             'plot_trajectories',
                             'plot_fibers',
                             'animate_trajectories',
+                            'trajectory_video',
+                            'make_trajectory_video',
                             'run_extention',
                             'web_gui',
                             'create_blob_mask',
@@ -148,6 +150,9 @@ class workflow(object):
                     
                 elif action == 'animate_trajectories':
                     self.do_animate_trajectories()
+
+                elif action in ['trajectory_video', 'make_trajectory_video']:
+                    self.do_trajectory_video()
                 
                 elif action == 'run_extention':
                     self.do_run_extention()    
@@ -2096,6 +2101,19 @@ class workflow(object):
         print('animation saved. Done!')
     
     
+    def do_trajectory_video(self):
+        '''
+        Generates a synchronized multi-camera MP4 video (and GIF preview)
+        following a particle or fiber trajectory using old or smart bounding box.
+        '''
+        from myptv.makePlots.plot_trajectory_video import render_trajectory_video_from_params
+        
+        p = self.get_action_params('trajectory_video')
+        if not p:
+            p = self.get_action_params('make_trajectory_video')
+            
+        render_trajectory_video_from_params(self.param_file_path, **p)
+        print('\nTrajectory video rendering completed.')
     
     
         
