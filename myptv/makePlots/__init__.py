@@ -8,6 +8,7 @@ MyPTV init file
 """
 
 from .plot_trajectory_video import (
+    trajectory_video,
     render_trajectory_video,
     render_trajectory_video_from_params,
 )
