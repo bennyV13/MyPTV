@@ -2,7 +2,7 @@
 """
 Created on Tue Sep  8 10:15:00 2026
 
-@author: ron
+@author: Benny
 
 
 This module is used to generate synchronized multi-camera MP4 videos 
