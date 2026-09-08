@@ -120,18 +120,19 @@ class trajectory_video(object):
     image_ext - string; extension of image files (default: '.dng')
     '''
     
-    def __init__(self, traj_file, camera_names, images_folder,
+    def __init__(self, traj_file=None, camera_names=None, images_folder=None,
                  blob_files=None, orientations_file=None, traj_id=None,
                  shape='particles', bbox_style='old', pad=40, fps=250,
                  fps_gif=10, save_mp4=True, save_gif=True, out_mp4=None,
                  out_gif=None, f_start=None, f_end=None, rec_name=None,
-                 image_ext='.dng', base_dirs=None):
+                 image_ext='.dng', base_dirs=None, trajectory_file=None,
+                 orientation_file=None):
         
-        self.traj_file = traj_file
+        self.traj_file = traj_file or trajectory_file
         self.camera_names = camera_names
         self.images_folder = images_folder
         self.blob_files = blob_files
-        self.orientations_file = orientations_file
+        self.orientations_file = orientations_file or orientation_file
         self.traj_id = traj_id
         self.shape = str(shape).lower().strip()
         self.bbox_style = str(bbox_style).lower().strip()
@@ -147,6 +148,16 @@ class trajectory_video(object):
         self.rec_name = rec_name
         self.image_ext = image_ext
         self.base_dirs = base_dirs or [os.getcwd()]
+
+        # Validate trajectory file presence
+        if not self.traj_file:
+            raise ValueError('A trajectory_file must be specified.')
+
+        # Validate dual file requirement for fibers
+        if self.shape == 'fibers':
+            is_npz = isinstance(self.traj_file, str) and self.traj_file.endswith('.npz')
+            if not self.orientations_file and not is_npz:
+                raise ValueError('For shape: fibers, both trajectory_file and orientation_file are required.')
 
         # 1) load cameras
         self.cams = self.load_cameras()
@@ -285,13 +296,14 @@ class trajectory_video(object):
         orientations_map = {}
         if self.orientations_file:
             res_ori = resolve_filepath(self.orientations_file, self.base_dirs)
-            if os.path.exists(res_ori):
-                odf = read_csv(res_ori, sep=r'\s+', header=None)
-                f_col = odf.columns[-1]
-                for _, r in odf.iterrows():
-                    tid = int(r[0])
-                    frm = int(np_round(r[f_col]))
-                    orientations_map[(tid, frm)] = array([float(r[1]), float(r[2]), float(r[3])])
+            if not os.path.exists(res_ori):
+                raise FileNotFoundError('Orientation file not found: %s' % self.orientations_file)
+            odf = read_csv(res_ori, sep=r'\s+', header=None)
+            f_col = odf.columns[-1]
+            for _, r in odf.iterrows():
+                tid = int(r[0])
+                frm = int(np_round(r[f_col]))
+                orientations_map[(tid, frm)] = array([float(r[1]), float(r[2]), float(r[3])])
 
         # 1) Handle .npz format
         if resolved_traj.endswith('.npz'):
@@ -711,7 +723,7 @@ def render_trajectory_video_from_params(params_file, **overrides):
     image_ext = cfg.get('image_extension') or sections.get('segmentation', {}).get('image_extension', '.dng')
 
     # 5) Trajectory file
-    traj_file = cfg.get('trajectory_file')
+    traj_file = cfg.get('trajectory_file') or cfg.get('traj_file')
     if not traj_file:
         traj_file = sections.get('smoothing', {}).get('save_name') or sections.get('smoothing', {}).get('trajectory_file')
     if not traj_file:
@@ -730,11 +742,16 @@ def render_trajectory_video_from_params(params_file, **overrides):
             blob_files = sections.get('matching', {}).get('blob_files')
 
     # 7) Orientations file (fibers)
-    orientations_file = cfg.get('orientations_file')
+    orientations_file = cfg.get('orientation_file') or cfg.get('orientations_file')
     if not orientations_file and shape == 'fibers':
         orientations_file = sections.get('smoothed_orientations', {}).get('save_name') or sections.get('smoothed_orientations', {}).get('orientations_file')
         if not orientations_file:
             orientations_file = sections.get('fiber_orientations', {}).get('save_name')
+
+    if shape == 'fibers':
+        is_npz = isinstance(traj_file, str) and traj_file.endswith('.npz')
+        if not orientations_file and not is_npz:
+            raise ValueError('For shape: fibers, both trajectory_file and orientation_file are required.')
 
     # 8) Trajectory ID
     traj_id_req = cfg.get('traj_id') or cfg.get('traj_idx') or cfg.get('particle_id')
@@ -811,6 +828,8 @@ def cli_main():
     parser.add_argument('--images-folder', default=None, help='Path to images directory (overrides params file)')
     parser.add_argument('--out-dir', default=None, help='Output directory for MP4 and GIF')
     parser.add_argument('--save-name', default=None, help='Custom output filename prefix')
+    parser.add_argument('--traj-file', '--trajectory-file', dest='traj_file', default=None, help='Path to trajectory file')
+    parser.add_argument('--orientation-file', '--orientations-file', dest='orientation_file', default=None, help='Path to orientation file (fibers)')
     parser.add_argument('--f-start', type=int, default=None, help='Starting frame number')
     parser.add_argument('--f-end', type=int, default=None, help='Ending frame number')
 
@@ -818,6 +837,8 @@ def cli_main():
 
     render_trajectory_video_from_params(
         args.params_file,
+        trajectory_file=args.traj_file,
+        orientation_file=args.orientation_file,
         traj_id=args.traj_id,
         shape=args.shape,
         bbox_style=args.bbox_style,
