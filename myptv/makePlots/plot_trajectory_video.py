@@ -830,6 +830,7 @@ def cli_main():
     parser.add_argument('--save-name', default=None, help='Custom output filename prefix')
     parser.add_argument('--traj-file', '--trajectory-file', dest='traj_file', default=None, help='Path to trajectory file')
     parser.add_argument('--orientation-file', '--orientations-file', dest='orientation_file', default=None, help='Path to orientation file (fibers)')
+    parser.add_argument('--blob-files', default=None, help='Paths to 2D blob files')
     parser.add_argument('--f-start', type=int, default=None, help='Starting frame number')
     parser.add_argument('--f-end', type=int, default=None, help='Ending frame number')
 
@@ -839,6 +840,7 @@ def cli_main():
         args.params_file,
         trajectory_file=args.traj_file,
         orientation_file=args.orientation_file,
+        blob_files=args.blob_files,
         traj_id=args.traj_id,
         shape=args.shape,
         bbox_style=args.bbox_style,
